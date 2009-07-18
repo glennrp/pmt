@@ -3,6 +3,10 @@
 
 Change log:
 
+Version 1.7.0  (built with libpng-1.2.38 and zlib-1.2.3.2)
+  Save (but do not recompress) APNG chunks if the output file has the
+    ".apng" extension and the color_type and bit_depth are not changed.
+
 Version 1.6.20 (built with libpng-1.2.38 and zlib-1.2.3.2)
   Changed local variable "write" to "wwrite" in inffast.c (zlib) to avoid
     shadowed declaration warning.

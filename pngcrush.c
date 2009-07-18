@@ -57,7 +57,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.6.20"
+#define PNGCRUSH_VERSION "1.7.0"
 
 /*
 #define PNGCRUSH_COUNT_COLORS
@@ -153,11 +153,16 @@
  *   all chunks (and byte offsets?) and marking each as "keep" or "remove"
  *   according to args table.  Can start with static table of ~20-30 slots,
  *   then double size & copy if run out of room:  still O(n) algorithm.
+ *
  */
 
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.0  (built with libpng-1.2.38 and zlib-1.2.3.2)
+  Save (but do not recompress) APNG chunks if the output file has the
+    ".apng" extension and the color_type and bit_depth are not changed.
 
 Version 1.6.20 (built with libpng-1.2.38 and zlib-1.2.3.2)
   Changed local variable "write" to "wwrite" in inffast.c (zlib) to avoid
@@ -621,7 +626,10 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 
 #define PNG_IDAT const png_byte png_IDAT[5] = { 73,  68,  65,  84, '\0'}
 #define PNG_IHDR const png_byte png_IHDR[5] = { 73,  72,  68,  82, '\0'}
+#define PNG_acTL const png_byte png_acTL[5] = { 97,  99,  84,  76, '\0'}
 #define PNG_dSIG const png_byte png_dSIG[5] = {100,  83,  73,  71, '\0'}
+#define PNG_fcTL const png_byte png_fcTL[5] = {102,  99,  84,  76, '\0'}
+#define PNG_fdAT const png_byte png_fdAT[5] = {102, 100,  65,  84, '\0'}
 #define PNG_iCCP const png_byte png_iCCP[5] = {105,  67,  67,  80, '\0'}
 #define PNG_IEND const png_byte png_IEND[5] = { 73,  69,  78,  68, '\0'}
 
@@ -668,6 +676,21 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
                          ((png_uint_32)  66<< 8) | \
                          ((png_uint_32)  73    ))
 #endif
+
+#  define PNG_UINT_acTL (((png_uint_32)  97<<24) | \
+                         ((png_uint_32)  99<<16) | \
+                         ((png_uint_32)  84<< 8) | \
+                         ((png_uint_32)  76    ))
+
+#  define PNG_UINT_fcTL (((png_uint_32) 102<<24) | \
+                         ((png_uint_32)  99<<16) | \
+                         ((png_uint_32)  84<< 8) | \
+                         ((png_uint_32)  76    ))
+
+#  define PNG_UINT_fdAT (((png_uint_32) 102<<24) | \
+                         ((png_uint_32) 100<<16) | \
+                         ((png_uint_32)  65<< 8) | \
+                         ((png_uint_32)  84    ))
 
 #ifndef PNG_UINT_cHRM
 #  define PNG_UINT_cHRM (((png_uint_32)  99<<24) | \
@@ -950,6 +973,8 @@ static int found_cHRM = 0;
 #endif
 static int found_CgBI = 0;
 static int found_any_chunk = 0;
+static int save_apng_chunks = 0;
+static int found_acTL_chunk = 0;
 static int image_is_immutable = 0;
 static int pngcrush_must_exit = 0;
 static int all_chunks_are_safe = 0;
@@ -2900,6 +2925,14 @@ int main(int argc, char *argv[])
             outname = out_string;
         }
 
+        if ((outname[strlen(outname) - 4] == 'a') &&
+            (outname[strlen(outname) - 3] == 'p') &&
+            (outname[strlen(outname) - 2] == 'n') &&
+            (outname[strlen(outname) - 1] == 'g'))
+        {
+           /* Writing an APNG */
+           save_apng_chunks=1;
+        }
 
         if (nosave < 2) {
             P1( "Opening file %s for length measurement\n",
@@ -3356,14 +3389,40 @@ int main(int argc, char *argv[])
 #endif
 #if defined(PNG_WRITE_UNKNOWN_CHUNKS_SUPPORTED)
                 if (nosave == 0) {
+                    if (save_apng_chunks == 1)
+                    {
+                       png_set_keep_unknown_chunks(write_ptr,
+                                                PNG_HANDLE_CHUNK_ALWAYS,
+                                                (png_bytep) "acTL", 1);
+                       png_set_keep_unknown_chunks(write_ptr,
+                                                PNG_HANDLE_CHUNK_ALWAYS,
+                                                (png_bytep) "fcTL", 1);
+                       png_set_keep_unknown_chunks(write_ptr,
+                                                PNG_HANDLE_CHUNK_ALWAYS,
+                                                (png_bytep) "fdAT", 1);
+                    }
                     if (found_any_chunk == 1)
-                    png_set_keep_unknown_chunks(write_ptr,
+                       png_set_keep_unknown_chunks(write_ptr,
                                                 PNG_HANDLE_CHUNK_ALWAYS,
                                                 (png_bytep) "dSIG", 1);
                     if (all_chunks_are_safe)
+                    {
                         png_set_keep_unknown_chunks(write_ptr,
                                                     PNG_HANDLE_CHUNK_ALWAYS,
                                                     (png_bytep) NULL, 0);
+                        if (save_apng_chunks == 0)
+                        {
+                           png_set_keep_unknown_chunks(write_ptr,
+                                                PNG_HANDLE_CHUNK_ALWAYS,
+                                                (png_bytep) "acTL", 1);
+                           png_set_keep_unknown_chunks(write_ptr,
+                                                PNG_HANDLE_CHUNK_ALWAYS,
+                                                (png_bytep) "fcTL", 1);
+                           png_set_keep_unknown_chunks(write_ptr,
+                                                PNG_HANDLE_CHUNK_ALWAYS,
+                                                (png_bytep) "fdAT", 1);
+                        }
+                    }
                     else {
 #if !defined(PNG_cHRM_SUPPORTED) || !defined(PNG_hIST_SUPPORTED) || \
     !defined(PNG_iCCP_SUPPORTED) || !defined(PNG_sCAL_SUPPORTED) || \
@@ -3673,6 +3732,36 @@ int main(int argc, char *argv[])
                             png_set_shift(read_ptr, &true_bits);
                         }
 #endif
+                        if (save_apng_chunks != 0 || found_acTL_chunk != 0)
+                        {
+                           if (save_apng_chunks == 0)
+                           {
+                              if (verbose > 0) fprintf(STDERR,
+                              "   pngcrush will only save APNG chunks in an\n");
+                              if (verbose > 0) fprintf(STDERR,
+                              "   output file with the \".apng\" extension\n");
+                           }
+                           if (input_color_type != output_color_type)
+                           {
+                              if (verbose > 0) fprintf(STDERR,
+                              "   Cannot save APNG chunks with a color_type\n");
+                              if (verbose > 0) fprintf(STDERR,
+                              "   different from that of the main image.\n");
+                              save_apng_chunks = 0;
+                           }
+                           if (input_bit_depth != output_bit_depth)
+                           {
+                              if (verbose > 0) fprintf(STDERR,
+                              "   Cannot save APNG chunks with a bit_depth\n");
+                              if (verbose > 0) fprintf(STDERR,
+                              "   different from that of the main image.\n");
+                              save_apng_chunks = 0;
+                           }
+                           if (save_apng_chunks == 0)
+                              if (verbose > 0) fprintf(STDERR,
+                              "   **** Discarding all APNG chunks. ****\n");
+                              found_acTL_chunk = 0;
+                        }
 
                         if (verbose > 1)
                             fprintf(STDERR, "   Setting IHDR\n");
@@ -5304,6 +5393,7 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
         PNG_IDAT;
         PNG_IEND;
         PNG_IHDR;
+        PNG_acTL;
 #ifdef PNG_iCCP_SUPPORTED
         PNG_iCCP;
 #else
@@ -5311,6 +5401,8 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
 #endif
 #endif
 #endif
+        const png_byte png_acTL[5] = { 97,  99,  84,  76, '\0'};
+
         png_byte chunk_name[5];
         png_byte chunk_length[4];
         png_byte buff[32];
@@ -5399,6 +5491,9 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
             }
         }
 
+        else if (!png_memcmp(chunk_name, png_acTL, 4)) {
+           found_acTL_chunk = 1;
+        }
         else {
 #ifdef PNG_UINT_IDAT
         if (png_get_uint_32(chunk_name) == PNG_UINT_IDAT)
@@ -6398,13 +6493,17 @@ struct options_help pngcrush_options[] = {
     {2, ""},
 #endif
 
-    {0, "         -save (keep all copy-unsafe chunks)"},
+    {0, "         -save (keep all copy-unsafe PNG chunks)"},
     {2, ""},
     {2, "               Save otherwise unknown ancillary chunks that would"},
     {2, "               be considered copy-unsafe.  This option makes"},
     {2, "               chunks 'known' to pngcrush, so they can be copied."},
     {2, "               It also causes the dSIG chunk to be saved, even when"},
     {2, "               it becomes invalid due to datastream changes."},
+    {2, "               This option does not affect APNG chunks. These"},
+    {2, "               chunks (acTL, fcTL, and fdAT) will be saved only"},
+    {2, "               if the output file has the \".apng\" extension"},
+    {2, "               and the color_type and bit_depth are not changed."},
     {2, ""},
 
     {0, FAKE_PAUSE_STRING},
