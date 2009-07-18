@@ -57,7 +57,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.0"
+#define PNGCRUSH_VERSION "1.7.1"
 
 /*
 #define PNGCRUSH_COUNT_COLORS
@@ -159,6 +159,10 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.1  (built with libpng-1.2.38 and zlib-1.2.3.2)
+  Revised some prototypes to eliminate "Shadowed Declaration" warnings.
+  Moved warning about discarding APNG chunks to the end.
 
 Version 1.7.0  (built with libpng-1.2.38 and zlib-1.2.3.2)
   Save (but do not recompress) APNG chunks if the output file has the
@@ -677,6 +681,7 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
                          ((png_uint_32)  73    ))
 #endif
 
+/* glennrp added acTL, fcTL, and fdAt at pngcrush-1.7.0 */
 #  define PNG_UINT_acTL (((png_uint_32)  97<<24) | \
                          ((png_uint_32)  99<<16) | \
                          ((png_uint_32)  84<< 8) | \
@@ -973,8 +978,8 @@ static int found_cHRM = 0;
 #endif
 static int found_CgBI = 0;
 static int found_any_chunk = 0;
-static int save_apng_chunks = 0;
-static int found_acTL_chunk = 0;
+static int save_apng_chunks = 0; /* 0: output not .apng 1: .apng 2: rejected */
+static int found_acTL_chunk = 0; /* 0: not found, 1: found, 2: rejected */
 static int image_is_immutable = 0;
 static int pngcrush_must_exit = 0;
 static int all_chunks_are_safe = 0;
@@ -1110,7 +1115,7 @@ static png_infop read_info_ptr, write_info_ptr;
 static png_infop end_info_ptr;
 static png_infop write_end_info_ptr;
 static FILE *fpin, *fpout, *mng_out;
-png_uint_32 measure_idats(FILE * fpin);
+png_uint_32 measure_idats(FILE * fp);
 #ifdef PNGCRUSH_LOCO
 static int do_loco = 0;
 static int input_format = 0;    /* 0: PNG  1: MNG */
@@ -1136,7 +1141,7 @@ int ia;
 
 
 /* prototypes */
-static void png_cexcept_error(png_structp png_ptr, png_const_charp msg);
+static void png_cexcept_error(png_structp png_ptr, png_const_charp message);
 
 void PNGAPI png_default_read_data(png_structp png_ptr, png_bytep data,
   png_size_t length);
@@ -1171,7 +1176,7 @@ static void setfiletype(const char *name)
 int keep_unknown_chunk(png_const_charp name, char *argv[]);
 int keep_chunk(png_const_charp name, char *argv[]);
 void show_result(void);
-png_uint_32 measure_idats(FILE * fpin);
+png_uint_32 measure_idats(FILE * fp);
 png_uint_32 png_measure_idat(png_structp png_ptr);
 
 #ifdef PNGCRUSH_COUNT_COLORS
@@ -2101,6 +2106,9 @@ void show_result(void)
         }
     }
 #endif
+    if (found_acTL_chunk == 2)
+      if (verbose > 0) fprintf(STDERR,
+      "   **** Discarded APNG chunks. ****\n");
 }
 
 
@@ -3732,7 +3740,7 @@ int main(int argc, char *argv[])
                             png_set_shift(read_ptr, &true_bits);
                         }
 #endif
-                        if (save_apng_chunks != 0 || found_acTL_chunk != 0)
+                        if (save_apng_chunks == 1 || found_acTL_chunk == 1)
                         {
                            if (save_apng_chunks == 0)
                            {
@@ -3747,7 +3755,7 @@ int main(int argc, char *argv[])
                               "   Cannot save APNG chunks with a color_type\n");
                               if (verbose > 0) fprintf(STDERR,
                               "   different from that of the main image.\n");
-                              save_apng_chunks = 0;
+                              save_apng_chunks = 2;
                            }
                            if (input_bit_depth != output_bit_depth)
                            {
@@ -3755,12 +3763,10 @@ int main(int argc, char *argv[])
                               "   Cannot save APNG chunks with a bit_depth\n");
                               if (verbose > 0) fprintf(STDERR,
                               "   different from that of the main image.\n");
-                              save_apng_chunks = 0;
+                              save_apng_chunks = 2;
                            }
-                           if (save_apng_chunks == 0)
-                              if (verbose > 0) fprintf(STDERR,
-                              "   **** Discarding all APNG chunks. ****\n");
-                              found_acTL_chunk = 0;
+                           if (save_apng_chunks != 1 && found_acTL_chunk == 1)
+                              found_acTL_chunk = 2;
                         }
 
                         if (verbose > 1)
