@@ -16,8 +16,8 @@
 
 CC = gcc
 LD = gcc
-# CC = /usr/local/bin/gcc-4.3.3
-# LD = /usr/local/bin/gcc-4.3.3
+# CC = /usr/local/bin/gcc-4.4.1
+# LD = /usr/local/bin/gcc-4.4.1
 RM = rm -f
 #CFLAGS = -I. -O -Wall
 #CFLAGS = -I. -O3 -fomit-frame-pointer -Wall
