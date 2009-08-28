@@ -57,7 +57,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.1"
+#define PNGCRUSH_VERSION "1.7.2"
 
 /*
 #define PNGCRUSH_COUNT_COLORS
@@ -160,7 +160,9 @@
 
 Change log:
 
-Version 1.7.1  (built with libpng-1.2.40beta02 and zlib-1.2.3.2)
+Version 1.7.2  (built with libpng-1.2.40beta02 and zlib-1.2.3.2)
+
+Version 1.7.1  (built with libpng-1.2.39 and zlib-1.2.3.2)
   Revised some prototypes to eliminate "Shadowed Declaration" warnings.
   Moved warning about discarding APNG chunks to the end.
   Replaced *.tar.lzma with *.tar.xz in the distribution.
