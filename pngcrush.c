@@ -161,6 +161,7 @@
 Change log:
 
 Version 1.7.2  (built with libpng-1.2.40beta02 and zlib-1.2.3.2)
+  Added check for "verbose" on some printf statements.
 
 Version 1.7.1  (built with libpng-1.2.39 and zlib-1.2.3.2)
   Revised some prototypes to eliminate "Shadowed Declaration" warnings.
@@ -1834,8 +1835,9 @@ void png_skip_chunk(png_structp png_ptr)
   length=buff[3]+(buff[2]<<8)+(buff[1]<<16)+(buff[0]<<24);
   /* read the chunk name */
   png_default_read_data(png_ptr, buff, 4);
-  printf("Skipping %c%c%c%c chunk.\n",buff[0],buff[1],
-    buff[2],buff[3]);
+  if (verbose > 0)
+    printf("Skipping %c%c%c%c chunk.\n",buff[0],buff[1],
+      buff[2],buff[3]);
   /* skip the data */
   for (i=0; i<length; i++)
      png_default_read_data(png_ptr, buff, 1);
@@ -2112,8 +2114,9 @@ void show_result(void)
     }
 #endif
     if (found_acTL_chunk == 2)
-      if (verbose > 0) fprintf(STDERR,
-      "   **** Discarded APNG chunks. ****\n");
+      if (verbose > 0)
+        fprintf(STDERR,
+        "   **** Discarded APNG chunks. ****\n");
 }
 
 
@@ -4205,7 +4208,7 @@ int main(int argc, char *argv[])
 #endif
                         {
                             things_have_changed = 1;
-                            if (first_trial)
+                            if (verbose > 0 && first_trial)
                                 fprintf(STDERR,
                                   "   Inserting sRGB chunk with intent=%d\n",
                                   intent);
@@ -4214,7 +4217,7 @@ int main(int argc, char *argv[])
                         }
                         else if (file_gamma != 0)
                         {
-                            if (first_trial)
+                            if (verbose > 0 && first_trial)
                             {
                                 fprintf(STDERR, "   Ignoring sRGB request; "
 #ifdef PNG_FIXED_POINT_SUPPORTED
@@ -4368,7 +4371,7 @@ int main(int argc, char *argv[])
                         (read_ptr, read_info_ptr, &trans, &num_trans,
                          &trans_values))
                     {
-                        if (verbose > 1)
+                        if (verbose > 1 && first_trial)
                             fprintf(STDERR,
                               "  Found tRNS chunk in input file.\n");
                         if (have_trns == 1)
@@ -4703,16 +4706,19 @@ int main(int argc, char *argv[])
                                     text_compression[ntext];
                                 png_set_text(write_ptr, write_info_ptr,
                                              added_text, 1);
-                                if (added_text[0].compression < 0)
-                                    printf("   Added a tEXt chunk.\n");
-                                else if (added_text[0].compression == 0)
-                                    printf("   Added a zTXt chunk.\n");
+                                if (verbose > 0 && first_trial)
+                                {
+                                  if (added_text[0].compression < 0)
+                                      printf("   Added a tEXt chunk.\n");
+                                  else if (added_text[0].compression == 0)
+                                      printf("   Added a zTXt chunk.\n");
 #ifdef PNG_iTXt_SUPPORTED
-                                else
-                                    printf("   Added a%scompressed iTXt chunk"
-                                      ".\n", (added_text[0].compression == 1)?
-                                      "n un" : " ");
+                                  else
+                                      printf("   Added a%scompressed iTXt chunk"
+                                        ".\n", (added_text[0].compression == 1)?
+                                        "n un" : " ");
 #endif
+                                }
                                 png_free(write_ptr, added_text);
                                 added_text = (png_textp) NULL;
                             }
@@ -5185,7 +5191,7 @@ int main(int argc, char *argv[])
                 {
                     png_byte rgb_error =
                         png_get_rgb_to_gray_status(read_ptr);
-                    if ((first_trial) && rgb_error)
+                    if (first_trial && verbose > 0 && rgb_error)
                         printf(
                           "   **** Converted non-gray image to gray. **** \n");
                 }
@@ -5322,18 +5328,22 @@ int main(int argc, char *argv[])
                                     text_compression[ntext];
                                 png_set_text(write_ptr, write_end_info_ptr,
                                              added_text, 1);
-                                if (added_text[0].compression < 0)
-                                    printf("   Added a tEXt chunk.\n");
-                                else if (added_text[0].compression == 0)
-                                    printf("   Added a zTXt chunk.\n");
+  
+                                if (verbose > 0 && first_trial)
+                                {
+                                  if (added_text[0].compression < 0)
+                                      printf("   Added a tEXt chunk.\n");
+                                  else if (added_text[0].compression == 0)
+                                      printf("   Added a zTXt chunk.\n");
 #ifdef PNG_iTXt_SUPPORTED
-                                else if (added_text[0].compression == 1)
-                                    printf("   Added an uncompressed iTXt "
-                                      "chunk.\n");
-                                else
-                                    printf("   Added a compressed iTXt "
-                                      "chunk.\n");
+                                  else if (added_text[0].compression == 1)
+                                      printf("   Added an uncompressed iTXt "
+                                        "chunk.\n");
+                                  else
+                                      printf("   Added a compressed iTXt "
+                                        "chunk.\n");
 #endif
+                                }
                                 png_free(write_ptr, added_text);
                                 added_text = (png_textp) NULL;
                             }
@@ -5678,8 +5688,9 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
             png_default_read_data(read_ptr, buff, 4);
             length=buff[3]+(buff[2]<<8)+(buff[1]<<16)+(buff[0]<<24);
             png_default_read_data(read_ptr, buff, 4);
-            printf("Reading %c%c%c%c chunk.\n",buff[0],buff[1],
-              buff[2],buff[3]);
+            if (verbose > 0)
+              printf("Reading %c%c%c%c chunk.\n",buff[0],buff[1],
+                buff[2],buff[3]);
             for (b=0; b<40; b++)
               buff[b]='\0';
             png_default_read_data(read_ptr, buff, length);
@@ -5775,22 +5786,25 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
           if (!png_memcmp(chunk_name, png_nEED, 4))
           {
               /* Skip the nEED chunk */
-              printf ("  skipping MNG %c%c%c%c chunk, %lu bytes\n",
-                chunk_name[0],
-                chunk_name[1],chunk_name[2],chunk_name[3],
-                (unsigned long)length);
+              if (verbose > 0)
+                printf ("  skipping MNG %c%c%c%c chunk, %lu bytes\n",
+                  chunk_name[0],
+                  chunk_name[1],chunk_name[2],chunk_name[3],
+                  (unsigned long)length);
           }
           else
           {
               /* copy the chunk. */
-              printf ("  reading MNG %c%c%c%c chunk, %lu bytes\n",
-                 chunk_name[0],
-                 chunk_name[1],chunk_name[2],chunk_name[3],
-                 (unsigned long)length);
+              if (verbose > 0)
+                printf ("  reading MNG %c%c%c%c chunk, %lu bytes\n",
+                   chunk_name[0],
+                   chunk_name[1],chunk_name[2],chunk_name[3],
+                   (unsigned long)length);
               if (length > malloced_length)
               {
                   png_free(mng_ptr,bb);
-                  printf ("  png_malloc %lu bytes.\n",(unsigned long)length);
+                  if (verbose > 0)
+                    printf ("  png_malloc %lu bytes.\n",(unsigned long)length);
                   bb=(png_byte*)png_malloc(mng_ptr, length);
                   malloced_length=length;
               }
