@@ -160,7 +160,7 @@
 
 Change log:
 
-Version 1.7.2  (built with libpng-1.2.40beta02 and zlib-1.2.3.2)
+Version 1.7.2  (built with libpng-1.2.40and zlib-1.2.3.2)
   Added check for "verbose" on some printf statements.
 
 Version 1.7.1  (built with libpng-1.2.39 and zlib-1.2.3.2)

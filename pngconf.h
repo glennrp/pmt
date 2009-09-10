@@ -1,9 +1,10 @@
 
 /* pngconf.h - machine configurable file for libpng
  *
- * This code is released under the libpng license.
- * For conditions of distribution and use, see the disclaimer
- * and license in png.h
+ * libpng version 1.2.40 - September 10, 2009
+ * Copyright (c) 1998-2009 Glenn Randers-Pehrson
+ * (Version 0.96 Copyright (c) 1996, 1997 Andreas Dilger)
+ * (Version 0.88 Copyright (c) 1995, 1996 Guy Eric Schalnat, Group 42, Inc.)
  *
  * This file has been modified, by Glenn Randers-Pehrson, from the original
  * libpng distribution by adding a line reading
