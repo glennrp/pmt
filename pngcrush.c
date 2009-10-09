@@ -57,7 +57,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.2"
+#define PNGCRUSH_VERSION "1.7.3"
 
 /*
 #define PNGCRUSH_COUNT_COLORS
@@ -160,7 +160,12 @@
 
 Change log:
 
-Version 1.7.2  (built with libpng-1.2.40and zlib-1.2.3.2)
+Version 1.7.3  (built with libpng-1.2.40 and zlib-1.2.3.2)
+  Print contents of text chunks after IDAT, even when the -n option
+    is used.  This requires a slight modification of pngconf.h,
+    when libpng-1.2.x is used.
+
+Version 1.7.2  (built with libpng-1.2.40 and zlib-1.2.3.2)
   Added check for "verbose" on some printf statements.
 
 Version 1.7.1  (built with libpng-1.2.39 and zlib-1.2.3.2)
@@ -3677,6 +3682,15 @@ int main(int argc, char *argv[])
                                                     chunk_name, 1);
                         }
 #endif
+#if !defined(PNG_iTXt_SUPPORTED)
+                        if (keep_unknown_chunk("iTXt", argv))
+                        {
+                            png_save_uint_32(chunk_name, PNG_UINT_iTXt);
+                            png_set_keep_unknown_chunks(write_ptr,
+                                                    PNG_HANDLE_CHUNK_ALWAYS,
+                                                    chunk_name, 1);
+                        }
+#endif
 #if !defined(PNG_sCAL_SUPPORTED)
                         if (keep_unknown_chunk("sCAL", argv))
                         {
@@ -4614,7 +4628,7 @@ int main(int argc, char *argv[])
                         || text_inputs)
                     {
                         int ntext;
-                        P1( "Handling %d tEXt/zTXt chunks\n",
+                        P1( "Handling %d tEXt/zTXt chunks before IDAT\n",
                                    num_text);
 
                         if (verbose > 1 && first_trial && num_text > 0)
@@ -5218,20 +5232,30 @@ int main(int argc, char *argv[])
                 /* { GRR:  added for %-navigation (2) */
 
 #if (defined(PNG_READ_tEXt_SUPPORTED) && defined(PNG_WRITE_tEXt_SUPPORTED)) \
+ || (defined(PNG_READ_iTXt_SUPPORTED) && defined(PNG_WRITE_iTXt_SUPPORTED)) \
  || (defined(PNG_READ_zTXt_SUPPORTED) && defined(PNG_WRITE_zTXt_SUPPORTED))
                 {
                     png_textp text_ptr;
                     int num_text = 0;
+
+P1("whoopee.\n");
 
                     if (png_get_text
                         (read_ptr, end_info_ptr, &text_ptr, &num_text) > 0
                         || text_inputs)
                     {
                         int ntext;
-                        P1( "Handling %d tEXt/zTXt chunks\n",
+P1("again.\n");
+
+#ifdef PNG_iTXt_SUPPORTED
+                        P1( "Handling %d tEXt/zTXt/iTXt chunks after IDAT\n",
+#else
+                        P1( "Handling %d tEXt/zTXt chunks after IDAT\n",
+#endif
                                    num_text);
 
-                        if (verbose > 1 && first_trial && num_text > 0)
+                        if (verbose > 1 && (!nosave || first_trial) &&
+                            num_text > 0)
                         {
                             for (ntext = 0; ntext < num_text; ntext++)
                             {
@@ -5352,6 +5376,7 @@ int main(int argc, char *argv[])
                     }
                 }
 #endif /* (PNG_READ_tEXt_SUPPORTED and PNG_WRITE_tEXt_SUPPORTED) or */
+       /* (PNG_READ_iTXt_SUPPORTED and PNG_WRITE_iTXt_SUPPORTED) or */
        /* (PNG_READ_zTXt_SUPPORTED and PNG_WRITE_zTXt_SUPPORTED) */
 #if defined(PNG_READ_tIME_SUPPORTED) && defined(PNG_WRITE_tIME_SUPPORTED)
                 {

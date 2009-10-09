@@ -1,14 +1,14 @@
 
 /* pngconf.h - machine configurable file for libpng
  *
- * libpng version 1.2.40 - September 10, 2009
- * Copyright (c) 1998-2009 Glenn Randers-Pehrson
- * (Version 0.96 Copyright (c) 1996, 1997 Andreas Dilger)
- * (Version 0.88 Copyright (c) 1995, 1996 Guy Eric Schalnat, Group 42, Inc.)
+ * This code is released under the libpng license.
+ * For conditions of distribution and use, see the disclaimer
+ * and license in png.h
  *
  * This file has been modified, by Glenn Randers-Pehrson, from the original
  * libpng distribution by adding a line reading
  * #include "pngcrush.h"
+ * and by making it possible to enable iTXt support.
  */
 
 /* Any machine specific code is near the front of this file, so if you
@@ -20,9 +20,9 @@
 #ifndef PNGCONF_H
 #define PNGCONF_H
 
-#define PNG_1_2_X
-
 #include "pngcrush.h"
+
+#define PNG_1_2_X
 
 /*
  * PNG_USER_CONFIG has to be defined on the compiler command line. This
@@ -495,6 +495,7 @@
  * will be turned on by default in libpng-1.4.0.
  */
 
+#ifndef PNG_iTXt_SUPPORTED
 #if defined(PNG_1_0_X) || defined (PNG_1_2_X)
 #  ifndef PNG_NO_iTXt_SUPPORTED
 #    define PNG_NO_iTXt_SUPPORTED
@@ -505,6 +506,7 @@
 #  ifndef PNG_NO_WRITE_iTXt
 #    define PNG_NO_WRITE_iTXt
 #  endif
+#endif
 #endif
 
 #if !defined(PNG_NO_iTXt_SUPPORTED)
