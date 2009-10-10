@@ -8,7 +8,6 @@
  * This file has been modified, by Glenn Randers-Pehrson, from the original
  * libpng distribution by adding a line reading
  * #include "pngcrush.h"
- * and by making it possible to enable iTXt support.
  */
 
 /* Any machine specific code is near the front of this file, so if you
@@ -20,9 +19,9 @@
 #ifndef PNGCONF_H
 #define PNGCONF_H
 
-#include "pngcrush.h"
-
 #define PNG_1_2_X
+
+#include "pngcrush.h"
 
 /*
  * PNG_USER_CONFIG has to be defined on the compiler command line. This
@@ -495,18 +494,18 @@
  * will be turned on by default in libpng-1.4.0.
  */
 
-#ifndef PNG_iTXt_SUPPORTED
 #if defined(PNG_1_0_X) || defined (PNG_1_2_X)
-#  ifndef PNG_NO_iTXt_SUPPORTED
-#    define PNG_NO_iTXt_SUPPORTED
+#  ifndef PNG_iTXt_SUPPORTED
+#    ifndef PNG_NO_iTXt_SUPPORTED
+#      define PNG_NO_iTXt_SUPPORTED
+#    endif
+#    ifndef PNG_NO_READ_iTXt
+#      define PNG_NO_READ_iTXt
+#    endif
+#    ifndef PNG_NO_WRITE_iTXt
+#      define PNG_NO_WRITE_iTXt
+#    endif
 #  endif
-#  ifndef PNG_NO_READ_iTXt
-#    define PNG_NO_READ_iTXt
-#  endif
-#  ifndef PNG_NO_WRITE_iTXt
-#    define PNG_NO_WRITE_iTXt
-#  endif
-#endif
 #endif
 
 #if !defined(PNG_NO_iTXt_SUPPORTED)
@@ -791,6 +790,7 @@
 #endif
 /* end of obsolete code to be removed from libpng-1.4.0 */
 
+/* Added at libpng-1.2.0 */
 #if !defined(PNG_1_0_X)
 #if !defined(PNG_NO_USER_MEM) && !defined(PNG_USER_MEM_SUPPORTED)
 #  define PNG_USER_MEM_SUPPORTED
@@ -798,12 +798,12 @@
 #endif /* PNG_1_0_X */
 
 /* Added at libpng-1.2.6 */
-#if !defined(PNG_1_0_X)
-#ifndef PNG_SET_USER_LIMITS_SUPPORTED
-#if !defined(PNG_NO_SET_USER_LIMITS) && !defined(PNG_SET_USER_LIMITS_SUPPORTED)
-#  define PNG_SET_USER_LIMITS_SUPPORTED
-#endif
-#endif
+#ifndef PNG_1_0_X
+#  ifndef PNG_SET_USER_LIMITS_SUPPORTED
+#    ifndef PNG_NO_SET_USER_LIMITS
+#      define PNG_SET_USER_LIMITS_SUPPORTED
+#    endif
+#  endif
 #endif /* PNG_1_0_X */
 
 /* Added at libpng-1.0.16 and 1.2.6.  To accept all valid PNGS no matter

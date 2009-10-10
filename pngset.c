@@ -1,7 +1,7 @@
 
 /* pngset.c - storage of image information into info struct
  *
- * Last changed in libpng 1.2.40 [September 10, 2009]
+ * Last changed in libpng 1.2.41 [October 10, 2009]
  * Copyright (c) 1998-2009 Glenn Randers-Pehrson
  * (Version 0.96 Copyright (c) 1996, 1997 Andreas Dilger)
  * (Version 0.88 Copyright (c) 1995, 1996 Guy Eric Schalnat, Group 42, Inc.)
@@ -20,7 +20,7 @@
 #include "png.h"
 #if defined(PNG_READ_SUPPORTED) || defined(PNG_WRITE_SUPPORTED)
 
-#if defined(PNG_bKGD_SUPPORTED)
+#ifdef PNG_bKGD_SUPPORTED
 void PNGAPI
 png_set_bKGD(png_structp png_ptr, png_infop info_ptr, png_color_16p background)
 {
@@ -34,7 +34,7 @@ png_set_bKGD(png_structp png_ptr, png_infop info_ptr, png_color_16p background)
 }
 #endif
 
-#if defined(PNG_cHRM_SUPPORTED)
+#ifdef PNG_cHRM_SUPPORTED
 #ifdef PNG_FLOATING_POINT_SUPPORTED
 void PNGAPI
 png_set_cHRM(png_structp png_ptr, png_infop info_ptr,
@@ -80,7 +80,7 @@ png_set_cHRM_fixed(png_structp png_ptr, png_infop info_ptr,
    if (png_ptr == NULL || info_ptr == NULL)
       return;
 
-#if !defined(PNG_NO_CHECK_cHRM)
+#ifndef PNG_NO_CHECK_cHRM
    if (png_check_cHRM_fixed(png_ptr,
       white_x, white_y, red_x, red_y, green_x, green_y, blue_x, blue_y))
 #endif
@@ -109,7 +109,7 @@ png_set_cHRM_fixed(png_structp png_ptr, png_infop info_ptr,
 #endif /* PNG_FIXED_POINT_SUPPORTED */
 #endif /* PNG_cHRM_SUPPORTED */
 
-#if defined(PNG_gAMA_SUPPORTED)
+#ifdef PNG_gAMA_SUPPORTED
 #ifdef PNG_FLOATING_POINT_SUPPORTED
 void PNGAPI
 png_set_gAMA(png_structp png_ptr, png_infop info_ptr, double file_gamma)
@@ -176,7 +176,7 @@ png_set_gAMA_fixed(png_structp png_ptr, png_infop info_ptr, png_fixed_point
 }
 #endif
 
-#if defined(PNG_hIST_SUPPORTED)
+#ifdef PNG_hIST_SUPPORTED
 void PNGAPI
 png_set_hIST(png_structp png_ptr, png_infop info_ptr, png_uint_16p hist)
 {
@@ -233,82 +233,18 @@ png_set_IHDR(png_structp png_ptr, png_infop info_ptr,
    if (png_ptr == NULL || info_ptr == NULL)
       return;
 
-   /* Check for width and height valid values */
-   if (width == 0 || height == 0)
-      png_error(png_ptr, "Image width or height is zero in IHDR");
-#ifdef PNG_SET_USER_LIMITS_SUPPORTED
-   if (width > png_ptr->user_width_max || height > png_ptr->user_height_max)
-      png_error(png_ptr, "image size exceeds user limits in IHDR");
-#else
-   if (width > PNG_USER_WIDTH_MAX || height > PNG_USER_HEIGHT_MAX)
-      png_error(png_ptr, "image size exceeds user limits in IHDR");
-#endif
-   if (width > PNG_UINT_31_MAX || height > PNG_UINT_31_MAX)
-      png_error(png_ptr, "Invalid image size in IHDR");
-   if ( width > (PNG_UINT_32_MAX
-                 >> 3)      /* 8-byte RGBA pixels */
-                 - 64       /* bigrowbuf hack */
-                 - 1        /* filter byte */
-                 - 7*8      /* rounding of width to multiple of 8 pixels */
-                 - 8)       /* extra max_pixel_depth pad */
-      png_warning(png_ptr, "Width is too large for libpng to process pixels");
-
-   /* Check other values */
-   if (bit_depth != 1 && bit_depth != 2 && bit_depth != 4 &&
-       bit_depth != 8 && bit_depth != 16)
-      png_error(png_ptr, "Invalid bit depth in IHDR");
-
-   if (color_type < 0 || color_type == 1 ||
-       color_type == 5 || color_type > 6)
-      png_error(png_ptr, "Invalid color type in IHDR");
-
-   if (((color_type == PNG_COLOR_TYPE_PALETTE) && bit_depth > 8) ||
-       ((color_type == PNG_COLOR_TYPE_RGB ||
-         color_type == PNG_COLOR_TYPE_GRAY_ALPHA ||
-         color_type == PNG_COLOR_TYPE_RGB_ALPHA) && bit_depth < 8))
-      png_error(png_ptr, "Invalid color type/bit depth combination in IHDR");
-
-   if (interlace_type >= PNG_INTERLACE_LAST)
-      png_error(png_ptr, "Unknown interlace method in IHDR");
-
-   if (compression_type != PNG_COMPRESSION_TYPE_BASE)
-      png_error(png_ptr, "Unknown compression method in IHDR");
-
-#if defined(PNG_MNG_FEATURES_SUPPORTED)
-   /* Accept filter_method 64 (intrapixel differencing) only if
-    * 1. Libpng was compiled with PNG_MNG_FEATURES_SUPPORTED and
-    * 2. Libpng did not read a PNG signature (this filter_method is only
-    *    used in PNG datastreams that are embedded in MNG datastreams) and
-    * 3. The application called png_permit_mng_features with a mask that
-    *    included PNG_FLAG_MNG_FILTER_64 and
-    * 4. The filter_method is 64 and
-    * 5. The color_type is RGB or RGBA
-    */
-   if ((png_ptr->mode&PNG_HAVE_PNG_SIGNATURE)&&png_ptr->mng_features_permitted)
-      png_warning(png_ptr, "MNG features are not allowed in a PNG datastream");
-   if (filter_type != PNG_FILTER_TYPE_BASE)
-   {
-     if (!((png_ptr->mng_features_permitted & PNG_FLAG_MNG_FILTER_64) &&
-         (filter_type == PNG_INTRAPIXEL_DIFFERENCING) &&
-         ((png_ptr->mode&PNG_HAVE_PNG_SIGNATURE) == 0) &&
-         (color_type == PNG_COLOR_TYPE_RGB ||
-         color_type == PNG_COLOR_TYPE_RGB_ALPHA)))
-        png_error(png_ptr, "Unknown filter method in IHDR");
-     if (png_ptr->mode&PNG_HAVE_PNG_SIGNATURE)
-        png_warning(png_ptr, "Invalid filter method in IHDR");
-   }
-#else
-   if (filter_type != PNG_FILTER_TYPE_BASE)
-      png_error(png_ptr, "Unknown filter method in IHDR");
-#endif
-
    info_ptr->width = width;
    info_ptr->height = height;
    info_ptr->bit_depth = (png_byte)bit_depth;
-   info_ptr->color_type =(png_byte) color_type;
+   info_ptr->color_type = (png_byte)color_type;
    info_ptr->compression_type = (png_byte)compression_type;
    info_ptr->filter_type = (png_byte)filter_type;
    info_ptr->interlace_type = (png_byte)interlace_type;
+
+   png_check_IHDR (png_ptr, info_ptr->width, info_ptr->height,
+       info_ptr->bit_depth, info_ptr->color_type, info_ptr->interlace_type,
+       info_ptr->compression_type, info_ptr->filter_type);
+
    if (info_ptr->color_type == PNG_COLOR_TYPE_PALETTE)
       info_ptr->channels = 1;
    else if (info_ptr->color_type & PNG_COLOR_MASK_COLOR)
@@ -331,7 +267,7 @@ png_set_IHDR(png_structp png_ptr, png_infop info_ptr,
       info_ptr->rowbytes = PNG_ROWBYTES(info_ptr->pixel_depth, width);
 }
 
-#if defined(PNG_oFFs_SUPPORTED)
+#ifdef PNG_oFFs_SUPPORTED
 void PNGAPI
 png_set_oFFs(png_structp png_ptr, png_infop info_ptr,
    png_int_32 offset_x, png_int_32 offset_y, int unit_type)
@@ -348,7 +284,7 @@ png_set_oFFs(png_structp png_ptr, png_infop info_ptr,
 }
 #endif
 
-#if defined(PNG_pCAL_SUPPORTED)
+#ifdef PNG_pCAL_SUPPORTED
 void PNGAPI
 png_set_pCAL(png_structp png_ptr, png_infop info_ptr,
    png_charp purpose, png_int_32 X0, png_int_32 X1, int type, int nparams,
@@ -487,7 +423,7 @@ png_set_sCAL_s(png_structp png_ptr, png_infop info_ptr,
 #endif
 #endif
 
-#if defined(PNG_pHYs_SUPPORTED)
+#ifdef PNG_pHYs_SUPPORTED
 void PNGAPI
 png_set_pHYs(png_structp png_ptr, png_infop info_ptr,
    png_uint_32 res_x, png_uint_32 res_y, int unit_type)
@@ -555,7 +491,7 @@ png_set_PLTE(png_structp png_ptr, png_infop info_ptr,
    info_ptr->valid |= PNG_INFO_PLTE;
 }
 
-#if defined(PNG_sBIT_SUPPORTED)
+#ifdef PNG_sBIT_SUPPORTED
 void PNGAPI
 png_set_sBIT(png_structp png_ptr, png_infop info_ptr,
    png_color_8p sig_bit)
@@ -570,7 +506,7 @@ png_set_sBIT(png_structp png_ptr, png_infop info_ptr,
 }
 #endif
 
-#if defined(PNG_sRGB_SUPPORTED)
+#ifdef PNG_sRGB_SUPPORTED
 void PNGAPI
 png_set_sRGB(png_structp png_ptr, png_infop info_ptr, int intent)
 {
@@ -587,7 +523,7 @@ void PNGAPI
 png_set_sRGB_gAMA_and_cHRM(png_structp png_ptr, png_infop info_ptr,
    int intent)
 {
-#if defined(PNG_gAMA_SUPPORTED)
+#ifdef PNG_gAMA_SUPPORTED
 #ifdef PNG_FLOATING_POINT_SUPPORTED
    float file_gamma;
 #endif
@@ -595,7 +531,7 @@ png_set_sRGB_gAMA_and_cHRM(png_structp png_ptr, png_infop info_ptr,
    png_fixed_point int_file_gamma;
 #endif
 #endif
-#if defined(PNG_cHRM_SUPPORTED)
+#ifdef PNG_cHRM_SUPPORTED
 #ifdef PNG_FLOATING_POINT_SUPPORTED
    float white_x, white_y, red_x, red_y, green_x, green_y, blue_x, blue_y;
 #endif
@@ -609,7 +545,7 @@ png_set_sRGB_gAMA_and_cHRM(png_structp png_ptr, png_infop info_ptr,
 
    png_set_sRGB(png_ptr, info_ptr, intent);
 
-#if defined(PNG_gAMA_SUPPORTED)
+#ifdef PNG_gAMA_SUPPORTED
 #ifdef PNG_FLOATING_POINT_SUPPORTED
    file_gamma = (float).45455;
    png_set_gAMA(png_ptr, info_ptr, file_gamma);
@@ -620,7 +556,7 @@ png_set_sRGB_gAMA_and_cHRM(png_structp png_ptr, png_infop info_ptr,
 #endif
 #endif
 
-#if defined(PNG_cHRM_SUPPORTED)
+#ifdef PNG_cHRM_SUPPORTED
    int_white_x = 31270L;
    int_white_y = 32900L;
    int_red_x   = 64000L;
@@ -641,28 +577,21 @@ png_set_sRGB_gAMA_and_cHRM(png_structp png_ptr, png_infop info_ptr,
    blue_y  = (float).06;
 #endif
 
-#if !defined(PNG_NO_CHECK_cHRM)
-   if (png_check_cHRM_fixed(png_ptr,
-       int_white_x, int_white_y, int_red_x, int_red_y, int_green_x,
-       int_green_y, int_blue_x, int_blue_y))
-#endif
-   {
 #ifdef PNG_FIXED_POINT_SUPPORTED
-      png_set_cHRM_fixed(png_ptr, info_ptr,
-          int_white_x, int_white_y, int_red_x, int_red_y, int_green_x,
-          int_green_y, int_blue_x, int_blue_y);
+   png_set_cHRM_fixed(png_ptr, info_ptr,
+       int_white_x, int_white_y, int_red_x, int_red_y, int_green_x,
+       int_green_y, int_blue_x, int_blue_y);
 #endif
 #ifdef PNG_FLOATING_POINT_SUPPORTED
-      png_set_cHRM(png_ptr, info_ptr,
-          white_x, white_y, red_x, red_y, green_x, green_y, blue_x, blue_y);
+   png_set_cHRM(png_ptr, info_ptr,
+       white_x, white_y, red_x, red_y, green_x, green_y, blue_x, blue_y);
 #endif
-   }
 #endif /* cHRM */
 }
 #endif /* sRGB */
 
 
-#if defined(PNG_iCCP_SUPPORTED)
+#ifdef PNG_iCCP_SUPPORTED
 void PNGAPI
 png_set_iCCP(png_structp png_ptr, png_infop info_ptr,
              png_charp name, int compression_type,
@@ -710,7 +639,7 @@ png_set_iCCP(png_structp png_ptr, png_infop info_ptr,
 }
 #endif
 
-#if defined(PNG_TEXT_SUPPORTED)
+#ifdef PNG_TEXT_SUPPORTED
 void PNGAPI
 png_set_text(png_structp png_ptr, png_infop info_ptr, png_textp text_ptr,
              int num_text)
@@ -883,7 +812,7 @@ png_set_text_2(png_structp png_ptr, png_infop info_ptr, png_textp text_ptr,
 }
 #endif
 
-#if defined(PNG_tIME_SUPPORTED)
+#ifdef PNG_tIME_SUPPORTED
 void PNGAPI
 png_set_tIME(png_structp png_ptr, png_infop info_ptr, png_timep mod_time)
 {
@@ -898,7 +827,7 @@ png_set_tIME(png_structp png_ptr, png_infop info_ptr, png_timep mod_time)
 }
 #endif
 
-#if defined(PNG_tRNS_SUPPORTED)
+#ifdef PNG_tRNS_SUPPORTED
 void PNGAPI
 png_set_tRNS(png_structp png_ptr, png_infop info_ptr,
    png_bytep trans, int num_trans, png_color_16p trans_values)
@@ -957,7 +886,7 @@ png_set_tRNS(png_structp png_ptr, png_infop info_ptr,
 }
 #endif
 
-#if defined(PNG_sPLT_SUPPORTED)
+#ifdef PNG_sPLT_SUPPORTED
 void PNGAPI
 png_set_sPLT(png_structp png_ptr,
              png_infop info_ptr, png_sPLT_tp entries, int nentries)
@@ -1121,7 +1050,7 @@ png_permit_empty_plte (png_structp png_ptr, int empty_plte_permitted)
 #endif
 #endif
 
-#if defined(PNG_MNG_FEATURES_SUPPORTED)
+#ifdef PNG_MNG_FEATURES_SUPPORTED
 png_uint_32 PNGAPI
 png_permit_mng_features (png_structp png_ptr, png_uint_32 mng_features)
 {
@@ -1135,7 +1064,7 @@ png_permit_mng_features (png_structp png_ptr, png_uint_32 mng_features)
 }
 #endif
 
-#if defined(PNG_UNKNOWN_CHUNKS_SUPPORTED)
+#ifdef PNG_UNKNOWN_CHUNKS_SUPPORTED
 void PNGAPI
 png_set_keep_unknown_chunks(png_structp png_ptr, int keep, png_bytep
    chunk_list, int num_chunks)
@@ -1182,7 +1111,7 @@ png_set_keep_unknown_chunks(png_structp png_ptr, int keep, png_bytep
 }
 #endif
 
-#if defined(PNG_READ_USER_CHUNKS_SUPPORTED)
+#ifdef PNG_READ_USER_CHUNKS_SUPPORTED
 void PNGAPI
 png_set_read_user_chunk_fn(png_structp png_ptr, png_voidp user_chunk_ptr,
    png_user_chunk_ptr read_user_chunk_fn)
@@ -1197,7 +1126,7 @@ png_set_read_user_chunk_fn(png_structp png_ptr, png_voidp user_chunk_ptr,
 }
 #endif
 
-#if defined(PNG_INFO_IMAGE_SUPPORTED)
+#ifdef PNG_INFO_IMAGE_SUPPORTED
 void PNGAPI
 png_set_rows(png_structp png_ptr, png_infop info_ptr, png_bytepp row_pointers)
 {

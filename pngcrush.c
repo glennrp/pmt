@@ -160,6 +160,9 @@
 
 Change log:
 
+Version 1.7.4  (built with libpng-1.2.41beta05 and zlib-1.2.3.2)
+  Use unmodified pngconf.h from libpng-1.2.41beta05 or later.
+
 Version 1.7.3  (built with libpng-1.2.40 and zlib-1.2.3.2)
   Print contents of text chunks after IDAT, even when the -n option
     is used.  This requires a slight modification of pngconf.h,
