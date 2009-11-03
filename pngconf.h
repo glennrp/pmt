@@ -1,5 +1,4 @@
 
-
 /* pngconf.h - machine configurable file for libpng
  *
  * libpng version 1.2.41beta14 - November 3, 2009
@@ -14,12 +13,6 @@
  * This file has been modified, by Glenn Randers-Pehrson, from the original
  * libpng distribution by adding a line reading
  * #include "pngcrush.h"
- */
-
-/* Any machine specific code is near the front of this file, so if you
- * are configuring libpng for a machine, you may want to read the section
- * starting here down to where it starts to typedef png_color, png_text,
- * and png_info.
  */
 
 #ifndef PNGCONF_H
@@ -1169,13 +1162,15 @@
 #  endif
 #endif
 
-#ifndef PNG_NO_CONVERT_tIME
-# ifndef _WIN32_WCE
-/* The "tm" structure is not supported on WindowsCE */
-#  ifndef PNG_CONVERT_tIME_SUPPORTED
-#    define PNG_CONVERT_tIME_SUPPORTED
+#ifdef PNG_WRITE_tIME_SUPPORTED
+#  ifndef PNG_NO_CONVERT_tIME
+#    ifndef _WIN32_WCE
+/*   The "tm" structure is not supported on WindowsCE */
+#      ifndef PNG_CONVERT_tIME_SUPPORTED
+#        define PNG_CONVERT_tIME_SUPPORTED
+#      endif
 #   endif
-# endif
+#  endif
 #endif
 
 #endif /* PNG_WRITE_ANCILLARY_CHUNKS_SUPPORTED */
