@@ -15,6 +15,8 @@
 #include <malloc.h>
 */
 
+#define PNG_NO_GLOBAL_ARRAYS
+
 #ifndef PNG_NO_ZALLOC_ZERO
 #  define PNG_NO_ZALLOC_ZERO  /* speeds it up a little */
 #endif

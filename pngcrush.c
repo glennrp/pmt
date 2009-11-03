@@ -57,7 +57,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.3"
+#define PNGCRUSH_VERSION "1.7.5"
 
 /*
 #define PNGCRUSH_COUNT_COLORS
@@ -160,7 +160,9 @@
 
 Change log:
 
-Version 1.7.4  (built with libpng-1.4.0rc01 and zlib-1.2.3.2)
+Version 1.7.5  (built with libpng-1.2.41beta14 and zlib-1.2.3.2)
+
+Version 1.7.4  (built with libpng-1.2.40rc01 and zlib-1.2.3.2)
   Use unmodified pngconf.h from libpng-1.2.41beta05 or later.
 
 Version 1.7.3  (built with libpng-1.2.40 and zlib-1.2.3.2)
@@ -5241,14 +5243,11 @@ int main(int argc, char *argv[])
                     png_textp text_ptr;
                     int num_text = 0;
 
-P1("whoopee.\n");
-
                     if (png_get_text
                         (read_ptr, end_info_ptr, &text_ptr, &num_text) > 0
                         || text_inputs)
                     {
                         int ntext;
-P1("again.\n");
 
 #ifdef PNG_iTXt_SUPPORTED
                         P1( "Handling %d tEXt/zTXt/iTXt chunks after IDAT\n",

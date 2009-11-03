@@ -1,7 +1,7 @@
 
 /* pngset.c - storage of image information into info struct
  *
- * Last changed in libpng 1.4.0 [October 21, 2009]
+ * Last changed in libpng 1.2.41 [November 3, 2009]
  * Copyright (c) 1998-2009 Glenn Randers-Pehrson
  * (Version 0.96 Copyright (c) 1996, 1997 Andreas Dilger)
  * (Version 0.88 Copyright (c) 1995, 1996 Guy Eric Schalnat, Group 42, Inc.)
@@ -16,9 +16,9 @@
  * info struct and allows us to change the structure in the future.
  */
 
+#define PNG_INTERNAL
 #include "png.h"
 #if defined(PNG_READ_SUPPORTED) || defined(PNG_WRITE_SUPPORTED)
-#include "pngpriv.h"
 
 #ifdef PNG_bKGD_SUPPORTED
 void PNGAPI
@@ -191,19 +191,21 @@ png_set_hIST(png_structp png_ptr, png_infop info_ptr, png_uint_16p hist)
        > PNG_MAX_PALETTE_LENGTH)
    {
       png_warning(png_ptr,
-         "Invalid palette size, hIST allocation skipped");
+         "Invalid palette size, hIST allocation skipped.");
       return;
    }
 
+#ifdef PNG_FREE_ME_SUPPORTED
    png_free_data(png_ptr, info_ptr, PNG_FREE_HIST, 0);
+#endif
    /* Changed from info->num_palette to PNG_MAX_PALETTE_LENGTH in
     * version 1.2.1
     */
    png_ptr->hist = (png_uint_16p)png_malloc_warn(png_ptr,
-      PNG_MAX_PALETTE_LENGTH * png_sizeof(png_uint_16));
+      (png_uint_32)(PNG_MAX_PALETTE_LENGTH * png_sizeof(png_uint_16)));
    if (png_ptr->hist == NULL)
    {
-      png_warning(png_ptr, "Insufficient memory for hIST chunk data");
+      png_warning(png_ptr, "Insufficient memory for hIST chunk data.");
       return;
    }
 
@@ -212,7 +214,11 @@ png_set_hIST(png_structp png_ptr, png_infop info_ptr, png_uint_16p hist)
    info_ptr->hist = png_ptr->hist;
    info_ptr->valid |= PNG_INFO_hIST;
 
+#ifdef PNG_FREE_ME_SUPPORTED
    info_ptr->free_me |= PNG_FREE_HIST;
+#else
+   png_ptr->flags |= PNG_FLAG_FREE_HIST;
+#endif
 }
 #endif
 
@@ -256,7 +262,7 @@ png_set_IHDR(png_structp png_ptr, png_infop info_ptr,
                  - 1        /* filter byte */
                  - 7*8      /* rounding of width to multiple of 8 pixels */
                  - 8)       /* extra max_pixel_depth pad */
-      info_ptr->rowbytes = 0;
+      info_ptr->rowbytes = (png_size_t)0;
    else
       info_ptr->rowbytes = PNG_ROWBYTES(info_ptr->pixel_depth, width);
 }
@@ -284,7 +290,7 @@ png_set_pCAL(png_structp png_ptr, png_infop info_ptr,
    png_charp purpose, png_int_32 X0, png_int_32 X1, int type, int nparams,
    png_charp units, png_charpp params)
 {
-   png_size_t length;
+   png_uint_32 length;
    int i;
 
    png_debug1(1, "in %s storage function", "pCAL");
@@ -298,10 +304,10 @@ png_set_pCAL(png_structp png_ptr, png_infop info_ptr,
    info_ptr->pcal_purpose = (png_charp)png_malloc_warn(png_ptr, length);
    if (info_ptr->pcal_purpose == NULL)
    {
-      png_warning(png_ptr, "Insufficient memory for pCAL purpose");
+      png_warning(png_ptr, "Insufficient memory for pCAL purpose.");
       return;
    }
-   png_memcpy(info_ptr->pcal_purpose, purpose, length);
+   png_memcpy(info_ptr->pcal_purpose, purpose, (png_size_t)length);
 
    png_debug(3, "storing X0, X1, type, and nparams in info");
    info_ptr->pcal_X0 = X0;
@@ -315,16 +321,16 @@ png_set_pCAL(png_structp png_ptr, png_infop info_ptr,
    info_ptr->pcal_units = (png_charp)png_malloc_warn(png_ptr, length);
    if (info_ptr->pcal_units == NULL)
    {
-      png_warning(png_ptr, "Insufficient memory for pCAL units");
+      png_warning(png_ptr, "Insufficient memory for pCAL units.");
       return;
    }
-   png_memcpy(info_ptr->pcal_units, units, length);
+   png_memcpy(info_ptr->pcal_units, units, (png_size_t)length);
 
    info_ptr->pcal_params = (png_charpp)png_malloc_warn(png_ptr,
-      (png_size_t)((nparams + 1) * png_sizeof(png_charp)));
+      (png_uint_32)((nparams + 1) * png_sizeof(png_charp)));
    if (info_ptr->pcal_params == NULL)
    {
-      png_warning(png_ptr, "Insufficient memory for pCAL params");
+      png_warning(png_ptr, "Insufficient memory for pCAL params.");
       return;
    }
 
@@ -338,14 +344,16 @@ png_set_pCAL(png_structp png_ptr, png_infop info_ptr,
       info_ptr->pcal_params[i] = (png_charp)png_malloc_warn(png_ptr, length);
       if (info_ptr->pcal_params[i] == NULL)
       {
-         png_warning(png_ptr, "Insufficient memory for pCAL parameter");
+         png_warning(png_ptr, "Insufficient memory for pCAL parameter.");
          return;
       }
-      png_memcpy(info_ptr->pcal_params[i], params[i], length);
+      png_memcpy(info_ptr->pcal_params[i], params[i], (png_size_t)length);
    }
 
    info_ptr->valid |= PNG_INFO_pCAL;
+#ifdef PNG_FREE_ME_SUPPORTED
    info_ptr->free_me |= PNG_FREE_PCAL;
+#endif
 }
 #endif
 
@@ -372,7 +380,7 @@ void PNGAPI
 png_set_sCAL_s(png_structp png_ptr, png_infop info_ptr,
              int unit, png_charp swidth, png_charp sheight)
 {
-   png_size_t length;
+   png_uint_32 length;
 
    png_debug1(1, "in %s storage function", "sCAL");
 
@@ -388,10 +396,10 @@ png_set_sCAL_s(png_structp png_ptr, png_infop info_ptr,
    if (info_ptr->scal_s_width == NULL)
    {
       png_warning(png_ptr,
-       "Memory allocation failed while processing sCAL");
+       "Memory allocation failed while processing sCAL.");
       return;
    }
-   png_memcpy(info_ptr->scal_s_width, swidth, length);
+   png_memcpy(info_ptr->scal_s_width, swidth, (png_size_t)length);
 
    length = png_strlen(sheight) + 1;
    png_debug1(3, "allocating unit for info (%u bytes)",
@@ -402,12 +410,14 @@ png_set_sCAL_s(png_structp png_ptr, png_infop info_ptr,
       png_free (png_ptr, info_ptr->scal_s_width);
       info_ptr->scal_s_width = NULL;
       png_warning(png_ptr,
-       "Memory allocation failed while processing sCAL");
+       "Memory allocation failed while processing sCAL.");
       return;
    }
-   png_memcpy(info_ptr->scal_s_height, sheight, length);
+   png_memcpy(info_ptr->scal_s_height, sheight, (png_size_t)length);
    info_ptr->valid |= PNG_INFO_sCAL;
+#ifdef PNG_FREE_ME_SUPPORTED
    info_ptr->free_me |= PNG_FREE_SCAL;
+#endif
 }
 #endif
 #endif
@@ -456,7 +466,9 @@ png_set_PLTE(png_structp png_ptr, png_infop info_ptr,
     * we do it for backward compatibility with the way the png_handle_tRNS
     * function used to do the allocation.
     */
+#ifdef PNG_FREE_ME_SUPPORTED
    png_free_data(png_ptr, info_ptr, PNG_FREE_PLTE, 0);
+#endif
 
    /* Changed in libpng-1.2.1 to allocate PNG_MAX_PALETTE_LENGTH instead
     * of num_palette entries, in case of an invalid PNG file that has
@@ -468,7 +480,11 @@ png_set_PLTE(png_structp png_ptr, png_infop info_ptr,
    info_ptr->palette = png_ptr->palette;
    info_ptr->num_palette = png_ptr->num_palette = (png_uint_16)num_palette;
 
+#ifdef PNG_FREE_ME_SUPPORTED
    info_ptr->free_me |= PNG_FREE_PLTE;
+#else
+   png_ptr->flags |= PNG_FLAG_FREE_PLTE;
+#endif
 
    info_ptr->valid |= PNG_INFO_PLTE;
 }
@@ -592,7 +608,7 @@ png_set_iCCP(png_structp png_ptr, png_infop info_ptr,
    new_iccp_name = (png_charp)png_malloc_warn(png_ptr, length);
    if (new_iccp_name == NULL)
    {
-      png_warning(png_ptr, "Insufficient memory to process iCCP chunk");
+      png_warning(png_ptr, "Insufficient memory to process iCCP chunk.");
       return;
    }
    png_memcpy(new_iccp_name, name, length);
@@ -601,7 +617,7 @@ png_set_iCCP(png_structp png_ptr, png_infop info_ptr,
    {
       png_free (png_ptr, new_iccp_name);
       png_warning(png_ptr,
-      "Insufficient memory to process iCCP profile");
+      "Insufficient memory to process iCCP profile.");
       return;
    }
    png_memcpy(new_iccp_profile, profile, (png_size_t)proflen);
@@ -614,7 +630,9 @@ png_set_iCCP(png_structp png_ptr, png_infop info_ptr,
    /* Compression is always zero but is here so the API and info structure
     * does not have to change if we introduce multiple compression types */
    info_ptr->iccp_compression = (png_byte)compression_type;
+#ifdef PNG_FREE_ME_SUPPORTED
    info_ptr->free_me |= PNG_FREE_ICCP;
+#endif
    info_ptr->valid |= PNG_INFO_iCCP;
 }
 #endif
@@ -635,6 +653,9 @@ png_set_text_2(png_structp png_ptr, png_infop info_ptr, png_textp text_ptr,
                int num_text)
 {
    int i;
+#ifdef PNG_iTXt_SUPPORTED
+   int caller_no_itxt = 0;
+#endif
 
    png_debug1(1, "in %s storage function", ((png_ptr == NULL ||
       png_ptr->chunk_name[0] == '\0') ?
@@ -642,6 +663,45 @@ png_set_text_2(png_structp png_ptr, png_infop info_ptr, png_textp text_ptr,
 
    if (png_ptr == NULL || info_ptr == NULL || num_text == 0)
       return(0);
+
+#ifdef PNG_iTXt_SUPPORTED
+   /* If an earlier version of the library was used to build the
+    * application, it might be using a png_textp structure that
+    * does not contain the lang or lang_key elements. Even if you build
+    * this library with PNG_iTXt_SUPPORTED explicitly defined,
+    * and your older library was also built with PNG_iTXt_SUPPORTED
+    * defined, the complete png_textp structure probably has not existed
+    * all along and it's not safe to access them, due to a bug in
+    * pngconf.h from version 1.2.9 to 1.2.40.
+    */
+   if (png_ptr->flags & PNG_FLAG_LIBRARY_MISMATCH)
+   {
+      int j;
+      png_byte c[12];
+
+      j = 0;
+      for (j = 0; j < 12; j++)
+         c[j] = 0;
+
+      for (j = 0; c[j] && j < 12; j++)
+         c[j] = png_ptr->user_png_ver[j];
+
+      if ((c[5] == '\0')   /* 1.2.N */         ||
+          (c[5] == 'b')    /* 1.2.NbetaNN */   ||
+          (c[5] == 'r')    /* 1.2.NrcNN   */   ||
+          (c[4] == '1')    /* 1.2.1x */        ||
+          (c[4] == '2')    /* 1.2.2x */        ||
+          (c[4] == '3')    /* 1.2.3x */        ||
+          ((c[4] == '4')   /* 1.2.4x */        &&
+          (((c[5] == '0')) /* 1.2.40 */        ||
+          ((c[5] == '1')   /* 1.2.41x */       &&
+          (((c[6] == 'b')  /* 1.2.41betax */   &&
+          ((c[10] == '0'))) /* 1.2.41beta0x */ ||
+          ((c[10] == '1')   /* 1.2.41beta1x */ &&
+          (c[11] == '0'))))))) /* 1.2.41beta10 */
+         caller_no_itxt = 1;
+   }
+#endif /* PNG_iTXt_SUPPORTED */
 
    /* Make sure we have enough space in the "text" array in info_struct
     * to hold all of the incoming text_ptr objects.
@@ -657,7 +717,7 @@ png_set_text_2(png_structp png_ptr, png_infop info_ptr, png_textp text_ptr,
          info_ptr->max_text = info_ptr->num_text + num_text + 8;
          old_text = info_ptr->text;
          info_ptr->text = (png_textp)png_malloc_warn(png_ptr,
-            (png_size_t)(info_ptr->max_text * png_sizeof(png_text)));
+            (png_uint_32)(info_ptr->max_text * png_sizeof(png_text)));
          if (info_ptr->text == NULL)
          {
             png_free(png_ptr, old_text);
@@ -672,10 +732,12 @@ png_set_text_2(png_structp png_ptr, png_infop info_ptr, png_textp text_ptr,
          info_ptr->max_text = num_text + 8;
          info_ptr->num_text = 0;
          info_ptr->text = (png_textp)png_malloc_warn(png_ptr,
-            (png_size_t)(info_ptr->max_text * png_sizeof(png_text)));
+            (png_uint_32)(info_ptr->max_text * png_sizeof(png_text)));
          if (info_ptr->text == NULL)
             return(1);
+#ifdef PNG_FREE_ME_SUPPORTED
          info_ptr->free_me |= PNG_FREE_TEXT;
+#endif
       }
       png_debug1(3, "allocated %d entries for info_ptr->text",
          info_ptr->max_text);
@@ -696,10 +758,14 @@ png_set_text_2(png_structp png_ptr, png_infop info_ptr, png_textp text_ptr,
          lang_len = 0;
          lang_key_len = 0;
       }
+
       else
 #ifdef PNG_iTXt_SUPPORTED
       {
          /* Set iTXt data */
+
+         if (caller_no_itxt == 0)
+         {
          if (text_ptr[i].lang != NULL)
             lang_len = png_strlen(text_ptr[i].lang);
          else
@@ -708,10 +774,19 @@ png_set_text_2(png_structp png_ptr, png_infop info_ptr, png_textp text_ptr,
             lang_key_len = png_strlen(text_ptr[i].lang_key);
          else
             lang_key_len = 0;
+         }
+
+         else /* Caller does not support iTXt */
+         {
+            lang_len = 0;
+            lang_key_len = 0;
+            png_warning(png_ptr,
+               "iTXt lang and lang_key not available from application");
+         }
       }
-#else
+#else /* PNG_iTXt_SUPPORTED */
       {
-         png_warning(png_ptr, "iTXt chunk not supported");
+         png_warning(png_ptr, "iTXt chunk not supported.");
          continue;
       }
 #endif
@@ -726,6 +801,7 @@ png_set_text_2(png_structp png_ptr, png_infop info_ptr, png_textp text_ptr,
 #endif
             textp->compression = PNG_TEXT_COMPRESSION_NONE;
       }
+
       else
       {
          text_length = png_strlen(text_ptr[i].text);
@@ -733,12 +809,12 @@ png_set_text_2(png_structp png_ptr, png_infop info_ptr, png_textp text_ptr,
       }
 
       textp->key = (png_charp)png_malloc_warn(png_ptr,
-         (png_size_t)
+         (png_uint_32)
          (key_len + text_length + lang_len + lang_key_len + 4));
       if (textp->key == NULL)
          return(1);
       png_debug2(2, "Allocated %lu bytes at %x in png_set_text",
-                 (unsigned long)(png_uint_32)
+                 (png_uint_32)
                  (key_len + lang_len + lang_key_len + text_length + 4),
                  (int)textp->key);
 
@@ -777,6 +853,7 @@ png_set_text_2(png_structp png_ptr, png_infop info_ptr, png_textp text_ptr,
       }
       else
 #endif
+
       {
          textp->text_length = text_length;
 #ifdef PNG_iTXt_SUPPORTED
@@ -808,42 +885,43 @@ png_set_tIME(png_structp png_ptr, png_infop info_ptr, png_timep mod_time)
 #ifdef PNG_tRNS_SUPPORTED
 void PNGAPI
 png_set_tRNS(png_structp png_ptr, png_infop info_ptr,
-   png_bytep trans_alpha, int num_trans, png_color_16p trans_color)
+   png_bytep trans, int num_trans, png_color_16p trans_values)
 {
    png_debug1(1, "in %s storage function", "tRNS");
 
    if (png_ptr == NULL || info_ptr == NULL)
       return;
 
-   if (trans_alpha != NULL)
+   if (trans != NULL)
    {
-       /*
-        * It may not actually be necessary to set png_ptr->trans_alpha here;
+       /* It may not actually be necessary to set png_ptr->trans here;
         * we do it for backward compatibility with the way the png_handle_tRNS
         * function used to do the allocation.
         */
 
+#ifdef PNG_FREE_ME_SUPPORTED
        png_free_data(png_ptr, info_ptr, PNG_FREE_TRNS, 0);
+#endif
 
        /* Changed from num_trans to PNG_MAX_PALETTE_LENGTH in version 1.2.1 */
-       png_ptr->trans_alpha = info_ptr->trans_alpha = (png_bytep)png_malloc(png_ptr,
-           (png_size_t)PNG_MAX_PALETTE_LENGTH);
+       png_ptr->trans = info_ptr->trans = (png_bytep)png_malloc(png_ptr,
+           (png_uint_32)PNG_MAX_PALETTE_LENGTH);
        if (num_trans > 0 && num_trans <= PNG_MAX_PALETTE_LENGTH)
-          png_memcpy(info_ptr->trans_alpha, trans_alpha, (png_size_t)num_trans);
+          png_memcpy(info_ptr->trans, trans, (png_size_t)num_trans);
    }
 
-   if (trans_color != NULL)
+   if (trans_values != NULL)
    {
       int sample_max = (1 << info_ptr->bit_depth);
       if ((info_ptr->color_type == PNG_COLOR_TYPE_GRAY &&
-          (int)trans_color->gray > sample_max) ||
+          (int)trans_values->gray > sample_max) ||
           (info_ptr->color_type == PNG_COLOR_TYPE_RGB &&
-          ((int)trans_color->red > sample_max ||
-          (int)trans_color->green > sample_max ||
-          (int)trans_color->blue > sample_max)))
+          ((int)trans_values->red > sample_max ||
+          (int)trans_values->green > sample_max ||
+          (int)trans_values->blue > sample_max)))
          png_warning(png_ptr,
             "tRNS chunk has out-of-range samples for bit_depth");
-      png_memcpy(&(info_ptr->trans_color), trans_color,
+      png_memcpy(&(info_ptr->trans_values), trans_values,
          png_sizeof(png_color_16));
       if (num_trans == 0)
          num_trans = 1;
@@ -853,7 +931,11 @@ png_set_tRNS(png_structp png_ptr, png_infop info_ptr,
    if (num_trans != 0)
    {
       info_ptr->valid |= PNG_INFO_tRNS;
+#ifdef PNG_FREE_ME_SUPPORTED
       info_ptr->free_me |= PNG_FREE_TRNS;
+#else
+      png_ptr->flags |= PNG_FLAG_FREE_TRNS;
+#endif
    }
 }
 #endif
@@ -878,10 +960,10 @@ png_set_sPLT(png_structp png_ptr,
 
    np = (png_sPLT_tp)png_malloc_warn(png_ptr,
        (info_ptr->splt_palettes_num + nentries) *
-        (png_size_t)png_sizeof(png_sPLT_t));
+        (png_uint_32)png_sizeof(png_sPLT_t));
    if (np == NULL)
    {
-      png_warning(png_ptr, "No memory for sPLT palettes");
+      png_warning(png_ptr, "No memory for sPLT palettes.");
      return;
    }
 
@@ -897,7 +979,7 @@ png_set_sPLT(png_structp png_ptr,
       png_uint_32 length;
 
       length = png_strlen(from->name) + 1;
-        to->name = (png_charp)png_malloc_warn(png_ptr, (png_size_t)length);
+        to->name = (png_charp)png_malloc_warn(png_ptr, length);
       if (to->name == NULL)
       {
          png_warning(png_ptr,
@@ -906,7 +988,7 @@ png_set_sPLT(png_structp png_ptr,
       }
       png_memcpy(to->name, from->name, length);
       to->entries = (png_sPLT_entryp)png_malloc_warn(png_ptr,
-            (png_size_t)(from->nentries * png_sizeof(png_sPLT_entry)));
+            (png_uint_32)(from->nentries * png_sizeof(png_sPLT_entry)));
       if (to->entries == NULL)
       {
          png_warning(png_ptr,
@@ -924,7 +1006,9 @@ png_set_sPLT(png_structp png_ptr,
    info_ptr->splt_palettes = np;
    info_ptr->splt_palettes_num += nentries;
    info_ptr->valid |= PNG_INFO_sPLT;
+#ifdef PNG_FREE_ME_SUPPORTED
    info_ptr->free_me |= PNG_FREE_SPLT;
+#endif
 }
 #endif /* PNG_sPLT_SUPPORTED */
 
@@ -940,18 +1024,19 @@ png_set_unknown_chunks(png_structp png_ptr,
       return;
 
    np = (png_unknown_chunkp)png_malloc_warn(png_ptr,
-       (png_size_t)((info_ptr->unknown_chunks_num + num_unknowns) *
+       (png_uint_32)((info_ptr->unknown_chunks_num + num_unknowns) *
        png_sizeof(png_unknown_chunk)));
    if (np == NULL)
    {
       png_warning(png_ptr,
-         "Out of memory while processing unknown chunk");
+         "Out of memory while processing unknown chunk.");
       return;
    }
 
    png_memcpy(np, info_ptr->unknown_chunks,
           info_ptr->unknown_chunks_num * png_sizeof(png_unknown_chunk));
    png_free(png_ptr, info_ptr->unknown_chunks);
+   info_ptr->unknown_chunks=NULL;
 
    for (i = 0; i < num_unknowns; i++)
    {
@@ -971,11 +1056,11 @@ png_set_unknown_chunks(png_structp png_ptr,
       else
       {
          to->data = (png_bytep)png_malloc_warn(png_ptr,
-           (png_size_t)from->size);
+           (png_uint_32)from->size);
          if (to->data == NULL)
          {
             png_warning(png_ptr,
-             "Out of memory while processing unknown chunk");
+             "Out of memory while processing unknown chunk.");
             to->size = 0;
          }
          else
@@ -985,7 +1070,9 @@ png_set_unknown_chunks(png_structp png_ptr,
 
    info_ptr->unknown_chunks = np;
    info_ptr->unknown_chunks_num += num_unknowns;
+#ifdef PNG_FREE_ME_SUPPORTED
    info_ptr->free_me |= PNG_FREE_UNKN;
+#endif
 }
 void PNGAPI
 png_set_unknown_chunk_location(png_structp png_ptr, png_infop info_ptr,
@@ -997,6 +1084,25 @@ png_set_unknown_chunk_location(png_structp png_ptr, png_infop info_ptr,
 }
 #endif
 
+#if defined(PNG_1_0_X) || defined(PNG_1_2_X)
+#if defined(PNG_READ_EMPTY_PLTE_SUPPORTED) || \
+    defined(PNG_WRITE_EMPTY_PLTE_SUPPORTED)
+void PNGAPI
+png_permit_empty_plte (png_structp png_ptr, int empty_plte_permitted)
+{
+   /* This function is deprecated in favor of png_permit_mng_features()
+      and will be removed from libpng-1.3.0 */
+
+   png_debug(1, "in png_permit_empty_plte, DEPRECATED.");
+
+   if (png_ptr == NULL)
+      return;
+   png_ptr->mng_features_permitted = (png_byte)
+     ((png_ptr->mng_features_permitted & (~PNG_FLAG_MNG_EMPTY_PLTE)) |
+     ((empty_plte_permitted & PNG_FLAG_MNG_EMPTY_PLTE)));
+}
+#endif
+#endif
 
 #ifdef PNG_MNG_FEATURES_SUPPORTED
 png_uint_32 PNGAPI
@@ -1038,7 +1144,7 @@ png_set_keep_unknown_chunks(png_structp png_ptr, int keep, png_bytep
       return;
    old_num_chunks = png_ptr->num_chunk_list;
    new_list=(png_bytep)png_malloc(png_ptr,
-      (png_size_t)
+      (png_uint_32)
       (5*(num_chunks + old_num_chunks)));
    if (png_ptr->chunk_list != NULL)
    {
@@ -1053,7 +1159,9 @@ png_set_keep_unknown_chunks(png_structp png_ptr, int keep, png_bytep
       *p=(png_byte)keep;
    png_ptr->num_chunk_list = old_num_chunks + num_chunks;
    png_ptr->chunk_list = new_list;
+#ifdef PNG_FREE_ME_SUPPORTED
    png_ptr->free_me |= PNG_FREE_LIST;
+#endif
 }
 #endif
 
@@ -1092,12 +1200,12 @@ png_set_rows(png_structp png_ptr, png_infop info_ptr, png_bytepp row_pointers)
 #ifdef PNG_WRITE_SUPPORTED
 void PNGAPI
 png_set_compression_buffer_size(png_structp png_ptr,
-    png_size_t size)
+    png_uint_32 size)
 {
     if (png_ptr == NULL)
        return;
     png_free(png_ptr, png_ptr->zbuf);
-    png_ptr->zbuf_size = size;
+    png_ptr->zbuf_size = (png_size_t)size;
     png_ptr->zbuf = (png_bytep)png_malloc(png_ptr, size);
     png_ptr->zstream.next_out = png_ptr->zbuf;
     png_ptr->zstream.avail_out = (uInt)png_ptr->zbuf_size;
@@ -1112,6 +1220,32 @@ png_set_invalid(png_structp png_ptr, png_infop info_ptr, int mask)
 }
 
 
+#ifndef PNG_1_0_X
+#ifdef PNG_ASSEMBLER_CODE_SUPPORTED
+/* Function was added to libpng 1.2.0 and should always exist by default */
+void PNGAPI
+png_set_asm_flags (png_structp png_ptr, png_uint_32 asm_flags)
+{
+/* Obsolete as of libpng-1.2.20 and will be removed from libpng-1.4.0 */
+    if (png_ptr != NULL)
+    png_ptr->asm_flags = 0;
+    asm_flags = asm_flags; /* Quiet the compiler */
+}
+
+/* This function was added to libpng 1.2.0 */
+void PNGAPI
+png_set_mmx_thresholds (png_structp png_ptr,
+                        png_byte mmx_bitdepth_threshold,
+                        png_uint_32 mmx_rowbytes_threshold)
+{
+/* Obsolete as of libpng-1.2.20 and will be removed from libpng-1.4.0 */
+    if (png_ptr == NULL)
+       return;
+    /* Quiet the compiler */
+    mmx_bitdepth_threshold = mmx_bitdepth_threshold;
+    mmx_rowbytes_threshold = mmx_rowbytes_threshold;
+}
+#endif /* ?PNG_ASSEMBLER_CODE_SUPPORTED */
 
 #ifdef PNG_SET_USER_LIMITS_SUPPORTED
 /* This function was added to libpng 1.2.6 */
@@ -1128,7 +1262,7 @@ png_set_user_limits (png_structp png_ptr, png_uint_32 user_width_max,
    png_ptr->user_width_max = user_width_max;
    png_ptr->user_height_max = user_height_max;
 }
-/* This function was added to libpng 1.4.0 */
+/* This function was added to libpng 1.2.41 */
 void PNGAPI
 png_set_chunk_cache_max (png_structp png_ptr,
    png_uint_32 user_chunk_cache_max)
@@ -1156,4 +1290,5 @@ png_set_benign_errors(png_structp png_ptr, int allowed)
       png_ptr->flags &= ~PNG_FLAG_BENIGN_ERRORS_WARN;
 }
 #endif /* PNG_BENIGN_ERRORS_SUPPORTED */
+#endif /* ?PNG_1_0_X */
 #endif /* PNG_READ_SUPPORTED || PNG_WRITE_SUPPORTED */
