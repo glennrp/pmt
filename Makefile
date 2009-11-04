@@ -20,8 +20,9 @@ LD = gcc
 # LD = /usr/local/bin/gcc-4.4.1
 RM = rm -f
 #CFLAGS = -I. -O -Wall
+#CFLAGS = -I. -O2 -fomit-frame-pointer -Wall
 #CFLAGS = -I. -O3 -fomit-frame-pointer -Wall
-CFLAGS = -I. -O3 -fomit-frame-pointer -Wall -Wshadow
+CFLAGS = -I. -O3 -funroll-loops -fomit-frame-pointer -Wall -Wshadow
 #CFLAGS = -I${ZINC} -I. -O3 -fomit-frame-pointer -Wall
 # [note that -Wall is a gcc-specific compilation flag ("all warnings on")]
 LDFLAGS =
