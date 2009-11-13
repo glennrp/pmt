@@ -107,4 +107,8 @@
    an error. */
 #define PNG_ABORT()
 
+/* Suppress libpng pedantic warnings */
+#define PNG_NORETURN    /* This function does not return */
+#define PNG_DEPSTRUCT   /* Access to this struct member is deprecated */
+
 #endif /* !PNGCRUSH_H */

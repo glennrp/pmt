@@ -1,7 +1,7 @@
 
 /* pngconf.h - machine configurable file for libpng
  *
- * libpng version 1.2.41beta14 - November 3, 2009
+ * libpng version 1.2.41beta19 - November 12, 2009
  * Copyright (c) 1998-2009 Glenn Randers-Pehrson
  * (Version 0.96 Copyright (c) 1996, 1997 Andreas Dilger)
  * (Version 0.88 Copyright (c) 1995, 1996 Guy Eric Schalnat, Group 42, Inc.)
@@ -13,6 +13,12 @@
  * This file has been modified, by Glenn Randers-Pehrson, from the original
  * libpng distribution by adding a line reading
  * #include "pngcrush.h"
+ */
+
+/* Any machine specific code is near the front of this file, so if you
+ * are configuring libpng for a machine, you may want to read the section
+ * starting here down to where it starts to typedef png_color, png_text,
+ * and png_info.
  */
 
 #ifndef PNGCONF_H
@@ -523,8 +529,29 @@
  * iTXt support was added.  iTXt support was turned off by default through
  * libpng-1.2.x, to support old apps that malloc the png_text structure
  * instead of calling png_set_text() and letting libpng malloc it.  It
- * was turned on by default in libpng-1.2.41.
+ * will be turned on by default in libpng-1.4.0.
  */
+
+#if defined(PNG_1_0_X) || defined (PNG_1_2_X)
+#  ifndef PNG_NO_iTXt_SUPPORTED
+#    define PNG_NO_iTXt_SUPPORTED
+#  endif
+#  ifndef PNG_NO_READ_iTXt
+#    define PNG_NO_READ_iTXt
+#  endif
+#  ifndef PNG_NO_WRITE_iTXt
+#    define PNG_NO_WRITE_iTXt
+#  endif
+#endif
+
+#if !defined(PNG_NO_iTXt_SUPPORTED)
+#  if !defined(PNG_READ_iTXt_SUPPORTED) && !defined(PNG_NO_READ_iTXt)
+#    define PNG_READ_iTXt
+#  endif
+#  if !defined(PNG_WRITE_iTXt_SUPPORTED) && !defined(PNG_NO_WRITE_iTXt)
+#    define PNG_WRITE_iTXt
+#  endif
+#endif
 
 /* The following support, added after version 1.0.0, can be turned off here en
  * masse by defining PNG_LEGACY_SUPPORTED in case you need binary compatibility
@@ -623,11 +650,6 @@
 #  ifndef PNG_NO_READ_INVERT_ALPHA
 #    define PNG_READ_INVERT_ALPHA_SUPPORTED
 #  endif
-#ifndef PNG_1_0_X
-#  ifndef PNG_NO_READ_PREMULTIPLY_ALPHA
-#      define PNG_READ_PREMULTIPLY_ALPHA_SUPPORTED
-#  endif
-#endif
 #  ifndef PNG_NO_READ_STRIP_ALPHA
 #    define PNG_READ_STRIP_ALPHA_SUPPORTED
 #  endif
@@ -850,13 +872,6 @@
 /* Added at libpng-1.2.41 */
 #ifndef PNG_USER_CHUNK_CACHE_MAX
 #  define PNG_USER_CHUNK_CACHE_MAX 0x7fffffffL
-#endif
-#endif
-
-/* Added at libpng-1.2.41 */
-#ifndef PNG_1_0_X
-#if !defined(PNG_NO_IO_STATE) && !defined(PNG_IO_STATE_SUPPORTED)
-#  define PNG_IO_STATE_SUPPORTED
 #endif
 #endif
 
@@ -1513,6 +1528,64 @@ typedef z_stream FAR *  png_zstreamp;
 #  endif
 #endif
 
+/* Support for compiler specific function attributes.  These are used
+ * so that where compiler support is available incorrect use of API
+ * functions in png.h will generate compiler warnings.  Added at libpng
+ * version 1.2.41.
+ */
+#ifdef __GNUC__
+#  ifndef PNG_USE_RESULT
+#    define PNG_USE_RESULT __attribute__((__warn_unused_result__))
+#  endif
+#  ifndef PNG_NORETURN
+#    define PNG_NORETURN   __attribute__((__noreturn__))
+#  endif
+#  ifndef PNG_ALLOCATED
+#    define PNG_ALLOCATED  __attribute__((__malloc__))
+#  endif
+
+#  ifndef PNG_CONFIGURE_LIBPNG
+    /* This specifically protects structure members that should only be
+     * accessed from within the library, therefore should be empty during
+     * a library build.
+     */
+#    ifndef PNG_DEPRECATED
+#      define PNG_DEPRECATED __attribute__((__deprecated__))
+#    endif
+#    ifndef PNG_DEPSTRUCT
+#      define PNG_DEPSTRUCT  __attribute__((__deprecated__))
+#    endif
+#    ifndef PNG_PRIVATE
+#if 0 /* Doesn't work so we use deprecated instead*/
+#      define PNG_PRIVATE \
+        __attribute__((warning("This function is not exported by libpng.")))
+#else
+#      define PNG_PRIVATE \
+        __attribute__((__deprecated__))
+#endif
+#    endif
+#  endif
+#endif
+
+#ifndef PNG_DEPRECATED
+#  define PNG_DEPRECATED  /* Use of this function is deprecated */
+#endif
+#ifndef PNG_USE_RESULT
+#  define PNG_USE_RESULT  /* The result of this function must be checked */
+#endif
+#ifndef PNG_NORETURN
+#  define PNG_NORETURN    /* This function does not return */
+#endif
+#ifndef PNG_ALLOCATED
+#  define PNG_ALLOCATED   /* The result of the function is new memory */
+#endif
+#ifndef PNG_DEPSTRUCT
+#  define PNG_DEPSTRUCT   /* Access to this struct member is deprecated */
+#endif
+#ifndef PNG_PRIVATE
+#  define PNG_PRIVATE     /* This is a private libpng function */
+#endif
+
 /* User may want to use these so they are not in PNG_INTERNAL. Any library
  * functions that are passed far data must be model independent.
  */
@@ -1529,7 +1602,7 @@ typedef z_stream FAR *  png_zstreamp;
 #endif
 
 #ifdef USE_FAR_KEYWORD  /* memory model independent fns */
-/* use this to make far-to-near assignments */
+/* Use this to make far-to-near assignments */
 #  define CHECK   1
 #  define NOCHECK 0
 #  define CVT_PTR(ptr) (png_far_to_near(png_ptr,ptr,CHECK))
@@ -1539,7 +1612,7 @@ typedef z_stream FAR *  png_zstreamp;
 #  define png_memcmp  _fmemcmp    /* SJT: added */
 #  define png_memcpy  _fmemcpy
 #  define png_memset  _fmemset
-#else /* use the usual functions */
+#else /* Use the usual functions */
 #  define CVT_PTR(ptr)         (ptr)
 #  define CVT_PTR_NOCHECK(ptr) (ptr)
 #  ifndef PNG_NO_SNPRINTF
@@ -1557,7 +1630,8 @@ typedef z_stream FAR *  png_zstreamp;
       * sprintf instead of snprintf exposes your application to accidental
       * or malevolent buffer overflows.  If you don't have snprintf()
       * as a general rule you should provide one (you can get one from
-      * Portable OpenSSH). */
+      * Portable OpenSSH).
+      */
 #    define png_snprintf(s1,n,fmt,x1) sprintf(s1,fmt,x1)
 #    define png_snprintf2(s1,n,fmt,x1,x2) sprintf(s1,fmt,x1,x2)
 #    define png_snprintf6(s1,n,fmt,x1,x2,x3,x4,x5,x6) \
