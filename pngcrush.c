@@ -161,7 +161,7 @@
 Change log:
 
 Version 1.7.6  (built with libpng-1.2.41beta19 and zlib-1.2.3.2)
-  Change some "#if defined(X)" to "#ifdef X"
+  Change some "#if defined(X)" to "#ifdef X" according to libpng coding style.
   Added some defines to suppress pedantic warnings from libpng-1.2.41beta15
     and later.  A warning about deprecated access to png_ptr->zstream is 
     otherwise unavoidable.  When building the embedded libpng, a warning
