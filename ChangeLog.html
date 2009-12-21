@@ -3,7 +3,27 @@
 
 Change log:
 
-Version 1.7.2  (built with libpng-1.2.40and zlib-1.2.3.2)
+Version 1.7.6  (built with libpng-1.4.0rc02 and zlib-1.2.3.2)
+  Change some "#if defined(X)" to "#ifdef X" according to libpng coding style.
+  Added some defines to suppress pedantic warnings from libpng-1.2.41beta15
+    and later.  A warning about deprecated access to png_ptr->zstream is 
+    otherwise unavoidable.  When building the embedded libpng, a warning
+    about png_default_error() returning is also otherwise unavoidable.
+  Write premultiplied alpha if output extension is .ppng and
+    PNG_READ_PREMULTIPLIED_ALPHA_SUPPORTED is set (needs libpng-1.5.0).
+  Check the "-m method" option for out-of-range method value.
+
+Version 1.7.5  (built with libpng-1.2.41beta14 and zlib-1.2.3.2)
+
+Version 1.7.4  (built with libpng-1.2.40rc01 and zlib-1.2.3.2)
+  Use unmodified pngconf.h from libpng-1.2.41beta05 or later.
+
+Version 1.7.3  (built with libpng-1.2.40 and zlib-1.2.3.2)
+  Print contents of text chunks after IDAT, even when the -n option
+    is used.  This requires a slight modification of pngconf.h,
+    when libpng-1.2.x is used.
+
+Version 1.7.2  (built with libpng-1.2.40 and zlib-1.2.3.2)
   Added check for "verbose" on some printf statements.
 
 Version 1.7.1  (built with libpng-1.2.39 and zlib-1.2.3.2)

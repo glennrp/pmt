@@ -160,12 +160,15 @@
 
 Change log:
 
-Version 1.7.6  (built with libpng-1.2.41beta19 and zlib-1.2.3.2)
+Version 1.7.6  (built with libpng-1.4.0rc02 and zlib-1.2.3.2)
   Change some "#if defined(X)" to "#ifdef X" according to libpng coding style.
   Added some defines to suppress pedantic warnings from libpng-1.2.41beta15
     and later.  A warning about deprecated access to png_ptr->zstream is 
     otherwise unavoidable.  When building the embedded libpng, a warning
     about png_default_error() returning is also otherwise unavoidable.
+  Write premultiplied alpha if output extension is .ppng and
+    PNG_READ_PREMULTIPLIED_ALPHA_SUPPORTED is set (needs libpng-1.5.0).
+  Check the "-m method" option for out-of-range method value.
 
 Version 1.7.5  (built with libpng-1.2.41beta14 and zlib-1.2.3.2)
 
@@ -625,7 +628,6 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 #endif /* end of changelog */
 
 /* Suppress libpng pedantic warnings */
-#define PNG_NORETURN    /* This function does not return */
 #define PNG_DEPSTRUCT   /* Access to this struct member is deprecated */
 
 #include "png.h"
@@ -1001,6 +1003,22 @@ static int found_gAMA = 0;
 #ifdef PNG_cHRM_SUPPORTED
 static int found_cHRM = 0;
 #endif
+
+static int premultiply = 0;
+
+       /* 0: not premultipled
+        * 1: premultiplied input (input has .ppng suffix)
+        * 2: premultiplied output (output has .ppng suffix)
+        * 3: premultiplied input and output (both have .ppng suffix)
+        *
+        *    .png -> .ppng is OK, do premultiplication.
+        *    .ppng -> .ppng is OK, simply copy data.
+        *    .ppng -> .ppng is not OK because colors are irretrievably lost.
+        *    .ppng -> no output (pngcrush -n) is OK.
+        *
+        * TO DO: Implement this stuff!
+        */
+
 static int found_CgBI = 0;
 static int found_any_chunk = 0;
 static int save_apng_chunks = 0; /* 0: output not .apng 1: .apng 2: rejected */
@@ -2591,9 +2609,18 @@ int main(int argc, char *argv[])
             names++;
             BUMP_I;
             method = atoi(argv[i]);
-            methods_specified = 1;
-            brute_force = 0;
-            try_method[method] = 0;
+            if (method >= 0 && method <= MAX_METHODS)
+            {
+              methods_specified = 1;
+              brute_force = 0;
+              try_method[method] = 0;
+            }
+            else
+            {
+              fprintf(STDERR, "\n  Ignoring invalid method: %d\n",
+                      method);
+              method = MAX_METHODS;
+            }
         }
         else if (!strncmp(argv[i], "-nofilecheck", 5))
         {
@@ -2609,6 +2636,10 @@ int main(int argc, char *argv[])
         else if (!strncmp(argv[i], "-oldtimestamp", 5))
         {
             new_time_stamp=0;
+        }
+        else if (!strncmp(argv[i], "-premultiply", 5))
+        {
+            premultiply=2;
         }
         else if (!strncmp(argv[i], "-plte_len", 9))
         {
@@ -3107,6 +3138,18 @@ int main(int argc, char *argv[])
 
             strcat(out_string, extension);
             outname = out_string;
+        }
+
+        if ((outname[strlen(outname) - 4] == 'p') &&
+            (outname[strlen(outname) - 3] == 'p') &&
+            (outname[strlen(outname) - 2] == 'n') &&
+            (outname[strlen(outname) - 1] == 'g'))
+        {
+           /* Writing a *.ppng (png with premultiplied alpha) */
+            premultiply=2;
+#ifndef PNG_READ_PREMULTIPLY_ALPHA_SUPPORTED
+            png_error(read_ptr, "Premultiplied alpha is not supported");
+#endif
         }
 
         if ((outname[strlen(outname) - 4] == 'a') &&
@@ -3806,6 +3849,11 @@ int main(int argc, char *argv[])
                     }
                 }
 
+#ifndef PNG_READ_PREMULTIPLY_ALPHA_SUPPORTED
+                if (premultiply)
+                   png_error(read_ptr, "Premultiplied alpha is not supported");
+#endif
+
                 png_read_info(read_ptr, read_info_ptr);
 
                 /* { GRR added for quick %-navigation (1) */
@@ -4051,6 +4099,23 @@ int main(int argc, char *argv[])
 
                     }
                 }
+
+            if (premultiply == 1 || premultiply == 2)
+            {
+
+#ifdef PNG_READ_PREMULTIPLY_ALPHA_SUPPORTED
+              /* 0: not premultipled
+               * 1: premultiplied input (input has .pngp suffix and
+               *    PNGP chunk is present)
+               * 2: premultiplied output (output has .pngp suffix of
+               *    -premultiply option is present; PNGP chunk is added)
+               * 3: premultiplied input and output (both have .pngp suffix)
+               */
+               P1("Calling png_set_premultiply_alpha\n");
+               png_set_premultiply_alpha(read_ptr,output_bit_depth);
+#endif
+            }
+
 
 #if defined(PNG_READ_bKGD_SUPPORTED) && defined(PNG_WRITE_bKGD_SUPPORTED)
                 {
@@ -4778,11 +4843,14 @@ int main(int argc, char *argv[])
                     png_unknown_chunkp unknowns;   /* allocated by libpng */
                     int num_unknowns;
 
+                    num_unknowns = (int)png_get_unknown_chunks(read_ptr,
+                      read_info_ptr, &unknowns);
+
                     if (nosave == 0 && ster_mode >= 0)
                     {
                         /* Add sTER chunk */
                         png_unknown_chunkp ster;
-                        P1("Handling sTER as unknown chunk %d\n", i);
+                        P1("Handling sTER as unknown chunk %d\n", num_unknowns);
                         ster = (png_unknown_chunk*)png_malloc(read_ptr,
                             (png_uint_32) sizeof(png_unknown_chunk));
                         png_memcpy((char *)ster[0].name, "sTER",5);
@@ -4793,10 +4861,8 @@ int main(int argc, char *argv[])
                          ster, 1);
                         png_free(read_ptr,ster[0].data);
                         png_free(read_ptr,ster);
+                        num_unknowns++;
                     }
-
-                    num_unknowns = (int)png_get_unknown_chunks(read_ptr,
-                      read_info_ptr, &unknowns);
 
 #ifndef PNG_HAVE_IHDR
 #define PNG_HAVE_IHDR 0x01
@@ -4887,30 +4953,6 @@ int main(int argc, char *argv[])
                         png_set_filter(write_ptr, 0, PNG_ALL_FILTERS);
                     else
                         png_set_filter(write_ptr, 0, PNG_FILTER_NONE);
-
-
-/* GRR 20050220: not clear why unknowns treated differently from other chunks */
-/*               (i.e., inside nosave==0 block)...  Moved up 50 lines now. */
-#if 0 /* #ifdef PNG_WRITE_UNKNOWN_CHUNKS_SUPPORTED */
-                    {
-                        png_unknown_chunkp unknowns;
-                        int num_unknowns = (int) png_get_unknown_chunks(
-                          read_ptr, read_info_ptr, &unknowns);
-
-                        P1("Keeping %d unknown chunks\n", num_unknowns);
-                        if (num_unknowns)
-                        {
-                            png_set_unknown_chunks(write_ptr, write_info_ptr,
-                              unknowns, num_unknowns);
-                            for (i = 0; i < num_unknowns; i++)
-                            {
-                                P2("  unknown[%d] = %s\n", i, unknowns[i].name);
-                                png_set_unknown_chunk_location(write_ptr,
-                                  write_info_ptr, i, (int)unknowns[i].location);
-                            }
-                        }
-                    }
-#endif /* 0, was PNG_WRITE_UNKNOWN_CHUNKS_SUPPORTED */
 
 #ifdef PNGCRUSH_LOCO
                     if (do_loco) {
@@ -5794,19 +5836,21 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
     for (;;)
     {
 #ifndef PNG_UINT_IDAT
-#ifdef PNG_USE_LOCAL_ARRAYS
+#  ifdef PNG_USE_LOCAL_ARRAYS
         PNG_IDAT;
         PNG_IEND;
         PNG_IHDR;
         PNG_acTL;
-#ifdef PNG_iCCP_SUPPORTED
+#    ifdef PNG_iCCP_SUPPORTED
         PNG_iCCP;
-#else
+#    endif
+#  else
+#    ifdef PNG_iCCP_SUPPORTED
         const png_byte png_iCCP[5] = { 105, 67, 67, 80, '\0' };
-#endif
-#endif
-#endif
+#    endif
         const png_byte png_acTL[5] = { 97,  99,  84,  76, '\0'};
+#  endif
+#endif
 
         png_byte chunk_name[5];
         png_byte chunk_length[4];
@@ -5910,7 +5954,11 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
           }
         }
 
+#ifdef PNG_UINT_acTL
+        else if (png_get_uint_32(chunk_name) == PNG_UINT_acTL)
+#else
         else if (!png_memcmp(chunk_name, png_acTL, 4))
+#endif
         {
            found_acTL_chunk = 1;
         }
@@ -5974,12 +6022,20 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
         }
 
 #ifdef PNG_gAMA_SUPPORTED
+#ifdef PNG_UINT_gAMA
         if (png_get_uint_32(chunk_name) == PNG_UINT_gAMA)
+#else
+        if (!png_memcmp(chunk_name, png_gAMA, 4))
+#endif
           found_gAMA=1;
 #endif
 
 #ifdef PNG_cHRM_SUPPORTED
+#ifdef PNG_UINT_cHRM
         if (png_get_uint_32(chunk_name) == PNG_UINT_cHRM)
+#else
+        if (!png_memcmp(chunk_name, png_iCCP, 4))
+#endif
           found_cHRM=1;
 #endif
 
