@@ -160,6 +160,11 @@
 
 Change log:
 
+Version 1.7.7  (built with libpng-1.4.0rc04 and zlib-1.2.3.4)
+  Check the "-plte_len n" option for out-of-range value of n.
+  Changed local variable "write" to "z_write" in inffast.c (zlib-1.2.3.4)
+    to avoid shadowed declaration warning.
+
 Version 1.7.6  (built with libpng-1.4.0rc02 and zlib-1.2.3.2)
   Change some "#if defined(X)" to "#ifdef X" according to libpng coding style.
   Added some defines to suppress pedantic warnings from libpng-1.2.41beta15
@@ -2646,6 +2651,8 @@ int main(int argc, char *argv[])
             names++;
             BUMP_I;
             plte_len = atoi(argv[i]);
+            if (plte_len < 0 || plte_len > 256)
+               plte_len = -1;
         }
         else if (!strncmp(argv[i], "-pplt", 3))
         {
@@ -2870,6 +2877,8 @@ int main(int argc, char *argv[])
                  !strncmp(argv[i], "-tRNS_a", 7))
         {
             num_trans_in = (png_uint_16) atoi(argv[++i]);
+            if (num_trans_in > 256)
+               num_trans_in = 256;
             trns_index=num_trans_in-1;
             have_trns = 1;
             for (ia = 0; ia < num_trans_in; ia++)

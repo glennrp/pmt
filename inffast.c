@@ -1,10 +1,6 @@
 /* inffast.c -- fast decoding
- * Copyright (C) 1995-2006 Mark Adler
+ * Copyright (C) 1995-2008 Mark Adler
  * For conditions of distribution and use, see copyright notice in zlib.h
- *
- * This file was modified by Glenn Randers-Pehrson, by changing the
- * variable name "write" to "wwrite" to avoid a "Shadowed Declaration"
- * warning.
  */
 
 #include "zutil.h"
@@ -83,7 +79,7 @@ unsigned start;         /* inflate()'s starting value for strm->avail_out */
 #endif
     unsigned wsize;             /* window size or zero if not using window */
     unsigned whave;             /* valid bytes in the window */
-    unsigned wwrite;            /* window write index (pngcrush mod) */
+    unsigned z_write;           /* window write index */
     unsigned char FAR *window;  /* allocated sliding window, if wsize != 0 */
     unsigned long hold;         /* local strm->hold */
     unsigned bits;              /* local strm->bits */
@@ -110,7 +106,7 @@ unsigned start;         /* inflate()'s starting value for strm->avail_out */
 #endif
     wsize = state->wsize;
     whave = state->whave;
-    wwrite = state->write;
+    z_write = state->write;
     window = state->window;
     hold = state->hold;
     bits = state->bits;
@@ -192,7 +188,8 @@ unsigned start;         /* inflate()'s starting value for strm->avail_out */
                     op = dist - op;             /* distance back in window */
                     if (op > whave) {
                         if (state->sane) {
-                            strm->msg = (char *)"invalid distance too far back";
+                            strm->msg =
+                                (char *)"invalid distance too far back";
                             state->mode = BAD;
                             break;
                         }
@@ -217,7 +214,7 @@ unsigned start;         /* inflate()'s starting value for strm->avail_out */
 #endif
                     }
                     from = window - OFF;
-                    if (wwrite == 0) {           /* very common case */
+                    if (z_write == 0) {           /* very common case */
                         from += wsize - op;
                         if (op < len) {         /* some from window */
                             len -= op;
@@ -227,17 +224,17 @@ unsigned start;         /* inflate()'s starting value for strm->avail_out */
                             from = out - dist;  /* rest from output */
                         }
                     }
-                    else if (wwrite < op) {      /* wrap around window */
-                        from += wsize + wwrite - op;
-                        op -= wwrite;
+                    else if (z_write < op) {      /* wrap around window */
+                        from += wsize + z_write - op;
+                        op -= z_write;
                         if (op < len) {         /* some from end of window */
                             len -= op;
                             do {
                                 PUP(out) = PUP(from);
                             } while (--op);
                             from = window - OFF;
-                            if (wwrite < len) {  /* some from start of window */
-                                op = wwrite;
+                            if (z_write < len) {  /* some from start of window */
+                                op = z_write;
                                 len -= op;
                                 do {
                                     PUP(out) = PUP(from);
@@ -247,7 +244,7 @@ unsigned start;         /* inflate()'s starting value for strm->avail_out */
                         }
                     }
                     else {                      /* contiguous in window */
-                        from += wwrite - op;
+                        from += z_write - op;
                         if (op < len) {         /* some from window */
                             len -= op;
                             do {
