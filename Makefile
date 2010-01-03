@@ -22,6 +22,7 @@ RM = rm -f
 #CFLAGS = -I. -O -Wall
 #CFLAGS = -I. -O2 -fomit-frame-pointer -Wall
 #CFLAGS = -I. -O3 -fomit-frame-pointer -Wall
+#CFLAGS = -I. -Os -fomit-frame-pointer -Wall
 CFLAGS = -I. -O3 -funroll-loops -fomit-frame-pointer -Wall -Wshadow
 #CFLAGS = -I${ZINC} -I. -O3 -fomit-frame-pointer -Wall
 # [note that -Wall is a gcc-specific compilation flag ("all warnings on")]
@@ -51,7 +52,7 @@ EXES = $(PNGCRUSH)$(E)
 
 # implicit make rules -------------------------------------------------------
 
-.c$(O): png.h pngconf.h pngcrush.h cexcept.h $(ZHDR)
+.c$(O): png.h pngconf.h pngcrush.h cexcept.h pngpriv.h $(ZHDR)
 	$(CC) -c $(CFLAGS) $<
 
 

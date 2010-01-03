@@ -160,8 +160,9 @@
 
 Change log:
 
-Version 1.7.7  (built with libpng-1.4.0rc04 and zlib-1.2.3.4)
-  Check "-plte_len n" option for out-of-range value of n.
+Version 1.7.7  (built with libpng-1.4.0 and zlib-1.2.3.4)
+  Updated bundled libpng to version 1.4.0.
+  Check the "-plte_len n" option for out-of-range value of n.
   Changed local variable "write" to "z_write" in inffast.c (zlib-1.2.3.4)
     to avoid shadowed declaration warning.
 
