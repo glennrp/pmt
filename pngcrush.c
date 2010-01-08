@@ -1,6 +1,6 @@
 /*
  * pngcrush.c - recompresses png files
- * Copyright (C) 1998-2002,2006-2009 Glenn Randers-Pehrson
+ * Copyright (C) 1998-2002,2006-2010 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
  * Copyright (C) 2005      Greg Roelofs
  *
@@ -71,7 +71,7 @@
  *
  * COPYRIGHT:
  *
- * Copyright (C) 1998-2002,2006-2009 Glenn Randers-Pehrson
+ * Copyright (C) 1998-2002,2006-2010 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
  * Copyright (C) 2005      Greg Roelofs
  *
@@ -161,6 +161,7 @@
 Change log:
 
 Version 1.7.8  (built with libpng-1.4.0 and zlib-1.2.3.5)
+  Removed gzio.c
 
 Version 1.7.7  (built with libpng-1.4.0 and zlib-1.2.3.4)
   Updated bundled libpng to version 1.4.0.
@@ -6705,7 +6706,7 @@ void print_version_info(void)
       " | pngcrush %s\n"
       /* If you have modified this source, you may insert additional notices
        * immediately after this sentence: */
-      " |    Copyright (C) 1998-2002,2006-2009 Glenn Randers-Pehrson\n"
+      " |    Copyright (C) 1998-2002,2006-2010 Glenn Randers-Pehrson\n"
       " |    Copyright (C) 2005      Greg Roelofs\n"
       " | This is a free, open-source program.  Permission is irrevocably\n"
       " | granted to everyone to use this version of pngcrush without\n"
@@ -6713,7 +6714,7 @@ void print_version_info(void)
       " | Executable name is %s\n"
       " | It was built with libpng version %s, and is\n"
       " | running with %s"
-      " |    Copyright (C) 1998-2004,2006-2009 Glenn Randers-Pehrson,\n"
+      " |    Copyright (C) 1998-2004,2006-2010 Glenn Randers-Pehrson,\n"
       " |    Copyright (C) 1996, 1997 Andreas Dilger,\n"
       " |    Copyright (C) 1995, Guy Eric Schalnat, Group 42 Inc.,\n"
       " | and zlib version %s, Copyright (C) 1998-2002 (or later),\n"
@@ -6751,7 +6752,7 @@ static const char *pngcrush_legal[] = {
     "",
     "If you have modified this source, you may insert additional notices",
     "immediately after this sentence.",
-    "Copyright (C) 1998-2002,2006-2009 Glenn Randers-Pehrson",
+    "Copyright (C) 1998-2002,2006-2010 Glenn Randers-Pehrson",
     "Copyright (C) 2005      Greg Roelofs",
     "",
     "DISCLAIMER: The pngcrush computer program is supplied \"AS IS\".",
