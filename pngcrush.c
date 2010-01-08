@@ -160,6 +160,8 @@
 
 Change log:
 
+Version 1.7.8  (built with libpng-1.4.0 and zlib-1.2.3.5)
+
 Version 1.7.7  (built with libpng-1.4.0 and zlib-1.2.3.4)
   Updated bundled libpng to version 1.4.0.
   Check the "-plte_len n" option for out-of-range value of n.
