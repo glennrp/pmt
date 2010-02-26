@@ -1,5 +1,5 @@
 /* zconf.h -- configuration of the zlib compression library
- * Copyright (C) 1995-2007 Jean-loup Gailly.
+ * Copyright (C) 1995-2010 Jean-loup Gailly.
  * For conditions of distribution and use, see copyright notice in zlib.h
  */
 
@@ -26,11 +26,13 @@
 #  define _tr_tally             z__tr_tally
 #  define adler32               z_adler32
 #  define adler32_combine       z_adler32_combine
+#  define adler32_combine64     z_adler32_combine64
 #  define compress              z_compress
 #  define compress2             z_compress2
 #  define compressBound         z_compressBound
 #  define crc32                 z_crc32
 #  define crc32_combine         z_crc32_combine
+#  define crc32_combine64       z_crc32_combine64
 #  define deflate               z_deflate
 #  define deflateBound          z_deflateBound
 #  define deflateCopy           z_deflateCopy
@@ -45,6 +47,9 @@
 #  define deflateTune           z_deflateTune
 #  define deflate_copyright     z_deflate_copyright
 #  define get_crc_table         z_get_crc_table
+#  define gz_error              z_gz_error
+#  define gz_intmax             z_gz_intmax
+#  define gz_strwinerror        z_gz_strwinerror
 #  define gzbuffer              z_gzbuffer
 #  define gzclearerr            z_gzclearerr
 #  define gzclose               z_gzclose
@@ -58,15 +63,19 @@
 #  define gzgetc                z_gzgetc
 #  define gzgets                z_gzgets
 #  define gzoffset              z_gzoffset
+#  define gzoffset64            z_gzoffset64
 #  define gzopen                z_gzopen
+#  define gzopen64              z_gzopen64
 #  define gzprintf              z_gzprintf
 #  define gzputc                z_gzputc
 #  define gzputs                z_gzputs
 #  define gzread                z_gzread
 #  define gzrewind              z_gzrewind
 #  define gzseek                z_gzseek
+#  define gzseek64              z_gzseek64
 #  define gzsetparams           z_gzsetparams
 #  define gztell                z_gztell
+#  define gztell64              z_gztell64
 #  define gzungetc              z_gzungetc
 #  define gzwrite               z_gzwrite
 #  define inflate               z_inflate
@@ -85,12 +94,12 @@
 #  define inflateSetDictionary  z_inflateSetDictionary
 #  define inflateSync           z_inflateSync
 #  define inflateSyncPoint      z_inflateSyncPoint
+#  define inflateUndermine      z_inflateUndermine
 #  define inflate_copyright     z_inflate_copyright
 #  define inflate_fast          z_inflate_fast
 #  define inflate_table         z_inflate_table
 #  define uncompress            z_uncompress
 #  define zError                z_zError
-#  define z_errmsg              z_z_errmsg
 #  define zcalloc               z_zcalloc
 #  define zcfree                z_zcfree
 #  define zlibCompileFlags      z_zlibCompileFlags
@@ -113,18 +122,12 @@
 #  define uLong                 z_uLong
 #  define uLongf                z_uLongf
 #  define voidp                 z_voidp
-#  define voidp                 z_voidp
-#  define voidpc                z_voidpc
 #  define voidpc                z_voidpc
 #  define voidpf                z_voidpf
-#  define voidpf                z_voidpf
-#  define z_stream              z_z_stream
-#  define z_streamp             z_z_streamp
 
 /* all zlib structs in zlib.h and zconf.h */
 #  define gz_header_s           z_gz_header_s
 #  define internal_state        z_internal_state
-#  define z_stream_s            z_z_stream_s
 
 #endif
 
@@ -357,7 +360,20 @@ typedef uLong FAR uLongf;
    typedef Byte       *voidp;
 #endif
 
-#include "zlibdefs.h"       /* created by configure */
+#if 1    /* was set to #if 1 by ./configure */
+#  define Z_HAVE_UNISTD_H
+#endif
+
+#ifdef Z_HAVE_UNISTD_H
+#  include <sys/types.h>    /* for off_t */
+#  include <unistd.h>       /* for SEEK_* and off_t */
+#  ifdef VMS
+#    include <unixio.h>     /* for off_t */
+#  endif
+#  ifndef z_off_t
+#    define z_off_t off_t
+#  endif
+#endif
 
 #ifdef _LARGEFILE64_SOURCE
 #  include <sys/types.h>
@@ -382,19 +398,19 @@ typedef uLong FAR uLongf;
 
 /* MVS linker does not support external names larger than 8 bytes */
 #if defined(__MVS__)
-#   pragma map(deflateInit_,"DEIN")
-#   pragma map(deflateInit2_,"DEIN2")
-#   pragma map(deflateEnd,"DEEND")
-#   pragma map(deflateBound,"DEBND")
-#   pragma map(inflateInit_,"ININ")
-#   pragma map(inflateInit2_,"ININ2")
-#   pragma map(inflateEnd,"INEND")
-#   pragma map(inflateSync,"INSY")
-#   pragma map(inflateSetDictionary,"INSEDI")
-#   pragma map(compressBound,"CMBND")
-#   pragma map(inflate_table,"INTABL")
-#   pragma map(inflate_fast,"INFA")
-#   pragma map(inflate_copyright,"INCOPY")
+  #pragma map(deflateInit_,"DEIN")
+  #pragma map(deflateInit2_,"DEIN2")
+  #pragma map(deflateEnd,"DEEND")
+  #pragma map(deflateBound,"DEBND")
+  #pragma map(inflateInit_,"ININ")
+  #pragma map(inflateInit2_,"ININ2")
+  #pragma map(inflateEnd,"INEND")
+  #pragma map(inflateSync,"INSY")
+  #pragma map(inflateSetDictionary,"INSEDI")
+  #pragma map(compressBound,"CMBND")
+  #pragma map(inflate_table,"INTABL")
+  #pragma map(inflate_fast,"INFA")
+  #pragma map(inflate_copyright,"INCOPY")
 #endif
 
 #endif /* ZCONF_H */

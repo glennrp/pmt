@@ -15,6 +15,13 @@
 #include <malloc.h>
 */
 
+#define TOO_FAR 32767
+
+#define PNG_USER_CHUNK_MALLOC_MAX 4000000L
+#define PNG_USER_CHUNK_CACHE_MAX 500
+#define PNG_NO_SET_USER_LIMITS
+#define PNG_NO_USER_LIMITS
+
 #define PNG_NO_GLOBAL_ARRAYS
 
 #ifndef PNG_NO_ZALLOC_ZERO
@@ -42,7 +49,9 @@
 
 # define PNG_NO_READ_cHRM
 # define PNG_NO_READ_hIST
+#if 0
 # define PNG_NO_READ_iCCP
+#endif
 # define PNG_NO_READ_pCAL
 # define PNG_NO_READ_sCAL
 # define PNG_NO_READ_sPLT

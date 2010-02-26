@@ -1,6 +1,6 @@
 # Sample makefile for pngcrush using gcc and GNU make.
 # Glenn Randers-Pehrson
-# Last modified:  19 February 2005
+# Last modified:  3 January 2010
 #
 # Invoke this makefile from a shell prompt in the usual way; for example:
 #
@@ -16,8 +16,6 @@
 
 CC = gcc
 LD = gcc
-# CC = /usr/local/bin/gcc-4.4.1
-# LD = /usr/local/bin/gcc-4.4.1
 RM = rm -f
 #CFLAGS = -I. -O -Wall
 #CFLAGS = -I. -O2 -fomit-frame-pointer -Wall
@@ -38,7 +36,7 @@ LIBS = -lm
 
 # uncomment these 4 lines only if you are NOT using an external copy of zlib:
 ZHDR = zlib.h
-ZOBJS  = adler32$(O) compress$(O) crc32$(O) deflate$(O) gzio$(O) \
+ZOBJS  = adler32$(O) compress$(O) crc32$(O) deflate$(O) \
 	 infback$(O) inffast$(O) inflate$(O) inftrees$(O) \
 	 trees$(O) uncompr$(O) zutil$(O)
 

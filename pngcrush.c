@@ -57,7 +57,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.6"
+#define PNGCRUSH_VERSION "1.7.9"
 
 /*
 #define PNGCRUSH_COUNT_COLORS
@@ -159,6 +159,11 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.9  (built with libpng-1.4.1 and zlib-1.2.3.9)
+  Defined TOO_FAR == 32767 in pngcrush.h (instead of in deflate.c)
+  Revised the "nolib" Makefiles to remove reference to gzio.c and
+    pnggccrd.c
 
 Version 1.7.8  (built with libpng-1.4.0 and zlib-1.2.3.5)
   Removed gzio.c
@@ -1051,7 +1056,7 @@ static int text_inputs = 0;
 int text_where[10];           /* 0: no text; 1: before PLTE; 2: after PLTE */
 int text_compression[10];     /* -1: uncompressed tEXt; 0: compressed zTXt
                                   1: uncompressed iTXt; 2: compressed iTXt */
-char text_text[20480];        /* It would be nice to png_malloc this, but we
+char text_text[2048];        /* It would be nice to png_malloc this, but we
                                * don't have a png_ptr yet when we need it. */
 char text_keyword[800];
 
@@ -3598,6 +3603,20 @@ int main(int argc, char *argv[])
 #endif
                 if (read_ptr == NULL)
                     Throw "pngcrush could not create read_ptr";
+
+#ifdef PNG_SET_USER_LIMITS_SUPPORTED
+# if PNG_LIBPNG_VER >= 10400
+                png_set_chunk_cache_max(read_ptr, 500);
+# endif
+# if PNG_LIBPNG_VER >= 10401
+                png_set_chunk_malloc_max(read_ptr, 4000000L);
+# endif
+#endif
+#if 0
+                /* Use a smaller decompression buffer for speed */
+                png_set_compression_buffer_size(read_ptr,
+                    (png_size_t)256);
+#endif
 
                 if (nosave == 0)
                 {
