@@ -3,6 +3,11 @@
 
 Change log:
 
+Version 1.7.10  (built with libpng-1.4.1 and zlib-1.2.3.9)
+  Added missing "(...)" in png_get_uint_32().
+  Only compile png_get_uint_32(), etc., when PNG_LIBPNG_VER < 1.2.9
+  Revised help info for "-zitxt".
+
 Version 1.7.9  (built with libpng-1.4.1 and zlib-1.2.3.9)
   Defined TOO_FAR == 32767 in pngcrush.h (instead of in deflate.c)
   Revised the "nolib" Makefiles to remove reference to gzio.c and

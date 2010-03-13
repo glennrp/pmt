@@ -57,7 +57,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.9"
+#define PNGCRUSH_VERSION "1.7.10"
 
 /*
 #define PNGCRUSH_COUNT_COLORS
@@ -159,6 +159,11 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.10  (built with libpng-1.4.1 and zlib-1.2.3.9)
+  Added missing "(...)" in png_get_uint_32().
+  Only compile png_get_uint_32(), etc., when PNG_LIBPNG_VER < 1.2.9
+  Revised help info for "-zitxt".
 
 Version 1.7.9  (built with libpng-1.4.1 and zlib-1.2.3.9)
   Defined TOO_FAR == 32767 in pngcrush.h (instead of in deflate.c)
@@ -1251,21 +1256,24 @@ void print_usage(int retval);
  * ============================================================
  */
 
-#ifndef PNG_READ_BIG_ENDIAN_SUPPORTED
+
+#  if (PNG_LIBPNG_VER < 10209)
+#    ifndef PNG_READ_BIG_ENDIAN_SUPPORTED
 /* Grab an unsigned 32-bit integer from a buffer in big-endian format. */
 png_uint_32 /* PRIVATE */
 png_get_uint_32(png_bytep buf)
 {
-   png_uint_32 i = ((png_uint_32)(*buf) << 24) +
+   png_uint_32 i =
+      ((png_uint_32)(*(buf    )) << 24) +
       ((png_uint_32)(*(buf + 1)) << 16) +
-      ((png_uint_32)(*(buf + 2)) << 8) +
-      (png_uint_32)(*(buf + 3));
+      ((png_uint_32)(*(buf + 2)) <<  8) +
+      ((png_uint_32)(*(buf + 3))      ) ;
 
    return (i);
 }
-#else
-#  define png_get_uint_32(buf) ( *((png_uint_32p) (buf)))
-#endif
+#    else
+#      define png_get_uint_32(buf) ( *((png_uint_32p) (buf)))
+#    endif
 png_uint_32 /* PRIVATE */
 png_get_uint_31(png_structp png_ptr, png_bytep buf)
 {
@@ -1282,6 +1290,7 @@ png_save_uint_32(png_bytep buf, png_uint_32 i)
    buf[2] = (png_byte)((i >> 8) & 0xff);
    buf[3] = (png_byte)(i & 0xff);
 }
+#  endif  /* PNG_LIBPNG_VER < 10209 */
 
 /*
  * Reset the CRC variable to 32 bits of 1's.  Care must be taken
@@ -3447,12 +3456,14 @@ int main(int argc, char *argv[])
 
                     for (;;)
                     {
-                        png_size_t num_in;
+                        png_size_t num_in, num_out;
 
                         num_in = fread(buffer, 1, 1, fpin);
                         if (!num_in)
                             break;
-                        fwrite(buffer, 1, 1, fpout);
+                        num_out = fwrite(buffer, 1, 1, fpout);
+                        if (num_out != num_in)
+                            P2("copy error.\n");
                     }
                     P2("copy complete.\n");
                     png_crush_pause();
@@ -7139,9 +7150,10 @@ struct options_help pngcrush_options[] = {
     {2, ""},
 
 #ifdef PNG_iTXt_SUPPORTED
-    {0, "        -zitxt b[efore_IDAT]|a[fter_IDAT] \"keyword\""},
-    {2, "               \"language_code\" \"translated_keyword\" \"text\""},
+    {0, "        -zitxt b|a \"keyword\" \"lcode\" \"tkey\" \"text\""},
     {2, ""},
+    {2, "               (where \"lcode\"==language_code and"},
+    {2, "                \"tkey\"==translated_keyword)\""},
     {2, "               Compressed iTXt chunk to insert (see -text)."},
     {2, ""},
 #endif
