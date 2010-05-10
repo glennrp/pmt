@@ -57,7 +57,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.10"
+#define PNGCRUSH_VERSION "1.7.11"
 
 /*
 #define PNGCRUSH_COUNT_COLORS
@@ -159,6 +159,8 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.11  (built with libpng-1.4.2 and zlib-1.2.5)
 
 Version 1.7.10  (built with libpng-1.4.1 and zlib-1.2.3.9)
   Added missing "(...)" in png_get_uint_32().
@@ -4970,7 +4972,7 @@ int main(int argc, char *argv[])
                         png_free(write_ptr, unknowns_keep);
                     }
                 }
-              P0("unknown chunk handling done.\n");
+              P1("unknown chunk handling done.\n");
 #endif /* PNG_WRITE_UNKNOWN_CHUNKS_SUPPORTED */
 
                 /* } GRR added for quick %-navigation (1) */
