@@ -3,6 +3,22 @@
 
 Change log:
 
+Version 1.7.15  (built with libpng-1.5.2rc02 and zlib-1.2.5)
+  Force bit_depth to 1, 2, or 4 when -plte_len is <=2, <=4, or <=16 and
+    the -bit_depth option is not present, to avoid writing invalid palette
+    indexes.
+
+Version 1.7.14  (built with libpng-1.5.1beta08 and zlib-1.2.5)
+  Removed WIN32_WCE support (libpng has dropped it already)
+  Include zlib.h and define png_memcpy, etc., and revise the
+    png_get_iCCP() and png_set_iCCP() calls to be able to build
+    with bundled libpng-1.5.x.  Pngcrush cannot be built yet with
+    a system libpng-1.5.x.
+
+Version 1.7.13  (built with libpng-1.4.5 and zlib-1.2.5)
+
+Version 1.7.12  (built with libpng-1.4.4beta05 and zlib-1.2.5)
+
 Version 1.7.11  (built with libpng-1.4.2 and zlib-1.2.5)
 
 Version 1.7.10  (built with libpng-1.4.1 and zlib-1.2.3.9)
