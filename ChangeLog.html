@@ -3,6 +3,10 @@
 
 Change log:
 
+Version 1.7.16  (built with libpng-1.5.4 and zlib-1.2.5)
+  Only report best method==0 if pngcrush cannot match the input filesize.
+    Otherwise, if there is no improvement, report the first matching method.
+
 Version 1.7.15  (built with libpng-1.5.2rc02 and zlib-1.2.5)
   Force bit_depth to 1, 2, or 4 when -plte_len is <=2, <=4, or <=16 and
     the -bit_depth option is not present, to avoid writing invalid palette

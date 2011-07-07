@@ -57,7 +57,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.15"
+#define PNGCRUSH_VERSION "1.7.16"
 
 /*
 #define PNGCRUSH_COUNT_COLORS
@@ -111,6 +111,20 @@
  *   Reset CINFO to reflect decoder's required window size (instead of
  *   libz-1.1.3 encoder's required window size, which is 262 bytes larger).
  *   See discussion about zlib in png-list archives for April 2001.
+ *   libpng-1.2.9 does some of this and libpng-1.5.4 does better.
+ *   But neither has access to the entire datastream, so pngcrush could
+ *   do even better.
+ *
+ *   In the meantime, one can just do the following and select the smallest
+ *   window that does not increase the filesize:
+ *
+ *      for w in 32 16 8 4 2 1 512
+ *      do
+ *      pngcrush -m <best method> -w $w $1 w-$w.png
+ *      done
+ *
+ *   Use pngcheck -v and look at the IDAT report to find out what window
+ *   size is actually set in a png file.
  *
  *   Add a "pcRu" ancillary chunk that keeps track of the best method,
  *   methods already tried, and whether "loco crushing" was effective.
@@ -118,7 +132,7 @@
  *   Try both transformed and untransformed colors when "-loco" is used.
  *
  *   Check for unused alpha channel and ok-to-reduce-depth.
- *   Take care that sBIT and bKGD data aren't lost when reducing images
+ *   Take care that sBIT and bKGD data are not lost when reducing images
  *   from truecolor to grayscale.
  *
  *   Rearrange palette to put most-used color first and transparent color
@@ -132,7 +146,9 @@
  *
  *   Use an alternate write function for the trial passes, that
  *   simply counts bytes rather than actually writing to a file, to save wear
- *   and tear on disk drives.
+ *   and tear on disk drives (actually, on modern operating systems it
+ *   will only save wear and tear on the memory cache) and possibly some
+ *   CPU time.
  *
  *   Remove text-handling and color-handling features and put
  *   those in a separate program or programs, to avoid unnecessary
@@ -146,7 +162,7 @@
  *   libpng (maybe IDAT-compression parts only?), instead handling virtually
  *   all chunks as opaque binary blocks that are copied to output file _once_,
  *   with IDATs alone replaced (either by best in-memory result or by original
- *   _data_ resplit into bigger IDATs, if pngcrush can't match/beat).  "edit"
+ *   _data_ resplit into bigger IDATs, if pngcrush cannot match/beat).  "edit"
  *   version should be similar to current code but more efficient:  make
  *   _one_ pass through args list, creating table of PNG_UINTs for removal;
  *   then make initial pass through PNG image, creating (in-order) table of
@@ -159,6 +175,10 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.16  (built with libpng-1.5.4 and zlib-1.2.5)
+  Only report best method==0 if pngcrush cannot match the input filesize.
+    Otherwise, if there is no improvement, report the first matching method.
 
 Version 1.7.15  (built with libpng-1.5.2rc02 and zlib-1.2.5)
   Force bit_depth to 1, 2, or 4 when -plte_len is <=2, <=4, or <=16 and
@@ -689,6 +709,7 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 #error pngcrush-nolib requires libpng-1.4 or earlier
 #    include <zlib.h>
 #  endif
+
    /* The following became unavailable to applications in libpng
     * version 1.5.0
     */
@@ -3443,6 +3464,11 @@ int main(int argc, char *argv[])
                 best_length = (png_uint_32) 0xffffffff;
                 for (j = things_have_changed; j < MAX_METHODS; j++)
                 {
+                    if (best == 0 && best_length == idat_length[j])
+                    {
+                        /* If no change, report the first match */
+                        best = j;
+                    }
                     if (best_length > idat_length[j])
                     {
                         best_length = idat_length[j];
@@ -5730,11 +5756,20 @@ int main(int argc, char *argv[])
             {
                 total_input_length += input_length + output_length;
 
-                if (!already_crushed && !image_is_immutable)
+                if (best == 0)
                 {
-                fprintf(STDERR, "   Best pngcrush method = %d (fm %d zl %d zs %d) "
+                  fprintf(STDERR,
+                  "   Best pngcrush method = 0 (settings undetermined) for %s",
+                  outname);
+                }
+
+                else if (!already_crushed && !image_is_immutable)
+                {
+                fprintf(STDERR,
+                  "   Best pngcrush method = %d (fm %d zl %d zs %d) "
                   "for %s\n", best, fm[best], lv[best], zs[best], outname);
                 }
+
                 if (idat_length[0] == idat_length[best])
                     fprintf(STDERR, "     (no IDAT change)\n");
                 else if (idat_length[0] > idat_length[best])
