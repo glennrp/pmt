@@ -57,7 +57,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.16"
+#define PNGCRUSH_VERSION "1.7.17"
 
 /*
 #define PNGCRUSH_COUNT_COLORS
@@ -108,6 +108,11 @@
 
 /* To do:
  *
+ *   Eliminate direct access to png_info members so pngcrush will work
+ *   with the system libpng15.  For now, it works with the bundled libpng15,
+ *   but requires libpng14 or an earlier system library.
+ *   See about 300 lines enclosed in #if (!defined(PNGCRUSH_H)) / #endif
+ *
  *   Reset CINFO to reflect decoder's required window size (instead of
  *   libz-1.1.3 encoder's required window size, which is 262 bytes larger).
  *   See discussion about zlib in png-list archives for April 2001.
@@ -116,11 +121,12 @@
  *   do even better.
  *
  *   In the meantime, one can just do the following and select the smallest
- *   window that does not increase the filesize:
+ *   window that does not increase the filesize, after running pngcrush once
+ *   and observing what was the best pngcrush method:
  *
  *      for w in 32 16 8 4 2 1 512
  *      do
- *      pngcrush -m <best method> -w $w $1 w-$w.png
+ *      pngcrush -m <best_pngcrush_method> -w $w $1 w-$w.png
  *      done
  *
  *   Use pngcheck -v and look at the IDAT report to find out what window
@@ -167,14 +173,23 @@
  *   _one_ pass through args list, creating table of PNG_UINTs for removal;
  *   then make initial pass through PNG image, creating (in-order) table of
  *   all chunks (and byte offsets?) and marking each as "keep" or "remove"
- *   according to args table.  Can start with static table of ~20-30 slots,
+ *   according to args table.  Could start with static table of ~20-30 slots,
  *   then double size & copy if run out of room:  still O(n) algorithm.
+ *
+ *   Blacken underlying colors of fully transparent pixels using a
+ *     png user transform callback function, if "-blacken" option is present.
  *
  */
 
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.17  (built with libpng-1.5.4 and zlib-1.2.5)
+  Changed "#if !defined(PNG_NO_STDIO)" to "#ifdef PNG_STDIO_SUPPORTED"
+    as recommended in the libpng documentation.
+  Added PNG_UINT_32_NAME macro and used it to simplify chunk_type integer
+    definitions.
 
 Version 1.7.16  (built with libpng-1.5.4 and zlib-1.2.5)
   Only report best method==0 if pngcrush cannot match the input filesize.
@@ -191,6 +206,7 @@ Version 1.7.14  (built with libpng-1.5.1beta08 and zlib-1.2.5)
     png_get_iCCP() and png_set_iCCP() calls to be able to build
     with bundled libpng-1.5.x.  Pngcrush cannot be built yet with
     a system libpng-1.5.x.
+  Dropped most of pngcrush.h, that eliminates various parts of libpng.
 
 Version 1.7.13  (built with libpng-1.4.5 and zlib-1.2.5)
 
@@ -740,189 +756,112 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 #define PNG_IEND const png_byte png_IEND[5] = { 73,  69,  78,  68, '\0'}
 
 /* GRR 20050220:  added these, which apparently aren't defined anywhere else */
+/* GRP 20110714:  define PNG_UINT_32_NAME macro and used that instead */
+#define PNG_UINT_32_NAME(a,b,c,d) \
+                    ((png_uint_32) (a) << 24  | \
+                    ((png_uint_32) (b) << 16) | \
+                    ((png_uint_32) (c) <<  8) | \
+                    ((png_uint_32) (d)      ))
 #ifndef PNG_UINT_IHDR
-#  define PNG_UINT_IHDR (((png_uint_32)  73<<24) | \
-                         ((png_uint_32)  72<<16) | \
-                         ((png_uint_32)  68<< 8) | \
-                         ((png_uint_32)  82    ))
+#  define PNG_UINT_IHDR PNG_UINT_32_NAME(73, 72, 68, 82)
 #endif
 
 #ifndef PNG_UINT_IDAT
-#  define PNG_UINT_IDAT (((png_uint_32)  73<<24) | \
-                         ((png_uint_32)  68<<16) | \
-                         ((png_uint_32)  65<< 8) | \
-                         ((png_uint_32)  84    ))
+#  define PNG_UINT_IDAT PNG_UINT_32_NAME(73, 68, 65, 84)
 #endif
 
 #ifndef PNG_UINT_IEND
-#  define PNG_UINT_IEND (((png_uint_32)  73<<24) | \
-                         ((png_uint_32)  69<<16) | \
-                         ((png_uint_32)  78<< 8) | \
-                         ((png_uint_32)  68    ))
+#  define PNG_UINT_IEND PNG_UINT_32_NAME(73, 69, 78, 68)
 #endif
 
 #ifndef PNG_UINT_PLTE
-#  define PNG_UINT_PLTE (((png_uint_32)  80<<24) | \
-                         ((png_uint_32)  76<<16) | \
-                         ((png_uint_32)  84<< 8) | \
-                         ((png_uint_32)  69    ))
+#  define PNG_UINT_PLTE PNG_UINT_32_NAME(80, 76, 84, 69)
 #endif
 
 #ifndef PNG_UINT_bKGD
-#  define PNG_UINT_bKGD (((png_uint_32)  98<<24) | \
-                         ((png_uint_32)  75<<16) | \
-                         ((png_uint_32)  71<< 8) | \
-                         ((png_uint_32)  68    ))
+#  define PNG_UINT_bKGD PNG_UINT_32_NAME(98, 75, 71, 68)
 #endif
 
 /* glennrp added CgBI at pngcrush-1.6.16 */
 #ifndef PNG_UINT_CgBI
-#  define PNG_UINT_CgBI (((png_uint_32)  67<<24) | \
-                         ((png_uint_32) 103<<16) | \
-                         ((png_uint_32)  66<< 8) | \
-                         ((png_uint_32)  73    ))
+#  define PNG_UINT_CgBI PNG_UINT_32_NAME(67,103, 66, 73)
 #endif
 
-/* glennrp added acTL, fcTL, and fdAt at pngcrush-1.7.0 */
-#  define PNG_UINT_acTL (((png_uint_32)  97<<24) | \
-                         ((png_uint_32)  99<<16) | \
-                         ((png_uint_32)  84<< 8) | \
-                         ((png_uint_32)  76    ))
-
-#  define PNG_UINT_fcTL (((png_uint_32) 102<<24) | \
-                         ((png_uint_32)  99<<16) | \
-                         ((png_uint_32)  84<< 8) | \
-                         ((png_uint_32)  76    ))
-
-#  define PNG_UINT_fdAT (((png_uint_32) 102<<24) | \
-                         ((png_uint_32) 100<<16) | \
-                         ((png_uint_32)  65<< 8) | \
-                         ((png_uint_32)  84    ))
+/* glennrp added acTL, fcTL, and fdAT at pngcrush-1.7.0 */
+#  define PNG_UINT_acTL PNG_UINT_32_NAME(97, 99, 84, 76)
+#  define PNG_UINT_fcTL PNG_UINT_32_NAME(102, 99, 84, 76)
+#  define PNG_UINT_fdAT PNG_UINT_32_NAME(102,100, 65, 84)
 
 #ifndef PNG_UINT_cHRM
-#  define PNG_UINT_cHRM (((png_uint_32)  99<<24) | \
-                         ((png_uint_32)  72<<16) | \
-                         ((png_uint_32)  82<< 8) | \
-                         ((png_uint_32)  77    ))
+#  define PNG_UINT_cHRM PNG_UINT_32_NAME(99, 72, 82, 77)
 #endif
 
 #ifndef PNG_UINT_dSIG
-#  define PNG_UINT_dSIG (((png_uint_32) 100<<24) | \
-                         ((png_uint_32)  83<<16) | \
-                         ((png_uint_32)  73<< 8) | \
-                         ((png_uint_32)  71    ))
+#  define PNG_UINT_dSIG PNG_UINT_32_NAME(100, 83, 73, 71)
 #endif
 
 #ifndef PNG_UINT_gAMA
-#  define PNG_UINT_gAMA (((png_uint_32) 103<<24) | \
-                         ((png_uint_32)  65<<16) | \
-                         ((png_uint_32)  77<< 8) | \
-                         ((png_uint_32)  65    ))
+#  define PNG_UINT_gAMA PNG_UINT_32_NAME(103, 65, 77, 65)
 #endif
 
 #ifndef PNG_UINT_hIST
-#  define PNG_UINT_hIST (((png_uint_32) 104<<24) | \
-                         ((png_uint_32)  73<<16) | \
-                         ((png_uint_32)  83<< 8) | \
-                         ((png_uint_32)  84    ))
+#  define PNG_UINT_hIST PNG_UINT_32_NAME(104, 73, 83, 84)
 #endif
 
 #ifndef PNG_UINT_iCCP
-#  define PNG_UINT_iCCP (((png_uint_32) 105<<24) | \
-                         ((png_uint_32)  67<<16) | \
-                         ((png_uint_32)  67<< 8) | \
-                         ((png_uint_32)  80    ))
+#  define PNG_UINT_iCCP PNG_UINT_32_NAME(105, 67, 67, 80)
 #endif
 
 #ifndef PNG_UINT_iTXt
-#  define PNG_UINT_iTXt (((png_uint_32) 105<<24) | \
-                         ((png_uint_32)  84<<16) | \
-                         ((png_uint_32)  88<< 8) | \
-                         ((png_uint_32) 116    ))
+#  define PNG_UINT_iTXt PNG_UINT_32_NAME(105, 84, 88, 116)
 #endif
 
 #ifndef PNG_UINT_oFFs
-#  define PNG_UINT_oFFs (((png_uint_32) 111<<24) | \
-                         ((png_uint_32)  70<<16) | \
-                         ((png_uint_32)  70<< 8) | \
-                         ((png_uint_32) 115    ))
+#  define PNG_UINT_oFFs PNG_UINT_32_NAME(111, 70, 70, 115)
 #endif
 
 #ifndef PNG_UINT_pCAL
-#  define PNG_UINT_pCAL (((png_uint_32) 112<<24) | \
-                         ((png_uint_32)  67<<16) | \
-                         ((png_uint_32)  65<< 8) | \
-                         ((png_uint_32)  76    ))
+#  define PNG_UINT_pCAL PNG_UINT_32_NAME(112, 67, 65, 76)
 #endif
 
 #ifndef PNG_UINT_pHYs
-#  define PNG_UINT_pHYs (((png_uint_32) 112<<24) | \
-                         ((png_uint_32)  72<<16) | \
-                         ((png_uint_32)  89<< 8) | \
-                         ((png_uint_32) 115    ))
+#  define PNG_UINT_pHYs PNG_UINT_32_NAME(112, 72, 89, 115)
 #endif
 
 #ifndef PNG_UINT_sBIT
-#  define PNG_UINT_sBIT (((png_uint_32) 115<<24) | \
-                         ((png_uint_32)  66<<16) | \
-                         ((png_uint_32)  73<< 8) | \
-                         ((png_uint_32)  84    ))
+#  define PNG_UINT_sBIT PNG_UINT_32_NAME(115, 66, 73, 84)
 #endif
 
 #ifndef PNG_UINT_sCAL
-#  define PNG_UINT_sCAL (((png_uint_32) 115<<24) | \
-                         ((png_uint_32)  67<<16) | \
-                         ((png_uint_32)  65<< 8) | \
-                         ((png_uint_32)  76    ))
+#  define PNG_UINT_sCAL PNG_UINT_32_NAME(115, 67, 65, 76)
 #endif
 
 #ifndef PNG_UINT_sPLT
-#  define PNG_UINT_sPLT (((png_uint_32) 115<<24) | \
-                         ((png_uint_32)  80<<16) | \
-                         ((png_uint_32)  76<< 8) | \
-                         ((png_uint_32)  84    ))
-#endif
-
-#ifndef PNG_UINT_sTER
-#  define PNG_UINT_sTER (((png_uint_32) 115<<24) | \
-                         ((png_uint_32)  84<<16) | \
-                         ((png_uint_32)  69<< 8) | \
-                         ((png_uint_32)  82    ))
+#  define PNG_UINT_sPLT PNG_UINT_32_NAME(115, 80, 76, 84)
 #endif
 
 #ifndef PNG_UINT_sRGB
-#  define PNG_UINT_sRGB (((png_uint_32) 115<<24) | \
-                         ((png_uint_32)  82<<16) | \
-                         ((png_uint_32)  71<< 8) | \
-                         ((png_uint_32)  66    ))
+#  define PNG_UINT_sRGB PNG_UINT_32_NAME(115, 82, 71, 66)
+#endif
+
+#ifndef PNG_UINT_sTER
+#  define PNG_UINT_sTER PNG_UINT_32_NAME(115, 84, 69, 82)
 #endif
 
 #ifndef PNG_UINT_tEXt
-#  define PNG_UINT_tEXt (((png_uint_32) 116<<24) | \
-                         ((png_uint_32)  69<<16) | \
-                         ((png_uint_32)  88<< 8) | \
-                         ((png_uint_32) 116    ))
+#  define PNG_UINT_tEXt PNG_UINT_32_NAME(116, 69, 88, 116)
 #endif
 
 #ifndef PNG_UINT_tIME
-#  define PNG_UINT_tIME (((png_uint_32) 116<<24) | \
-                         ((png_uint_32)  73<<16) | \
-                         ((png_uint_32)  77<< 8) | \
-                         ((png_uint_32)  69    ))
+#  define PNG_UINT_tIME PNG_UINT_32_NAME(116, 73, 77, 69)
 #endif
 
 #ifndef PNG_UINT_tRNS
-#  define PNG_UINT_tRNS (((png_uint_32) 116<<24) | \
-                         ((png_uint_32)  82<<16) | \
-                         ((png_uint_32)  78<< 8) | \
-                         ((png_uint_32)  83    ))
+#  define PNG_UINT_tRNS PNG_UINT_32_NAME(116, 82, 78, 83)
 #endif
 
 #ifndef PNG_UINT_zTXt
-#  define PNG_UINT_zTXt (((png_uint_32) 122<<24) | \
-                         ((png_uint_32)  84<<16) | \
-                         ((png_uint_32)  88<< 8) | \
-                         ((png_uint_32) 116    ))
+#  define PNG_UINT_zTXt PNG_UINT_32_NAME(122, 84, 88, 116)
 #endif
 
 #define PNG_FLAG_CRC_ANCILLARY_USE        0x0100
@@ -1624,7 +1563,7 @@ defined(PNG_READ_USER_TRANSFORM_SUPPORTED)
 
 #endif /* !defined(PNGCRUSH_H) */
 
-#if !defined(PNG_NO_STDIO)
+#ifdef PNG_STDIO_SUPPORTED
 /*
  * This is the function that does the actual reading of data.  If you are
  * not reading from a standard C stream, you should create a replacement
@@ -1698,9 +1637,9 @@ pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
       png_error(png_ptr, "read Error");
 }
 #endif /* USE_FAR_KEYWORD */
-#endif /* !defined(PNG_NO_STDIO) */
+#endif /* PNG_STDIO_SUPPORTED */
 
-#if !defined(PNG_NO_STDIO)
+#ifdef PNG_STDIO_SUPPORTED
 /*
  * This is the function that does the actual writing of data.  If you are
  * not writing to a standard C stream, you should create a replacement
@@ -1769,7 +1708,7 @@ png_defaultwrite_data(png_structp png_ptr, png_bytep data, png_size_t length)
 }
 
 #endif /* USE_FAR_KEYWORD */
-#endif /* !defined(PNG_NO_STDIO) */
+#endif /* PNG_STDIO_SUPPORTED */
 
 
 /* cexcept interface */
@@ -1779,7 +1718,7 @@ static void png_cexcept_error(png_structp png_ptr, png_const_charp err_msg)
     if (png_ptr);
 #ifdef PNGCRUSH_H
     if (!strcmp(err_msg, "Too many IDAT's found")) {
-#ifndef PNG_NO_CONSOLE_IO
+#ifdef PNG_CONSOLE_IO_SUPPORTED
         fprintf(stderr, "\nIn %s, correcting ", inname);
 #else
         png_warning(png_ptr, err_msg);
@@ -3722,7 +3661,7 @@ int main(int argc, char *argv[])
                 pngcrush_pause();
 
                 P1( "Initializing input and output streams\n");
-#if !defined(PNG_NO_STDIO)
+#ifdef PNG_STDIO_SUPPORTED
                 png_init_io(read_ptr, fpin);
                 if (nosave == 0)
                     png_init_io(write_ptr, fpout);
@@ -3737,7 +3676,7 @@ int main(int argc, char *argv[])
 #else
                                      NULL);
 #endif
-#endif /* !defined(PNG_NO_STDIO) */
+#endif /* PNG_STDIO_SUPPORTED */
 
                 P2("io has been initialized.\n");
                 pngcrush_pause();
@@ -5836,7 +5775,7 @@ png_uint_32 measure_idats(FILE * fp_in)
         read_info_ptr = png_create_info_struct(read_ptr);
         end_info_ptr = png_create_info_struct(read_ptr);
 
-#if !defined(PNG_NO_STDIO)
+#ifdef PNG_STDIO_SUPPORTED
         png_init_io(read_ptr, fp_in);
 #else
         png_set_read_fn(read_ptr, (png_voidp) fp_in, (png_rw_ptr) NULL);
@@ -6323,7 +6262,7 @@ int count_colors(FILE * fp_in)
 #endif
             end_info_ptr = NULL;
 
-#if !defined(PNG_NO_STDIO)
+#ifdef PNG_STDIO_SUPPORTED
             png_init_io(read_ptr, fp_in);
 #else
             png_set_read_fn(read_ptr, (png_voidp) fp_in, (png_rw_ptr) NULL);
