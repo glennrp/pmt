@@ -5,15 +5,10 @@
  * license (see LICENSE, in pngcrush.c).
  */
 
-/* Special defines for pngcrush, mostly just to reduce the size of the
-   static executable. */
+/* Special defines for pngcrush. */
 
 #ifndef PNGCRUSH_H
 #define PNGCRUSH_H
-
-/*
-#include <malloc.h>
-*/
 
 #define TOO_FAR 32767
 

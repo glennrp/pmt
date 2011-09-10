@@ -3,6 +3,12 @@
 
 Change log:
 
+Version 1.7.17  (built with libpng-1.5.5beta08 and zlib-1.2.5)
+  Changed "#if !defined(PNG_NO_STDIO)" to "#ifdef PNG_STDIO_SUPPORTED"
+    as recommended in the libpng documentation.
+  Added PNG_UINT_32_NAME macro and used it to simplify chunk_type integer
+    definitions.
+
 Version 1.7.16  (built with libpng-1.5.4 and zlib-1.2.5)
   Only report best method==0 if pngcrush cannot match the input filesize.
     Otherwise, if there is no improvement, report the first matching method.
@@ -18,6 +24,7 @@ Version 1.7.14  (built with libpng-1.5.1beta08 and zlib-1.2.5)
     png_get_iCCP() and png_set_iCCP() calls to be able to build
     with bundled libpng-1.5.x.  Pngcrush cannot be built yet with
     a system libpng-1.5.x.
+  Dropped most of pngcrush.h, that eliminates various parts of libpng.
 
 Version 1.7.13  (built with libpng-1.4.5 and zlib-1.2.5)
 

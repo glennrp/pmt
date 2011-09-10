@@ -185,7 +185,7 @@
 
 Change log:
 
-Version 1.7.17  (built with libpng-1.5.4 and zlib-1.2.5)
+Version 1.7.17  (built with libpng-1.5.5beta08 and zlib-1.2.5)
   Changed "#if !defined(PNG_NO_STDIO)" to "#ifdef PNG_STDIO_SUPPORTED"
     as recommended in the libpng documentation.
   Added PNG_UINT_32_NAME macro and used it to simplify chunk_type integer
@@ -3970,9 +3970,11 @@ int main(int argc, char *argv[])
                             need_expand = 1;
 
 #ifdef PNG_READ_RGB_TO_GRAY_SUPPORTED
-                        if ((color_type == 2 || color_type == 6
-                                             || color_type == 3) &&
-                            (output_color_type == 0 || output_color_type == 4))
+                        if ((color_type == 2 ||
+                             color_type == 6 ||
+                             color_type == 3) &&
+                             (output_color_type == 0 ||
+                             output_color_type == 4))
                         {
                             if (verbose > 0 && first_trial)
                             {
@@ -3986,9 +3988,11 @@ int main(int argc, char *argv[])
                                       "image to grayscale.\n");
                             }
 #ifdef PNG_FIXED_POINT_SUPPORTED
-                            png_set_rgb_to_gray_fixed(read_ptr, 1, -1, -1);
+                            png_set_rgb_to_gray_fixed(read_ptr, 1,
+                               21260, 71520);
 #else
-                            png_set_rgb_to_gray(read_ptr, 1, 0., 0.);
+                            png_set_rgb_to_gray(read_ptr, 1,
+                               0.21260, 0.71520);
 #endif
                             if (output_bit_depth < 8)
                                 output_bit_depth = 8;
