@@ -3,6 +3,13 @@
 
 Change log:
 
+Version 1.7.18  (built with libpng-1.5.5 and zlib-1.2.5)
+  This version will work with either a "system" libpng14 or libpng15, or with
+    the embedded libpng15.  The deprecated usage of libpng png_struct members
+    and unexported functions has been removed.
+  Revised the format of the time report (all on one line so you can get
+    a nice compact report by piping the output to "grep coding").
+
 Version 1.7.17  (built with libpng-1.5.5beta08 and zlib-1.2.5)
   Changed "#if !defined(PNG_NO_STDIO)" to "#ifdef PNG_STDIO_SUPPORTED"
     as recommended in the libpng documentation.
