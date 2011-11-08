@@ -3,10 +3,24 @@
 
 Change log:
 
+Version 1.7.21  (built with libpng-1.5.6 and zlib-1.2.5)
+  Defined TOO_FAR=32767 in Makefile (instead of in pngcrush.h)
+
+Version 1.7.20  (built with libpng-1.5.5 and zlib-1.2.5)
+  Removed the call to png_read_transform_info() when the system libpng
+    is being used, so it can be built with a system libpng.
+
+Version 1.7.19  (built with libpng-1.5.5 and zlib-1.2.5)
+  pngcrush-1.7.18 failed to read interlaced PNGs.  Reverted the change
+    from calling png_read_transform_info() to png_read_update_info().
+    Since png_read_transform_info() is not exported we again cannot build
+    with the system libpng15.
+
 Version 1.7.18  (built with libpng-1.5.5 and zlib-1.2.5)
   This version will work with either a "system" libpng14 or libpng15, or with
     the embedded libpng15.  The deprecated usage of libpng png_struct members
     and unexported functions has been removed.
+  Fixing "too far back" errors does not work with libpng15.
   Revised the format of the time report (all on one line so you can get
     a nice compact report by piping the output to "grep coding").
 
@@ -405,7 +419,7 @@ Version 1.4.2 (built with libpng-1.0.6f and cexcept-0.6.0)
 
 Version 1.4.1 (built with libpng-1.0.6e and cexcept-0.6.0)
 
-  Uses cexcept.h for error handling instead of libpngs built-in
+  Uses cexcept.h for error handling instead of the libpng built-in
   setjmp/longjmp mechanism.  See http://cexcept.sf.net/
 
   Pngcrush.c will now run when compiled with old versions of libpng back

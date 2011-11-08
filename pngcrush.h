@@ -10,8 +10,6 @@
 #ifndef PNGCRUSH_H
 #define PNGCRUSH_H
 
-#define TOO_FAR 32767
-
 /* This allows png_default_error() to return, when it is called after our
    own exception handling, which only returns after "Too many IDAT's",
    or anything else that we might want to handle as a warning instead of

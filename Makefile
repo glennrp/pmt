@@ -24,6 +24,11 @@ RM = rm -f
 CFLAGS = -I. -O3 -funroll-loops -fomit-frame-pointer -Wall -Wshadow
 #CFLAGS = -I${ZINC} -I. -O3 -fomit-frame-pointer -Wall
 # [note that -Wall is a gcc-specific compilation flag ("all warnings on")]
+
+# Cannot use this with libpng15
+# TOOFAR_OK=-DINFLATE_ALLOW_INVALID_DISTANCE_TOOFAR_ARRR
+TOOFAR_OK=
+
 LDFLAGS =
 O = .o
 E =
@@ -51,16 +56,24 @@ EXES = $(PNGCRUSH)$(E)
 # implicit make rules -------------------------------------------------------
 
 .c$(O): png.h pngconf.h pngcrush.h cexcept.h pngpriv.h $(ZHDR)
-	$(CC) -c $(CFLAGS) $<
+	$(CC) -c $(CFLAGS) $(TOOFAR_OK) $<
 
 
 # dependencies --------------------------------------------------------------
 
 all:  $(EXES)
 
+inffast$(O): inffast.c
+	$(CC) -c $(TOOFAR_OK) $(CFLAGS) $<
+
+inflate$(O): inflate.c
+	$(CC) -c $(TOOFAR_OK) $(CFLAGS) $<
+
+deflate$(O): deflate.c
+	$(CC) -c -DTOO_FAR=32767 $(CFLAGS) $<
 
 pngcrush$(O): pngcrush.c png.h pngconf.h pngcrush.h cexcept.h $(ZHDR)
-	$(CC) -c $(CFLAGS) $<
+	$(CC) -c $(CFLAGS) $(TOOFAR_OK) $<
 
 $(PNGCRUSH)$(E): $(OBJS)
 	$(LD) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)

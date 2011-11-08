@@ -59,11 +59,13 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.18"
+#define PNGCRUSH_VERSION "1.7.21"
 
-/*
+/* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
+#define PNGCRUSH_MULTIPLE_ROWS
 */
+#define PNGCRUSH_LARGE
 
 /*
  * NOTICES
@@ -191,10 +193,24 @@
 
 Change log:
 
+Version 1.7.21  (built with libpng-1.5.6 and zlib-1.2.5)
+  Defined TOO_FAR=32767 in Makefile (instead of in pngcrush.h)
+
+Version 1.7.20  (built with libpng-1.5.5 and zlib-1.2.5)
+  Removed the call to png_read_transform_info() when the system libpng
+    is being used, so it can be built with a system libpng.
+
+Version 1.7.19  (built with libpng-1.5.5 and zlib-1.2.5)
+  pngcrush-1.7.18 failed to read interlaced PNGs.  Reverted the change
+    from calling png_read_transform_info() to png_read_update_info().
+    Since png_read_transform_info() is not exported we again cannot build
+    with the system libpng15.
+
 Version 1.7.18  (built with libpng-1.5.5 and zlib-1.2.5)
   This version will work with either a "system" libpng14 or libpng15, or with
     the embedded libpng15.  The deprecated usage of libpng png_struct members
     and unexported functions has been removed.
+  Fixing "too far back" errors does not work with libpng15.
   Revised the format of the time report (all on one line so you can get
     a nice compact report by piping the output to "grep coding").
 
@@ -593,7 +609,7 @@ Version 1.4.2 (built with libpng-1.0.6f and cexcept-0.6.0)
 
 Version 1.4.1 (built with libpng-1.0.6e and cexcept-0.6.0)
 
-  Uses cexcept.h for error handling instead of libpngs built-in
+  Uses cexcept.h for error handling instead of the libpng built-in
   setjmp/longjmp mechanism.  See http://cexcept.sf.net/
 
   Pngcrush.c will now run when compiled with old versions of libpng back
@@ -1221,6 +1237,10 @@ static void png_cexcept_error(png_structp png_ptr, png_const_charp message);
 void PNGAPI pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
   png_size_t length);
 
+#ifdef PNGCRUSH_H
+void png_read_transform_info(png_structp png_ptr, png_infop info_ptr);
+#endif
+
 void PNGAPI png_defaultwrite_data(png_structp png_ptr, png_bytep data,
   png_size_t length);
 
@@ -1386,7 +1406,6 @@ pngcrush_crc_finish(png_structp png_ptr, png_uint_32 skip)
    for (i = (png_size_t)skip; i > istop; i -= istop)
    {
       pngcrush_crc_read(png_ptr, bytes, (png_size_t)1024);
-void png_crc_read(png_structp png_ptr, png_bytep buf, png_size_t length);
    }
    if (i)
    {
@@ -3988,9 +4007,9 @@ int main(int argc, char *argv[])
 
 #ifdef PNG_READ_PREMULTIPLY_ALPHA_SUPPORTED
               /* 0: not premultipled
-               * 1: premultiplied input (input has .pngp suffix and
+               * 1: premultiplied input (input has .pngp suffix and the
                *    PNGP chunk is present)
-               * 2: premultiplied output (output has .pngp suffix of
+               * 2: premultiplied output (output has .pngp suffix and the
                *    -premultiply option is present; PNGP chunk is added)
                * 3: premultiplied input and output (both have .pngp suffix)
                */
@@ -4831,11 +4850,6 @@ int main(int argc, char *argv[])
                 /* } GRR added for quick %-navigation (1) */
 
                 /*
-                 * Setting PNG_FLAG_ROW_INIT causes png_read_update_info()
-                 * to just do
-                 *     png_read_transform_info(read_ptr, read_info_ptr);
-                 * with a png_warning() that can be ignored.
-                 *
                  * Would be useful to have a libpng fix, that either exports
                  * png_read_transform_info() or provides a generic API that
                  * can set any png_ptr->flag, or, simpler, provides an API
@@ -4844,9 +4858,15 @@ int main(int argc, char *argv[])
                  * Starting in libpng-1.5.6beta06, png_read_update_info()
                  * does not check the PNG_FLAG_ROW_INIT flag and does not
                  * initialize the row or issue a warning.
+                 *
+                 * However, pngcrush fails to read interlaced PNGs properly
+                 * when png_read_update_info() is called here.
                  */
 
-                png_read_update_info(read_ptr, read_info_ptr);
+                /* png_read_update_info(read_ptr, read_info_ptr); */
+#ifdef PNGCRUSH_H
+                png_read_transform_info(read_ptr, read_info_ptr);
+#endif
 
                 /* This is the default case (nosave == 1 -> perf-testing
                    only) */
@@ -5017,7 +5037,6 @@ int main(int argc, char *argv[])
                     }
 #endif
                 } /* no save */
-#define LARGE_PNGCRUSH
 
 #ifdef PNGCRUSH_MULTIPLE_ROWS
                 rows_at_a_time = max_rows_at_a_time;
@@ -5025,7 +5044,7 @@ int main(int argc, char *argv[])
                     rows_at_a_time = height;
 #endif
 
-#ifndef LARGE_PNGCRUSH
+#ifndef PNGCRUSH_LARGE
                 {
                     png_uint_32 rowbytes_s;
                     png_uint_32 rowbytes;
@@ -5044,7 +5063,7 @@ int main(int argc, char *argv[])
                     else
                         row_buf = NULL;
                 }
-#else
+#else /* PNGCRUSH_LARGE */
                 {
                     png_uint_32 read_row_length, write_row_length;
                     read_row_length =
@@ -5067,7 +5086,7 @@ int main(int argc, char *argv[])
                         (png_bytep) png_malloc(read_ptr, row_length + 16);
 #  endif
                 }
-#endif /* LARGE_PNGCRUSH */
+#endif /* PNGCRUSH_LARGE */
 
                 if (row_buf == NULL)
                     png_error(read_ptr,
@@ -5140,9 +5159,11 @@ int main(int argc, char *argv[])
                             }
                             t_start = t_stop;
 #ifdef PNGCRUSH_MULTIPLE_ROWS
+                            /* To do: zero the padding bits */
                             png_write_rows(write_ptr, row_pointers,
                                            num_rows);
 #else
+                            /* To do: zero the padding bits */
                             png_write_row(write_ptr, row_buf);
 #endif
                             t_stop = (TIME_T) clock();
@@ -5748,8 +5769,8 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
         png_set_crc_action(png_ptr, PNG_CRC_WARN_USE, PNG_CRC_WARN_USE);
 #endif
 #ifdef INFLATE_ALLOW_INVALID_DISTANCE_TOOFAR_ARRR
-        /* The warning here about deprecated access  to png_ptr->zstream
-         * is unavoidable.
+        /* The warning here about deprecated access to png_ptr->zstream
+         * is unavoidable.  This will not work with libpng-1.5.x.
          */
         inflateUndermine(&png_ptr->zstream, 1);
 #endif
