@@ -2529,9 +2529,9 @@ int main(int argc, char *argv[])
         }
         else if(!strncmp(argv[i], "-ow",3))
         {
-			//names++;
-			overwrite = 1;
-	}
+                        //names++;
+                        overwrite = 1;
+        }
         else if (!strncmp(argv[i], "-premultiply", 5))
         {
             premultiply=2;
@@ -2890,9 +2890,9 @@ int main(int argc, char *argv[])
         }
         else if (overwrite)
         {
-		inname = argv[names];
-		outname = outname;
-	}
+                inname = argv[names];
+                outname = outname;
+        }
         else
         {
             if ((argc - names == 1 || nosave))
@@ -5593,24 +5593,18 @@ int main(int argc, char *argv[])
             setfiletype(outname);
         }
         
-	if (nosave == 0 && overwrite != 0)
-	{
-		/* delete the old file */
-		if ( remove( inname ) != 0)
-			fprintf(STDERR,"overwrite error");
-		else
-		{ 
-		P2("remove %s complete.\n",inname);
-		
-		/* rename the new file , outname = inname */
-		if ( rename( outname, inname) != 0 )
-			fprintf(STDERR,
-                        "renaming of \"%s\" to \"%s\" error\n",outname,inname);
-			else
-			P2("rename %s to %s complete.\n",outname,inname);
-		}
-
-	}
+        if (nosave == 0 && overwrite != 0)
+        {
+            /* rename the new file , outname = inname */
+            if (rename(outname, inname) != 0 )
+            {
+                fprintf(STDERR,
+                    "error while renaming \"%s\" to \"%s\" \n",outname,inname);
+                exit (1);
+            }
+            else
+                P2("rename %s to %s complete.\n",outname,inname);
+        }
 
         if (nosave == 0)
         {
@@ -6968,9 +6962,12 @@ struct options_help pngcrush_options[] = {
     {2, "               Don't reset file modification time."},
     {2, ""},
     
-    {0, "		-ow Overwrite."},
+    {0, "           -ow (Overwrite)"},
     {2, ""},
-    {2, "               Overwrite the input file."},
+    {2, "               Overwrite the input file.  The input file is "},
+    {2, "               removed and the output file (default \"pngout.png\")"},
+    {2, "               is renamed to the input file after recompression"},
+    {2, "               and therefore they must reside on the same filesystem"},
     {2, ""},
     
     {0, "            -n (no save; doesn't do compression or write output PNG)"},
