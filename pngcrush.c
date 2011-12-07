@@ -59,7 +59,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.21"
+#define PNGCRUSH_VERSION "1.7.22"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -192,6 +192,14 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.22  (built with libpng-1.5.6 and zlib-1.2.5)
+  Added "-ow" (overwrite) option.  The input file is overwritten and the
+    output file is just used temporarily and removed after it is copied
+    over the input file..  If you do not specify an output file, "pngout.png"
+    is used as the temporary file.  Contributed by a group of students
+    of the University of Paris who were taking the "Understanding of Programs"
+    course and wished to gain familiariaty with an open-source program.
 
 Version 1.7.21  (built with libpng-1.5.6 and zlib-1.2.5)
   Defined TOO_FAR=32767 in Makefile (instead of in pngcrush.h)
@@ -755,12 +763,33 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 #    include <zlib.h>
 #  endif
 
-   /* The following became unavailable to applications in libpng
-    * version 1.5.0
-    */
-#  define png_memcmp memcmp
-#  define png_memcpy memcpy
-#  define png_memset memset
+/* The following became unavailable in libpng16 (and were
+ * deprecated in libpng14 and 15)
+ */
+#ifdef USE_FAR_KEYWORD
+/* Use this to make far-to-near assignments */
+#  define CHECK   1
+#  define NOCHECK 0
+#  define CVT_PTR(ptr) (png_far_to_near(png_ptr,ptr,CHECK))
+#  define CVT_PTR_NOCHECK(ptr) (png_far_to_near(png_ptr,ptr,NOCHECK))
+#  define png_memcmp  _fmemcmp    /* SJT: added */
+#  define png_memcpy  _fmemcpy
+#  define png_memset  _fmemset
+#else
+#  ifdef _WINDOWS_  /* Favor Windows over C runtime fns */
+#    define CVT_PTR(ptr)         (ptr)
+#    define CVT_PTR_NOCHECK(ptr) (ptr)
+#    define png_memcmp  memcmp
+#    define png_memcpy  CopyMemory
+#    define png_memset  memset
+#  else
+#    define CVT_PTR(ptr)         (ptr)
+#    define CVT_PTR_NOCHECK(ptr) (ptr)
+#    define png_memcmp  memcmp      /* SJT: added */
+#    define png_memcpy  memcpy
+#    define png_memset  memset
+#  endif
+#endif
 #endif
 
 #if PNGCRUSH_LIBPNG_VER < 10600 || defined(PNGCRUSH_H)
@@ -1150,6 +1179,8 @@ static int brute_force_strategies[NUM_STRATEGIES] = { 1, 1, 1 };
 static int method = 10;
 static int pauses = 0;
 static int nosave = 0;
+static int overwrite = 0; /* overwrite the input file instead of creating
+                           a new output file */
 static int nofilecheck = 0;
 #ifdef PNGCRUSH_LOCO
 static int new_mng = 0;
@@ -2495,6 +2526,11 @@ int main(int argc, char *argv[])
         {
             new_time_stamp=0;
         }
+        else if(!strncmp(argv[i], "-ow",3))
+        {
+			//names++;
+			overwrite = 1;
+	}
         else if (!strncmp(argv[i], "-premultiply", 5))
         {
             premultiply=2;
@@ -2851,6 +2887,11 @@ int main(int argc, char *argv[])
             inname = argv[names];
             outname = argv[names + 1];
         }
+        else if (overwrite)
+        {
+		inname = argv[names];
+		outname = outname;
+	}
         else
         {
             if ((argc - names == 1 || nosave))
@@ -5550,6 +5591,25 @@ int main(int argc, char *argv[])
             FCLOSE(fpout);
             setfiletype(outname);
         }
+        
+	if (nosave == 0 && overwrite != 0)
+	{
+		/* delete the old file */
+		if ( remove( inname ) != 0)
+			fprintf(STDERR,"overwrite error");
+		else
+		{ 
+		P2("remove %s complete.\n",inname);
+		
+		/* rename the new file , outname = inname */
+		if ( rename( outname, inname) != 0 )
+			fprintf(STDERR,
+                        "renaming of \"%s\" to \"%s\" error\n",outname,inname);
+			else
+			P2("rename %s to %s complete.\n",outname,inname);
+		}
+
+	}
 
         if (nosave == 0)
         {
@@ -6906,7 +6966,12 @@ struct options_help pngcrush_options[] = {
     {2, ""},
     {2, "               Don't reset file modification time."},
     {2, ""},
-
+    
+    {0, "		-ow Overwrite."},
+    {2, ""},
+    {2, "               Overwrite the input file."},
+    {2, ""},
+    
     {0, "            -n (no save; doesn't do compression or write output PNG)"},
     {2, ""},
     {2, "               Useful in conjunction with -v option to get info."},
