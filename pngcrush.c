@@ -1,6 +1,6 @@
 /*
  * pngcrush.c - recompresses png files
- * Copyright (C) 1998-2002,2006-2011 Glenn Randers-Pehrson
+ * Copyright (C) 1998-2002,2006-2012 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
  * Portions copyright (C) 2005      Greg Roelofs
  *
@@ -59,7 +59,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.22"
+#define PNGCRUSH_VERSION "1.7.23"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -75,7 +75,7 @@
  *
  * COPYRIGHT:
  *
- * Copyright (C) 1998-2002,2006-2011 Glenn Randers-Pehrson
+ * Copyright (C) 1998-2002,2006-2012 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
  * Portions copyright (C) 2005      Greg Roelofs
  *
@@ -154,10 +154,6 @@
  *
  *   Finish pplt (partial palette) feature.
  *
- *   Allow in-place file replacement or as a filter, as in
- *    "pngcrush -overwrite file.png"
- *    "pngcreator | pngcrush > output.png"
- *
  *   Use an alternate write function for the trial passes, that
  *   simply counts bytes rather than actually writing to a file, to save wear
  *   and tear on disk drives (actually, on modern operating systems it
@@ -192,6 +188,13 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.23  (built with libpng-1.5.7 and zlib-1.2.5)
+  Ignore any attempt to use "-ow" with the "-d" or "-e" options, with warning.
+  Include zlib.h if ZLIB_H is not defined (instead of checking the libpng
+    version; see entry below for pngcrush-1.7.14), and include string.h
+    if _STRING_H_ is not defined (because libpng-1.6 does not include string.h)
+  Define SLASH = backslash on Windows platforms so the "-d" option will work..
 
 Version 1.7.22  (built with libpng-1.5.6 and zlib-1.2.5)
   Added "-ow" (overwrite) option.  The input file is overwritten and the
@@ -758,39 +761,39 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 #endif
 
 #if PNGCRUSH_LIBPNG_VER >= 10500
-#  ifdef PNGCRUSH_H
-#    include "zlib.h"
-#  else
-#    include <zlib.h>
-#  endif
+   /* Not provided by libpng15 */
+#  include <zlib.h>
 
-/* The following became unavailable in libpng16 (and were
- * deprecated in libpng14 and 15)
- */
-#ifdef USE_FAR_KEYWORD
-/* Use this to make far-to-near assignments */
-#  define CHECK   1
-#  define NOCHECK 0
-#  define CVT_PTR(ptr) (png_far_to_near(png_ptr,ptr,CHECK))
-#  define CVT_PTR_NOCHECK(ptr) (png_far_to_near(png_ptr,ptr,NOCHECK))
-#  define png_memcmp  _fmemcmp    /* SJT: added */
-#  define png_memcpy  _fmemcpy
-#  define png_memset  _fmemset
-#else
-#  ifdef _WINDOWS_  /* Favor Windows over C runtime fns */
-#    define CVT_PTR(ptr)         (ptr)
-#    define CVT_PTR_NOCHECK(ptr) (ptr)
-#    define png_memcmp  memcmp
-#    define png_memcpy  CopyMemory
-#    define png_memset  memset
+   /* Not provided by libpng16 */
+#  include <string.h>
+
+   /* The following became unavailable in libpng16 (and were
+    * deprecated in libpng14 and 15)
+    */
+#  ifdef   USE_FAR_KEYWORD
+     /*   Use this to make far-to-near assignments */
+#    define CHECK   1
+#    define NOCHECK 0
+#    define CVT_PTR(ptr) (png_far_to_near(png_ptr,ptr,CHECK))
+#    define CVT_PTR_NOCHECK(ptr) (png_far_to_near(png_ptr,ptr,NOCHECK))
+#    define png_memcmp  _fmemcmp    /* SJT: added */
+#    define png_memcpy  _fmemcpy
+#    define png_memset  _fmemset
 #  else
-#    define CVT_PTR(ptr)         (ptr)
-#    define CVT_PTR_NOCHECK(ptr) (ptr)
-#    define png_memcmp  memcmp      /* SJT: added */
-#    define png_memcpy  memcpy
-#    define png_memset  memset
+#    ifdef _WINDOWS_  /* Favor Windows over C runtime fns */
+#      define CVT_PTR(ptr)         (ptr)
+#      define CVT_PTR_NOCHECK(ptr) (ptr)
+#      define png_memcmp  memcmp
+#      define png_memcpy  CopyMemory
+#      define png_memset  memset
+#    else
+#      define CVT_PTR(ptr)         (ptr)
+#      define CVT_PTR_NOCHECK(ptr) (ptr)
+#      define png_memcmp  memcmp      /* SJT: added */
+#      define png_memcpy  memcpy
+#      define png_memset  memset
+#    endif
 #  endif
-#endif
 #endif
 
 #if PNGCRUSH_LIBPNG_VER < 10600 || defined(PNGCRUSH_H)
@@ -976,10 +979,13 @@ png_uint_32 pngcrush_crc;
 #define PNG_HANDLE_CHUNK_IF_SAFE HANDLE_CHUNK_IF_SAFE
 #endif
 
-#ifdef __DJGPP__
-#  if ((__DJGPP__ == 2) && (__DJGPP_MINOR__ == 0))
-#    include <libc/dosio.h>     /* for _USE_LFN, djgpp 2.0 only */
-#  endif
+#if defined(__DJGPP__) && ((__DJGPP__ == 2) && (__DJGPP_MINOR__ == 0))
+#  include <libc/dosio.h>     /* for _USE_LFN, djgpp 2.0 only */
+#endif 
+
+#if ( defined(_Windows) || defined(_WINDOWS) || defined(WIN32) ||  \
+   defined(_WIN32) || defined(__WIN32__) || defined(__CYGWIN__) || \
+   defined(__DJGPP__) )
 #  define SLASH "\\"
 #  define DOT "."
 #else
@@ -2529,8 +2535,7 @@ int main(int argc, char *argv[])
         }
         else if(!strncmp(argv[i], "-ow",3))
         {
-                        //names++;
-                        overwrite = 1;
+            overwrite = 1;
         }
         else if (!strncmp(argv[i], "-premultiply", 5))
         {
@@ -3001,6 +3006,17 @@ int main(int argc, char *argv[])
             strcpy(out_string+outlen, op);
             /*outlen += inlen - (op - in_string); */
             outname = out_string;
+        }
+
+        if (overwrite && (pngcrush_mode == EXTENSION_MODE ||
+            pngcrush_mode == DIRECTORY_MODE ||
+            pngcrush_mode == DIREX_MODE))
+        {
+            if (overwrite > 0)
+            {
+               P1( "Ignoring \"-ow\"; cannot use it with \"-d\" or \"-e\"");
+               overwrite=0;
+            }
         }
 
         /*
@@ -6691,7 +6707,7 @@ void print_version_info(void)
       " | pngcrush %s\n"
       /* If you have modified this source, you may insert additional notices
        * immediately after this sentence: */
-      " |    Copyright (C) 1998-2002,2006-2011 Glenn Randers-Pehrson\n"
+      " |    Copyright (C) 1998-2002,2006-2012 Glenn Randers-Pehrson\n"
       " |    Portions copyright (C) 2005       Greg Roelofs\n"
       " | This is a free, open-source program.  Permission is irrevocably\n"
       " | granted to everyone to use this version of pngcrush without\n"
@@ -6699,7 +6715,7 @@ void print_version_info(void)
       " | Executable name is %s\n"
       " | It was built with libpng version %s, and is\n"
       " | running with %s"
-      " |    Copyright (C) 1998-2004, 2006-2011 Glenn Randers-Pehrson,\n"
+      " |    Copyright (C) 1998-2004, 2006-2012 Glenn Randers-Pehrson,\n"
       " |    Copyright (C) 1996, 1997 Andreas Dilger,\n"
       " |    Copyright (C) 1995, Guy Eric Schalnat, Group 42 Inc.,\n"
       " | and zlib version %s, Copyright (C) 1995-2010 (or later),\n"
@@ -6737,7 +6753,7 @@ static const char *pngcrush_legal[] = {
     "",
     "If you have modified this source, you may insert additional notices",
     "immediately after this sentence.",
-    "Copyright (C) 1998-2002,2006-2011 Glenn Randers-Pehrson",
+    "Copyright (C) 1998-2002,2006-2012 Glenn Randers-Pehrson",
     "Portions copyright (C) 2005       Greg Roelofs",
     "",
     "DISCLAIMER: The pngcrush computer program is supplied \"AS IS\".",
