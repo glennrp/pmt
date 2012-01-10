@@ -59,7 +59,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.23"
+#define PNGCRUSH_VERSION "1.7.24"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -188,6 +188,9 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.24  (built with libpng-1.5.7 and zlib-1.2.5)
+  Do not append a slash to the directory name if it already has one.
 
 Version 1.7.23  (built with libpng-1.5.7 and zlib-1.2.5)
   Ignore any attempt to use "-ow" with the "-d" or "-e" options, with warning.
@@ -997,6 +1000,9 @@ png_uint_32 pngcrush_crc;
 #    define DOT "."
 #  endif
 #endif
+
+#define BACK_SLASH "\\"
+#define FWD_SLASH "/"
 
 #ifndef GAS_VERSION
 #  define GAS_VERSION "2.9.5(?)"  /* used only in help/usage screen */
@@ -2965,9 +2971,13 @@ int main(int argc, char *argv[])
                   directory_name);
                 exit(1);
             }
+
             strcpy(out_string, directory_name);
-            /*strcpy(out_string+outlen, SLASH); */
-            out_string[outlen++] = SLASH[0];   /* (assuming SLASH is 1 byte) */
+            /* Append a slash if it hasn't already got one at the end. */
+            if (out_string[outlen-1] != SLASH[0] &&
+                out_string[outlen-1] != FWD_SLASH[0] &&
+                out_string[outlen-1] != BACK_SLASH[0])
+              out_string[outlen++] = SLASH[0];   /* (assume SLASH is 1 byte) */
             out_string[outlen] = '\0';
 
             inlen = strlen(inname);
@@ -6787,7 +6797,7 @@ static const char *pngcrush_legal[] = {
 static const char *pngcrush_usage[] = {
     "\nusage: %s [options] infile.png outfile.png\n",
     "       %s -e ext [other options] files.png ...\n",
-    "       %s -d dir [other options] files.png ...\n"
+    "       %s -d dir/ [other options] files.png ...\n"
 };
 
 struct options_help pngcrush_options[] = {
@@ -6833,13 +6843,16 @@ struct options_help pngcrush_options[] = {
     {2, ""},
 #endif
 
-    {0, "            -d directory_name (where output files will go)"},
+    {0, "            -d directory_name/ (where output files will go)"},
     {2, ""},
     {2, "               If a directory name is given, then the output"},
     {2, "               files are placed in it, with the same filenames as"},
     {2, "               those of the original files. For example,"},
-    {2, "               you would type 'pngcrush -directory CRUSHED *.png'"},
-    {2, "               to get *.png => CRUSHED/*.png"},
+    {2, "               you would type 'pngcrush -directory CRUSHED/ *.png'"},
+    {2, "               to get *.png => CRUSHED/*.png.  The trailing slash is"},
+    {2, "               optional, but if pngcrush appends the wrong kind of"},
+    {2, "               slash or backslash, please include the correct one"},
+    {2, "               at the end of the directory_name, as shown."},
     {2, ""},
 
     {0, FAKE_PAUSE_STRING},
@@ -7178,7 +7191,7 @@ void print_usage(int retval)
           "\n"
           "options (Note: any option can be spelled out for clarity, e.g.,\n"
           "          \"pngcrush -dir New -method 7 -remove bkgd *.png\"\n"
-          "          is the same as \"pngcrush -d New -m 7 -rem bkgd *.png\"):"
+          "          is the same as \"pngcrush -d New/ -m 7 -rem bkgd *.png\"):"
           "\n\n");
     }
     else
