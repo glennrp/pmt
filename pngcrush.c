@@ -59,7 +59,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.24"
+#define PNGCRUSH_VERSION "1.7.25"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -188,6 +188,8 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.25  (built with libpng-1.5.9 and zlib-1.2.5)
 
 Version 1.7.24  (built with libpng-1.5.7 and zlib-1.2.5)
   Do not append a slash to the directory name if it already has one.
