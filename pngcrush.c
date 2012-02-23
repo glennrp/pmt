@@ -189,6 +189,10 @@
 
 Change log:
 
+Version 1.7.26  (built with libpng-1.5.9 and zlib-1.2.5)
+  Increased the text_text buffer from 2048 to 10*2048, and change an incorrect
+    test for keyword length "< 180" to "< 80".
+
 Version 1.7.25  (built with libpng-1.5.9 and zlib-1.2.5)
 
 Version 1.7.24  (built with libpng-1.5.7 and zlib-1.2.5)
@@ -269,6 +273,7 @@ Version 1.7.9  (built with libpng-1.4.1 and zlib-1.2.3.9)
   Defined TOO_FAR == 32767 in pngcrush.h (instead of in deflate.c)
   Revised the "nolib" Makefiles to remove reference to gzio.c and
     pnggccrd.c
+  Imposed user limits of chunk_malloc_max=4000000 and chunk_cache_max=500.
 
 Version 1.7.8  (built with libpng-1.4.0 and zlib-1.2.3.5)
   Removed gzio.c
@@ -1134,9 +1139,9 @@ static int text_inputs = 0;
 int text_where[10];           /* 0: no text; 1: before PLTE; 2: after PLTE */
 int text_compression[10];     /* -1: uncompressed tEXt; 0: compressed zTXt
                                   1: uncompressed iTXt; 2: compressed iTXt */
-char text_text[2048];        /* It would be nice to png_malloc this, but we
+char text_text[10*2048];      /* It would be nice to png_malloc this, but we
                                * don't have a png_ptr yet when we need it. */
-char text_keyword[800];
+char text_keyword[10*80];
 
 /* PNG_iTXt_SUPPORTED */
 char text_lang[800];
@@ -2700,7 +2705,7 @@ int main(int argc, char *argv[])
             i += 2;
             BUMP_I;
             i -= 3;
-            if (strlen(argv[i + 2]) < 180 && strlen(argv[i + 3]) < 2048 &&
+            if (strlen(argv[i + 2]) < 80 && strlen(argv[i + 3]) < 2048 &&
                 text_inputs < 10)
             {
 #ifdef PNG_iTXt_SUPPORTED
