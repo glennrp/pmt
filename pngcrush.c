@@ -190,8 +190,11 @@
 Change log:
 
 Version 1.7.26  (built with libpng-1.5.9 and zlib-1.2.5)
-  Increased the text_text buffer from 2048 to 10*2048, and change an incorrect
-    test for keyword length "< 180" to "< 80".
+  Increased the text_text buffer from 2048 to 10*2048 (Ralph Giles), and
+    changed an incorrect test for keyword length "< 180" to "< 80".  The
+    text_text buffer was inadvertently reduced from 20480 to 2048 in
+    pngcrush-1.7.9.
+  Added -DZ_SOLO to CFLAGS, needed to compile zlib-1.2.6.
 
 Version 1.7.25  (built with libpng-1.5.9 and zlib-1.2.5)
 
