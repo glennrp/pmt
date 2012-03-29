@@ -59,7 +59,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.25"
+#define PNGCRUSH_VERSION "1.7.26"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -189,12 +189,16 @@
 
 Change log:
 
-Version 1.7.26  (built with libpng-1.5.9 and zlib-1.2.5)
+Version 1.7.26  (built with libpng-1.5.10 and zlib-1.2.6)
   Increased the text_text buffer from 2048 to 10*2048 (Ralph Giles), and
     changed an incorrect test for keyword length "< 180" to "< 80".  The
     text_text buffer was inadvertently reduced from 20480 to 2048 in
     pngcrush-1.7.9.
   Added -DZ_SOLO to CFLAGS, needed to compile zlib-1.2.6.
+  Changed user limits to width and height max 500000, malloc max 2MB,
+    cache max 500.
+  Added -nolimits option which sets the user limits to the default
+    unlimited values.
 
 Version 1.7.25  (built with libpng-1.5.9 and zlib-1.2.5)
 
@@ -1205,6 +1209,7 @@ static int nosave = 0;
 static int overwrite = 0; /* overwrite the input file instead of creating
                            a new output file */
 static int nofilecheck = 0;
+static int no_limits = 0;
 #ifdef PNGCRUSH_LOCO
 static int new_mng = 0;
 #endif
@@ -2534,10 +2539,17 @@ int main(int argc, char *argv[])
               method = MAX_METHODS;
             }
         }
+
         else if (!strncmp(argv[i], "-nofilecheck", 5))
         {
             nofilecheck++;
         }
+
+        else if (!strncmp(argv[i], "-nolimits", 5))
+        {
+            no_limits++;
+        }
+
         else if (!strncmp(argv[i], "-nosave", 2))
         {
             /* no save; I just use this for testing decode speed */
@@ -3547,12 +3559,17 @@ int main(int argc, char *argv[])
                     Throw "pngcrush could not create read_ptr";
 
 #ifdef PNG_SET_USER_LIMITS_SUPPORTED
+                if (no_limits == 0)
+                {
 # if PNG_LIBPNG_VER >= 10400
-                png_set_chunk_cache_max(read_ptr, 500);
+                   png_set_chunk_cache_max(read_ptr, 500);
+                   png_set_user_limits(read_ptr, 500000L, 500000L);
+                   png_set_chunk_cache_max(read_ptr, 500);
 # endif
 # if PNG_LIBPNG_VER >= 10401
-                png_set_chunk_malloc_max(read_ptr, 4000000L);
+                   png_set_chunk_malloc_max(read_ptr, 2000000L);
 # endif
+                }
 #endif /* PNG_SET_USER_LIMITS_SUPPORTED */
 
 #if 0
@@ -6993,6 +7010,11 @@ struct options_help pngcrush_options[] = {
     {2, "               To avoid false hits from MSVC-compiled code.  Note"},
     {2, "               that if you use this option, you are responsible for"},
     {2, "               ensuring that the input file is not the output file."},
+    {2, ""},
+
+    {0, "     -nolimits (turns off limits on width, height, cache, malloc)"},
+    {2, ""},
+    {2, "               Instead, the user limits are inherited from libpng."},
     {2, ""},
 
 

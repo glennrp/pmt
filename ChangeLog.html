@@ -3,9 +3,16 @@
 
 Change log:
 
-Version 1.7.26  (built with libpng-1.5.9 and zlib-1.2.5)
-  Increased the text_text buffer from 2048 to 10*2048, and change an incorrect
-    test for keyword length "< 180" to "< 80".
+Version 1.7.26  (built with libpng-1.5.10 and zlib-1.2.6)
+  Increased the text_text buffer from 2048 to 10*2048 (Ralph Giles), and
+    changed an incorrect test for keyword length "< 180" to "< 80".  The
+    text_text buffer was inadvertently reduced from 20480 to 2048 in
+    pngcrush-1.7.9.
+  Added -DZ_SOLO to CFLAGS, needed to compile zlib-1.2.6.
+  Changed user limits to width and height max 500000, malloc max 2MB,
+    cache max 500.
+  Added -nolimits option which sets the user limits to the default
+    unlimited values.
 
 Version 1.7.25  (built with libpng-1.5.9 and zlib-1.2.5)
 
@@ -87,6 +94,7 @@ Version 1.7.9  (built with libpng-1.4.1 and zlib-1.2.3.9)
   Defined TOO_FAR == 32767 in pngcrush.h (instead of in deflate.c)
   Revised the "nolib" Makefiles to remove reference to gzio.c and
     pnggccrd.c
+  Imposed user limits of chunk_malloc_max=4000000 and chunk_cache_max=500.
 
 Version 1.7.8  (built with libpng-1.4.0 and zlib-1.2.3.5)
   Removed gzio.c
