@@ -3,6 +3,12 @@
 
 Change log:
 
+Version 1.7.27  (built with libpng-1.5.10 and zlib-1.2.6)
+  Increased row_buf malloc to row_bytes+64 instead of row_bytes+16, to
+    match the size of big_row_buf in pngrutil.c (it is 48 in libpng14, 15, 16,
+    and 64 in libpng10, 12.  Otherwise there is a double-free crash when the
+    row_buf is destroyed.
+
 Version 1.7.26  (built with libpng-1.5.10 and zlib-1.2.6)
   Increased the text_text buffer from 2048 to 10*2048 (Ralph Giles), and
     changed an incorrect test for keyword length "< 180" to "< 80".  The

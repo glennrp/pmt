@@ -59,7 +59,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.26"
+#define PNGCRUSH_VERSION "1.7.27"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -188,6 +188,12 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.27  (built with libpng-1.5.10 and zlib-1.2.6)
+  Increased row_buf malloc to row_bytes+64 instead of row_bytes+16, to
+    match the size of big_row_buf in pngrutil.c (it is 48 in libpng14, 15, 16,
+    and 64 in libpng10, 12.  Otherwise there is a double-free crash when the
+    row_buf is destroyed.
 
 Version 1.7.26  (built with libpng-1.5.10 and zlib-1.2.6)
   Increased the text_text buffer from 2048 to 10*2048 (Ralph Giles), and
@@ -5151,9 +5157,9 @@ int main(int argc, char *argv[])
 #  ifdef PNGCRUSH_MULTIPLE_ROWS
                         row_buf =
                             png_malloc(read_ptr,
-                                       rows_at_a_time * rowbytes + 16);
+                                       rows_at_a_time * rowbytes + 64);
 #  else
-                        row_buf = png_malloc(read_ptr, rowbytes + 16);
+                        row_buf = png_malloc(read_ptr, rowbytes + 64);
 #  endif
                     else
                         row_buf = NULL;
@@ -5175,10 +5181,10 @@ int main(int argc, char *argv[])
                     row_buf =
                         (png_bytep) png_malloc(read_ptr,
                                                rows_at_a_time *
-                                               row_length + 16);
+                                               row_length + 64);
 #  else
                     row_buf =
-                        (png_bytep) png_malloc(read_ptr, row_length + 16);
+                        (png_bytep) png_malloc(read_ptr, row_length + 64);
 #  endif
                 }
 #endif /* PNGCRUSH_LARGE */
@@ -5899,7 +5905,7 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
 #    ifdef PNG_iCCP_SUPPORTED
         const png_byte png_iCCP[5] = { 105, 67, 67, 80, '\0' };
 #    endif
-        const png_byte png_acTL[5] = { 97,  99,  84,  76, '\0'};
+        const png_byte png_acTL[5] = {  97, 99, 84, 76, '\0' };
 #  endif
 #endif
 
@@ -5916,9 +5922,9 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
 
         if (new_mng)
         {
-          const png_byte png_DHDR[5] = { 68, 72, 68, 82, '\0' };
-          const png_byte png_DEFI[5] = { 68, 69, 70, 73, '\0' };
-          const png_byte png_FRAM[5] = { 70, 82, 65, 77, '\0' };
+          const png_byte png_DHDR[5] = {  68, 72, 68, 82, '\0' };
+          const png_byte png_DEFI[5] = {  68, 69, 70, 73, '\0' };
+          const png_byte png_FRAM[5] = {  70, 82, 65, 77, '\0' };
           const png_byte png_nEED[5] = { 110, 69, 69, 68, '\0' };
 
           if (!png_memcmp(chunk_name, png_nEED, 4))
@@ -6343,7 +6349,7 @@ int count_colors(FILE * fp_in)
 
                 rowbytes = png_get_rowbytes(read_ptr, read_info_ptr);
 
-                row_buf = png_malloc(read_ptr, rowbytes + 16);
+                row_buf = png_malloc(read_ptr, rowbytes + 64);
 
                 for (pass = 0; pass < num_pass; pass++)
                 {
