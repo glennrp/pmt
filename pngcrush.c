@@ -59,7 +59,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.27"
+#define PNGCRUSH_VERSION "1.7.28"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -188,6 +188,9 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.28  (built with libpng-1.5.10 and zlib-1.2.7)
+  Write proper copyright year for zlib, depending upon ZLIB_VERNUM
 
 Version 1.7.27  (built with libpng-1.5.10 and zlib-1.2.6)
   Increased row_buf malloc to row_bytes+64 instead of row_bytes+16, to
@@ -6745,6 +6748,33 @@ int count_colors(FILE * fp_in)
 
 void print_version_info(void)
 {
+    char *zlib_copyright;
+
+#ifndef ZLIB_VERNUM /* This became available in zlib-1.2 */
+         zlib_copyright=" (or later)";
+#else
+    switch (ZLIB_VERNUM)
+    {
+      case 0x1220:
+         zlib_copyright="-2004";
+         break;
+      case 0x1230:
+         zlib_copyright="-2005";
+         break;
+      case 0x1240:
+      case 0x1250:
+         zlib_copyright="-2010";
+         break;
+      case 0x1260:
+      case 0x1270:
+         zlib_copyright="-2012";
+         break;
+      default:
+         zlib_copyright=" (or later)";
+         break;
+    }
+#endif
+
     fprintf(STDERR,
       "\n"
       " | pngcrush %s\n"
@@ -6761,10 +6791,10 @@ void print_version_info(void)
       " |    Copyright (C) 1998-2004, 2006-2012 Glenn Randers-Pehrson,\n"
       " |    Copyright (C) 1996, 1997 Andreas Dilger,\n"
       " |    Copyright (C) 1995, Guy Eric Schalnat, Group 42 Inc.,\n"
-      " | and zlib version %s, Copyright (C) 1995-2010 (or later),\n"
+      " | and zlib version %s, Copyright (C) 1995%s,\n"
       " |    Jean-loup Gailly and Mark Adler.\n",
       PNGCRUSH_VERSION, progname, PNG_LIBPNG_VER_STRING,
-      png_get_header_version(NULL), ZLIB_VERSION);
+      png_get_header_version(NULL), ZLIB_VERSION,zlib_copyright);
 
 #if defined(__GNUC__)
     fprintf(STDERR,
