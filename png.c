@@ -2044,7 +2044,7 @@ png_muldiv_warn(png_structp png_ptr, png_fixed_point a, png_int_32 times,
 }
 #endif
 
-#ifdef PNG_READ_GAMMA_SUPPORTED /* more fixed point functions for gammma */
+#ifdef PNG_READ_GAMMA_SUPPORTED /* more fixed point functions for gamma */
 /* Calculate a reciprocal, return 0 on div-by-zero or overflow. */
 png_fixed_point
 png_reciprocal(png_fixed_point a)
