@@ -59,7 +59,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.28"
+#define PNGCRUSH_VERSION "1.7.29"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -188,6 +188,11 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.29  (built with libpng-1.5.10 and zlib-1.2.7)
+  Set "things_have_changed" flag when adding text chunks, so the "-force"
+    option is no longer necessary when adding text to an already-compressed
+    file.
 
 Version 1.7.28  (built with libpng-1.5.10 and zlib-1.2.7)
   Write proper copyright year for zlib, depending upon ZLIB_VERNUM
@@ -2729,6 +2734,7 @@ int main(int argc, char *argv[])
             i += 2;
             BUMP_I;
             i -= 3;
+            global_things_have_changed = 1;
             if (strlen(argv[i + 2]) < 80 && strlen(argv[i + 3]) < 2048 &&
                 text_inputs < 10)
             {
