@@ -3,6 +3,15 @@
 
 Change log:
 
+Version 1.7.29  (built with libpng-1.5.10 and zlib-1.2.7)
+  Set "things_have_changed" flag when adding text chunks, so the "-force"
+    option is no longer necessary when adding text to an already-compressed
+    file.
+  Direct usage message and error messages to stderr instead of stdout. If
+    anyone is still using DOS they may have to change the "if 0" at line
+    990 to "if 1".
+  Added "pngcrush -n -v files.png" to the usage message.
+
 Version 1.7.28  (built with libpng-1.5.10 and zlib-1.2.7)
   Write proper copyright year for zlib, depending upon ZLIB_VERNUM
 
