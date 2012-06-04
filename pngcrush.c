@@ -193,6 +193,10 @@ Version 1.7.29  (built with libpng-1.5.10 and zlib-1.2.7)
   Set "things_have_changed" flag when adding text chunks, so the "-force"
     option is no longer necessary when adding text to an already-compressed
     file.
+  Direct usage message and error messages to stderr instead of stdout. If
+    anyone is still using DOS they may have to change the "if 0" at line
+    990 to "if 1".
+  Added "pngcrush -n -v files.png" to the usage message.
 
 Version 1.7.28  (built with libpng-1.5.10 and zlib-1.2.7)
   Write proper copyright year for zlib, depending upon ZLIB_VERNUM
@@ -984,8 +988,11 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
  */
 
 /* Defined so I can write to a file on gui/windowing platforms */
-/*  #define STDERR stderr  */
-#define STDERR stdout /* for DOS */
+#if 0 /* Change this to "#if 1" if you need to. */
+#  define STDERR stdout /* for DOS */
+#else
+#  define STDERR stderr
+#endif
 
 #ifndef PNGCRUSH_LIBPNG_VER
 #  define PNGCRUSH_LIBPNG_VER PNG_LIBPNG_VER
@@ -4976,6 +4983,12 @@ int main(int argc, char *argv[])
                 /* png_read_update_info(read_ptr, read_info_ptr); */
 #ifdef PNGCRUSH_H
                 png_read_transform_info(read_ptr, read_info_ptr);
+#else
+                /* Some pngcrush capabilities are lacking with the system
+                 * libpng is used instead of the one bundled with pngcrush
+                 *
+                 * To do: list those capabilities here
+                 */
 #endif
 
                 /* This is the default case (nosave == 1 -> perf-testing
@@ -6867,6 +6880,7 @@ static const char *pngcrush_usage[] = {
     "\nusage: %s [options] infile.png outfile.png\n",
     "       %s -e ext [other options] files.png ...\n",
     "       %s -d dir/ [other options] files.png ...\n"
+    "       %s -n -v files.png ...\n"
 };
 
 struct options_help pngcrush_options[] = {
