@@ -59,7 +59,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.29"
+#define PNGCRUSH_VERSION "1.7.30"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -188,6 +188,10 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.30  (built with libpng-1.5.11 and zlib-1.2.7)
+  Only run the new (in libpng-1.5.10) test of palette indexes during the
+    first trial.
 
 Version 1.7.29  (built with libpng-1.5.10 and zlib-1.2.7)
   Set "things_have_changed" flag when adding text chunks, so the "-force"
@@ -3665,6 +3669,14 @@ int main(int argc, char *argv[])
 #ifdef PNG_CRC_QUIET_USE
                 png_set_crc_action(read_ptr, PNG_CRC_QUIET_USE,
                                    PNG_CRC_QUIET_USE);
+#endif
+
+#ifdef PNG_READ_CHECK_FOR_INVALID_INDEX_SUPPORTED
+    /* Only run this test (new in libpng-1.5.10) during the first trial */
+    png_set_check_for_invalid_index (read_ptr, first_trial);
+#endif
+#ifdef PNG_WRITE_CHECK_FOR_INVALID_INDEX_SUPPORTED
+    png_set_check_for_invalid_index (write_ptr, first_trial);
 #endif
 
 #ifdef PNG_READ_UNKNOWN_CHUNKS_SUPPORTED
