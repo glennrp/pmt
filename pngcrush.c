@@ -59,7 +59,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.30"
+#define PNGCRUSH_VERSION "1.7.31"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -188,6 +188,11 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.31  (built with libpng-1.5.11 and zlib-1.2.7)
+  Dropped *.tar.bz2 from distribution.
+  Added a comma that was missing from one of the "usage" strings (error
+    introduced in version 1.7.29).
 
 Version 1.7.30  (built with libpng-1.5.11 and zlib-1.2.7)
   Only run the new (in libpng-1.5.10) test of palette indexes during the
@@ -6891,7 +6896,7 @@ static const char *pngcrush_legal[] = {
 static const char *pngcrush_usage[] = {
     "\nusage: %s [options] infile.png outfile.png\n",
     "       %s -e ext [other options] files.png ...\n",
-    "       %s -d dir/ [other options] files.png ...\n"
+    "       %s -d dir/ [other options] files.png ...\n",
     "       %s -n -v files.png ...\n"
 };
 
