@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# png2uri version 1.0.5, July 7, 2012.
+# png2uri version 1.0.6, July 7, 2012.
 #
 # NO COPYRIGHT RIGHTS ARE CLAIMED TO THIS SOFTWARE.
 #
@@ -53,7 +53,7 @@
 # on Gnu/Linux platforms, which often hasn't happened).
 
 png2uri_encode(){
-base64 2>/dev/null || uuencode -m "====" 2>/dev/null | grep -v "===="
+base64 2>/dev/null || uuencode -m "====" | grep -v "===="
 }
 
 PNG2URI_FMT="unknown"
@@ -104,12 +104,13 @@ case X$1 in
 
       case X$PNG2URI_URI in
         Xfalse)
-          echo "data:$PNG2URI_FMT;base64,"
+          echo "data:$PNG2URI_FMT;base64," &&
           png2uri_encode
           ;;
 
         *)
-          echo "<img alt=\"PNG\" title=\"PNG\" src=\"data:$PNG2URI_FMT;base64,"
+          echo "<img alt=\"PNG\" title=\"PNG\" src=\"" &&
+          echo "data:$PNG2URI_FMT;base64," &&
           png2uri_encode
           echo "\">"
           ;;
@@ -158,11 +159,12 @@ case X$1 in
 
       case X$PNG2URI_URI in
         Xfalse)
-            echo "data:$PNG2URI_FMT;base64,"
+            echo "data:$PNG2URI_FMT;base64," &&
             png2uri_encode < "$1"
             ;;
         *)
-            echo "<img alt=\"$1\" title=\"$1\" src=\"data:$PNG2URI_FMT;base64,"
+            echo "<img alt=\"PNG\" title=\"PNG\" src=\"" &&
+            echo "data:$PNG2URI_FMT;base64," &&
             png2uri_encode < "$1"
             echo "\">"
             ;;

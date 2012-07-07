@@ -119,10 +119,19 @@
       John Bowler.  Added a check for too many arguments, also a JB suggestion.
       Accept output filename as an optional final argument.
 
+   Version 1.0.6, July 7, 2012:
+
+      Removed an unnecessary "2> /dev/null" from the uuencode command, which
+      was hiding the error report when both "base64" nd "uuencode" fail within
+      the png2uri_encode function, as when attempting a run under MSYS.
+      Added "&&" after the echo commands to be sure that any error return
+      is displayed.
+
  TO DO
 
  1. Test on various other platforms. I assume we'll soon find one that has
-    neither "uuencode" nor "base64".  The following have been tried
+    neither "uuencode" nor "base64".  The following have been tried and
+    succeed:
 
     Ubuntu 10.04 (using "base64")
     Ubuntu 12.04 (using "base64")
@@ -131,6 +140,13 @@
     FreeBSD 8.0  (using "uuencode")
     Redhat Gnu/Linux (using "base64")
     Redhat Enterprise (using "base64")
+    Cywin
+    Gentoo-linux
+    OpenBSD
+
+    The following fail:
+
+    MSYS
 
  2. Find out if the script works on Windows and Mac or can be modified to
  do so.
