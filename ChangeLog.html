@@ -3,9 +3,14 @@
 
 Change log:
 
+Version 1.7.33  (built with libpng-1.5.12 and zlib-1.2.7)
+  Ignore all ancillary chunks except during the final trial.  This can be
+    significantly faster when large ancillary chunks such as iCCP are
+    present.
+
 Version 1.7.32  (built with libpng-1.5.12 and zlib-1.2.7)
   Fixed bug introduced in 1.7.30: Do not call png_set_check_for_invalid_index()
-   when nosave != 0 (otherwise pngcrush crashes with the "-n" option.
+    when nosave != 0 (otherwise pngcrush crashes with the "-n" option).
 
 Version 1.7.31  (built with libpng-1.5.11 and zlib-1.2.7)
   Dropped *.tar.bz2 from distribution.
