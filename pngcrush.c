@@ -59,7 +59,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.32"
+#define PNGCRUSH_VERSION "1.7.33"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -189,9 +189,14 @@
 
 Change log:
 
+Version 1.7.33  (built with libpng-1.5.12 and zlib-1.2.7)
+  Ignore all ancillary chunks except during the final trial.  This can be
+    significantly faster when large ancillary chunks such as iCCP are
+    present.
+
 Version 1.7.32  (built with libpng-1.5.12 and zlib-1.2.7)
   Fixed bug introduced in 1.7.30: Do not call png_set_check_for_invalid_index()
-   when nosave != 0 (otherwise pngcrush crashes with the "-n" option.
+    when nosave != 0 (otherwise pngcrush crashes with the "-n" option).
 
 Version 1.7.31  (built with libpng-1.5.11 and zlib-1.2.7)
   Dropped *.tar.bz2 from distribution.
@@ -1083,7 +1088,7 @@ png_uint_32 pngcrush_crc;
 #define FOPEN(file, how) fopen(file, how)
 #define FCLOSE(file)     {fclose(file); file=NULL;--number_of_open_files;};
 
-#define P0 if(first_trial && verbose > 0)printf
+#define P0 if(last_trial && verbose > 0)printf
 #define P1 if(verbose > 1)printf
 #define P2 if(verbose > 2)printf
 
@@ -1217,7 +1222,7 @@ static int force_output_bit_depth = 0;
 static int input_color_type;
 static int input_bit_depth;
 static int trial;
-static int first_trial = 0;
+static int last_trial = 0;
 static int verbose = 1;
 static int fix = 0;
 static int things_have_changed = 0;
@@ -1323,6 +1328,29 @@ static png_uint_32 crushed_idat_size = 0x3ffffffL;
 static int already_crushed = 0;
 int ia;
 
+#if defined(PNG_UNKNOWN_CHUNKS_SUPPORTED)
+static /* const */ png_byte chunks_to_ignore[] = {
+
+     98,  75,  71 , 68, '\0',  /* bKGD */
+     99,  72,  82,  77, '\0',  /* cHRM */
+    103,  65,  77,  65, '\0',  /* gAMA */
+    104,  73,  83,  84, '\0',  /* hIST */
+    105,  67,  67,  80, '\0',  /* iCCP */
+    105,  84,  88, 116, '\0',  /* iTXt */
+    111,  70,  70, 115, '\0',  /* oFFs */
+    112,  67,  65,  76, '\0',  /* pCAL */
+    112,  72,  89, 115, '\0',  /* pHYs */
+    115,  66,  73,  84, '\0',  /* sBIT */
+    115,  67,  65,  76, '\0',  /* sCAL */
+    115,  80,  76,  84, '\0',  /* sPLT */
+    115,  82,  71,  66, '\0',  /* sRGB */
+    115,  84,  69,  82, '\0',  /* sTER */
+    116,  69,  88, 116, '\0',  /* tEXt */
+    116,  73,  77,  69, '\0',  /* tIME */
+    116,  82,  78,  83, '\0',  /* tRNS */
+    122,  84,  88, 116, '\0'   /* zTXt */
+};
+#endif
 
 /* Prototypes */
 static void png_cexcept_error(png_structp png_ptr, png_const_charp message);
@@ -1967,11 +1995,11 @@ int keep_unknown_chunk(png_const_charp name, char *argv[])
 int keep_chunk(png_const_charp name, char *argv[])
 {
     int i;
-    if (verbose > 2 && first_trial)
+    if (verbose > 2 && last_trial)
         fprintf(STDERR, "   Read the %s chunk.\n", name);
     if (remove_chunks == 0)
         return 1;
-    if (verbose > 1 && first_trial)
+    if (verbose > 1 && last_trial)
         fprintf(STDERR, "     Check for removal of the %s chunk.\n", name);
     for (i = 1; i <= remove_chunks; i++) {
         if (!strncmp(argv[i], "-rem", 4)) {
@@ -2039,13 +2067,13 @@ int keep_chunk(png_const_charp name, char *argv[])
                 things_have_changed = 1;
                 /* (caller actually does the removal--by failing to create
                  * copy) */
-                if (verbose > 0 && first_trial)
+                if (verbose > 0 && last_trial)
                     fprintf(STDERR, "   Removed the %s chunk.\n", name);
                 return 0;
             }
         }
     }
-    if (verbose > 1 && first_trial)
+    if (verbose > 1 && last_trial)
         fprintf(STDERR, "   Preserving the %s chunk.\n", name);
     return 1;
 }
@@ -2979,7 +3007,7 @@ int main(int argc, char *argv[])
 
     for (;;)  /* loop on input files */
     {
-        first_trial = 1;
+        last_trial = 0;
 
         things_have_changed = global_things_have_changed;
 
@@ -3375,6 +3403,9 @@ int main(int argc, char *argv[])
         P1("\n\nENTERING MAIN LOOP OVER %d METHODS\n", MAX_METHODS);
         for (trial = 1; trial <= MAX_METHODS; trial++)
         {
+            if (nosave || trial == MAX_METHODS)
+               last_trial = 1;
+
             idat_length[trial] = (png_uint_32) 0xffffffff;
 
             /* this part of if-block is for final write-the-best-file
@@ -3451,25 +3482,18 @@ int main(int argc, char *argv[])
                     break;
                 }
 
-                if (idat_length[best] == idat_length[final_method])
-                {
-                    break;
-                }
-                else
-                {
-                    filter_type = fm[best];
-                    zlib_level = lv[best];
-                    if (zs[best] == 1)
-                        z_strategy = Z_FILTERED;
-                    else if (zs[best] == 2)
-                        z_strategy = Z_HUFFMAN_ONLY;
+                filter_type = fm[best];
+                zlib_level = lv[best];
+                if (zs[best] == 1)
+                    z_strategy = Z_FILTERED;
+                else if (zs[best] == 2)
+                    z_strategy = Z_HUFFMAN_ONLY;
 #ifdef Z_RLE
-                    else if (zs[best] == 3)
-                        z_strategy = Z_RLE;
+                else if (zs[best] == 3)
+                    z_strategy = Z_RLE;
 #endif
-                    else /* if (zs[best] == 0) */
-                        z_strategy = Z_DEFAULT_STRATEGY;
-                }
+                else /* if (zs[best] == 0) */
+                    z_strategy = Z_DEFAULT_STRATEGY;
             }
             else
             {
@@ -3537,7 +3561,7 @@ int main(int argc, char *argv[])
                    for update or output
                  */
                 struct stat stat_in, stat_out;
-                if (first_trial && !nofilecheck
+                if (last_trial && !nofilecheck
                     && (stat(inname, &stat_in) == 0)
                     && (stat(outname, &stat_out) == 0) &&
 #if defined(_MSC_VER) || defined(__MINGW32__)   /* maybe others? */
@@ -3613,6 +3637,17 @@ int main(int argc, char *argv[])
                     (png_size_t)256);
 #endif /* 0 */
 
+#ifdef PNG_READ_UNKNOWN_CHUNKS_SUPPORTED
+                if (last_trial == 0)
+                {
+                   png_set_keep_unknown_chunks(read_ptr,
+                        PNG_HANDLE_CHUNK_NEVER, (png_bytep) NULL, 0);
+                   png_set_keep_unknown_chunks(read_ptr,
+                        PNG_HANDLE_CHUNK_NEVER, chunks_to_ignore,
+                        sizeof (chunks_to_ignore)/5);
+                }
+#endif
+
                 if (nosave == 0)
                 {
 #ifdef PNG_USER_MEM_SUPPORTED
@@ -3680,15 +3715,17 @@ int main(int argc, char *argv[])
                                    PNG_CRC_QUIET_USE);
 #endif
 
+            if (last_trial == 1)
+            {
 #ifdef PNG_READ_CHECK_FOR_INVALID_INDEX_SUPPORTED
                 /* Only run this test (new in libpng-1.5.10) during the
                  * first trial
                  */
-                png_set_check_for_invalid_index (read_ptr, first_trial);
+                png_set_check_for_invalid_index (read_ptr, last_trial);
 #endif
 #ifdef PNG_WRITE_CHECK_FOR_INVALID_INDEX_SUPPORTED
                 if (nosave == 0)
-                   png_set_check_for_invalid_index (write_ptr, first_trial);
+                   png_set_check_for_invalid_index (write_ptr, last_trial);
 #endif
 
 #ifdef PNG_READ_UNKNOWN_CHUNKS_SUPPORTED
@@ -3838,6 +3875,7 @@ int main(int argc, char *argv[])
                     }
                 }
 #endif /* PNG_WRITE_UNKNOWN_CHUNKS_SUPPORTED */
+            } /* Ancillary chunk handling */
 
                 P1( "Reading info struct\n");
                 {
@@ -3938,7 +3976,7 @@ int main(int argc, char *argv[])
                             output_color_type = input_color_type;
                         }
 
-                        if (verbose > 1 && first_trial)
+                        if (verbose > 1 && last_trial)
                         {
                             fprintf(STDERR, "   IHDR chunk data:\n");
                             fprintf(STDERR,
@@ -3978,7 +4016,7 @@ int main(int argc, char *argv[])
                              (output_color_type == 0 ||
                              output_color_type == 4))
                         {
-                            if (verbose > 0 && first_trial)
+                            if (verbose > 0 && last_trial)
                             {
 #ifdef PNGCRUSH_COUNT_COLORS
                                 if (reduce_to_gray)
@@ -4021,7 +4059,7 @@ int main(int argc, char *argv[])
                             (output_color_type != 4
                              && output_color_type != 6))
                         {
-                            if (verbose > 0 && first_trial)
+                            if (verbose > 0 && last_trial)
                             {
 #ifdef PNGCRUSH_COUNT_COLORS
                                 if (it_is_opaque)
@@ -4042,7 +4080,7 @@ int main(int argc, char *argv[])
                                                             && color_type
                                                             != 6))
                         {
-                            if (verbose > 0 && first_trial)
+                            if (verbose > 0 && last_trial)
                                 fprintf(STDERR,
                                   "   Adding an opaque alpha channel.\n");
 #ifdef PNG_READ_FILLER_SUPPORTED
@@ -4060,7 +4098,7 @@ int main(int argc, char *argv[])
                              || output_color_type == 6)
                             && color_type == 3)
                         {
-                            if (verbose > 0 && first_trial)
+                            if (verbose > 0 && last_trial)
                                 fprintf(STDERR,
                                   "   Expanding indexed color file.\n");
                             need_expand = 1;
@@ -4082,6 +4120,8 @@ int main(int argc, char *argv[])
                             png_set_shift(read_ptr, &true_bits);
                         }
 #endif
+                        if (last_trial == 1)
+                        {
                         if (save_apng_chunks == 1 || found_acTL_chunk == 1)
                         {
                            if (save_apng_chunks == 0)
@@ -4109,6 +4149,7 @@ int main(int argc, char *argv[])
                            }
                            if (save_apng_chunks != 1 && found_acTL_chunk == 1)
                               found_acTL_chunk = 2;
+                        }
                         }
 
                         if (verbose > 1)
@@ -4160,6 +4201,9 @@ int main(int argc, char *argv[])
             }
 
 
+            /* Handle ancillary chunks */
+            if (last_trial == 1)
+            {
 #if defined(PNG_READ_bKGD_SUPPORTED) && defined(PNG_WRITE_bKGD_SUPPORTED)
                 {
                     png_color_16p background;
@@ -4243,7 +4287,7 @@ int main(int argc, char *argv[])
                 {
                     if (force_specified_gamma)
                     {
-                        if (first_trial)
+                        if (last_trial)
                         {
                             things_have_changed = 1;
                             if (verbose > 0)
@@ -4279,7 +4323,7 @@ int main(int argc, char *argv[])
                         {
                             if (image_specified_gamma)
                                 file_gamma = image_specified_gamma;
-                            if (verbose > 1 && first_trial)
+                            if (verbose > 1 && last_trial)
 #ifdef PNG_FIXED_POINT_SUPPORTED
                                 fprintf(STDERR, "   gamma=(%d/100000)\n",
                                         (int) file_gamma);
@@ -4299,7 +4343,7 @@ int main(int argc, char *argv[])
                     }
                     else if (specified_gamma)
                     {
-                        if (first_trial)
+                        if (last_trial)
                         {
                             things_have_changed = 1;
                             if (verbose > 0)
@@ -4348,7 +4392,7 @@ int main(int argc, char *argv[])
 #  endif
                         {
                             things_have_changed = 1;
-                            if (verbose > 0 && first_trial)
+                            if (verbose > 0 && last_trial)
                                 fprintf(STDERR,
                                   "   Inserting sRGB chunk with intent=%d\n",
                                   intent);
@@ -4357,7 +4401,7 @@ int main(int argc, char *argv[])
                         }
                         else if (file_gamma != 0)
                         {
-                            if (verbose > 0 && first_trial)
+                            if (verbose > 0 && last_trial)
                             {
                                 fprintf(STDERR, "   Ignoring sRGB request; "
 #  ifdef PNG_FIXED_POINT_SUPPORTED
@@ -4432,7 +4476,7 @@ int main(int argc, char *argv[])
                          &unit_type)) {
                         if (offset_x == 0 && offset_y == 0)
                         {
-                            if (verbose > 0 && first_trial)
+                            if (verbose > 0 && last_trial)
                                 fprintf(STDERR,
                                   "   Deleting useless oFFs 0 0 chunk\n");
                         }
@@ -4479,7 +4523,7 @@ int main(int argc, char *argv[])
                         {
                             if (res_x == 0 && res_y == 0)
                             {
-                                if (verbose > 0 && first_trial)
+                                if (verbose > 0 && last_trial)
                                     fprintf(STDERR,
                                       "   Deleting useless pHYs 0 0 chunk\n");
                             }
@@ -4496,7 +4540,7 @@ int main(int argc, char *argv[])
                             (png_uint_32) ((resolution / .0254 + 0.5));
                         png_set_pHYs(write_ptr, write_info_ptr, res_x,
                                      res_y, unit_type);
-                        if (verbose > 0 && first_trial)
+                        if (verbose > 0 && last_trial)
                             fprintf(STDERR, "   Added pHYs %lu %lu 1 chunk\n",
                             (unsigned long)res_x, 
                             (unsigned long)res_y);
@@ -4526,7 +4570,7 @@ int main(int argc, char *argv[])
                         (read_ptr, read_info_ptr, &trans, &num_trans,
                          &trans_values))
                     {
-                        if (verbose > 1 && first_trial)
+                        if (verbose > 1 && last_trial)
                             fprintf(STDERR,
                               "  Found tRNS chunk in input file.\n");
                         if (have_trns == 1)
@@ -4551,7 +4595,7 @@ int main(int argc, char *argv[])
                                     if (trns_array[ia] != 255)
                                         last_nonmax = ia;
                                 }
-                                if (first_trial && verbose > 0)
+                                if (last_trial && verbose > 0)
                                 {
                                     if (last_nonmax < 0)
                                         fprintf(STDERR, "   Deleting "
@@ -4613,7 +4657,7 @@ int main(int argc, char *argv[])
                         for (ia = 0; ia < 256; ia++)
                             trns_array[ia] = 255;
                     }
-                    if (verbose > 1 && first_trial)
+                    if (verbose > 1 && last_trial)
                     {
                         int last = -1;
                         for (i = 0; ia < num_palette; ia++)
@@ -4634,6 +4678,7 @@ int main(int argc, char *argv[])
                     }
                 }
 #endif /* PNG_READ_tRNS_SUPPORTED && PNG_WRITE_tRNS_SUPPORTED */
+            }  /* End of ancillary chunk handling */
 
                 if (png_get_PLTE
                     (read_ptr, read_info_ptr, &palette, &num_palette))
@@ -4651,7 +4696,7 @@ int main(int argc, char *argv[])
                     else if (keep_chunk("PLTE", argv))
                         png_set_PLTE(write_ptr, write_info_ptr, palette,
                                      num_palette);
-                    if (verbose > 1 && first_trial)
+                    if (verbose > 1 && last_trial)
                     {
                         png_colorp p = palette;
                         fprintf(STDERR, "   Palette:\n");
@@ -4669,6 +4714,9 @@ int main(int argc, char *argv[])
                 }
 
 
+            /* Handle ancillary chunks */
+            if (last_trial == 1)
+            {
 #if defined(PNG_READ_sBIT_SUPPORTED) && defined(PNG_WRITE_sBIT_SUPPORTED)
                 {
                     png_color_8p sig_bit;
@@ -4772,7 +4820,7 @@ int main(int argc, char *argv[])
                         P1( "Handling %d tEXt/zTXt chunks before IDAT\n",
                                    num_text);
 
-                        if (verbose > 1 && first_trial && num_text > 0)
+                        if (verbose > 1 && last_trial && num_text > 0)
                         {
                             for (ntext = 0; ntext < num_text; ntext++)
                             {
@@ -4803,7 +4851,7 @@ int main(int argc, char *argv[])
                                 int num_to_write = num_text;
                                 for (ntext = 0; ntext < num_text; ntext++)
                                 {
-                                    if (first_trial)
+                                    if (last_trial)
                                         P2("Text chunk before IDAT, "
                                           "compression=%d\n",
                                           text_ptr[ntext].compression);
@@ -4861,7 +4909,7 @@ int main(int argc, char *argv[])
                                     text_compression[ntext];
                                 png_set_text(write_ptr, write_info_ptr,
                                              added_text, 1);
-                                if (verbose > 0 && first_trial)
+                                if (verbose > 0 && last_trial)
                                 {
                                   if (added_text[0].compression < 0)
                                       printf("   Added a tEXt chunk.\n");
@@ -4987,6 +5035,7 @@ int main(int argc, char *argv[])
                 }
               P1("unknown chunk handling done.\n");
 #endif /* PNG_WRITE_UNKNOWN_CHUNKS_SUPPORTED */
+            }  /* End of ancillary chunk handling */
 
                 /* } GRR added for quick %-navigation (1) */
 
@@ -5157,7 +5206,7 @@ int main(int argc, char *argv[])
                             compression_window =
                                 default_compression_window;
 
-                        if (verbose > 1 && first_trial
+                        if (verbose > 1 && last_trial
                             && (compression_window != 15
                                 || force_compression_window))
                             fprintf(STDERR,
@@ -5346,7 +5395,7 @@ int main(int argc, char *argv[])
                 {
                     png_byte rgb_error =
                         png_get_rgb_to_gray_status(read_ptr);
-                    if (first_trial && verbose > 0 && rgb_error)
+                    if (last_trial && verbose > 0 && rgb_error)
                         printf(
                           "   **** Converted non-gray image to gray. **** \n");
                 }
@@ -5372,6 +5421,9 @@ int main(int argc, char *argv[])
 
                 /* { GRR:  added for %-navigation (2) */
 
+            /* Handle ancillary chunks */
+            if (last_trial == 1)
+            {
 #if (defined(PNG_READ_tEXt_SUPPORTED) && defined(PNG_WRITE_tEXt_SUPPORTED)) \
  || (defined(PNG_READ_iTXt_SUPPORTED) && defined(PNG_WRITE_iTXt_SUPPORTED)) \
  || (defined(PNG_READ_zTXt_SUPPORTED) && defined(PNG_WRITE_zTXt_SUPPORTED))
@@ -5392,8 +5444,7 @@ int main(int argc, char *argv[])
 #endif
                                    num_text);
 
-                        if (verbose > 1 && (!nosave || first_trial) &&
-                            num_text > 0)
+                        if (verbose > 1 && last_trial && num_text > 0)
                         {
                             for (ntext = 0; ntext < num_text; ntext++)
                             {
@@ -5425,7 +5476,7 @@ int main(int argc, char *argv[])
                                 int num_to_write = num_text;
                                 for (ntext = 0; ntext < num_text; ntext++)
                                 {
-                                    if (first_trial)
+                                    if (last_trial)
                                         P2("Text chunk after IDAT, "
                                           "compression=%d\n",
                                           text_ptr[ntext].compression);
@@ -5491,7 +5542,7 @@ int main(int argc, char *argv[])
                                 png_set_text(write_ptr, write_end_info_ptr,
                                              added_text, 1);
   
-                                if (verbose > 0 && first_trial)
+                                if (verbose > 0 && last_trial)
                                 {
                                   if (added_text[0].compression < 0)
                                       printf("   Added a tEXt chunk.\n");
@@ -5554,6 +5605,7 @@ int main(int argc, char *argv[])
                     }
                 }
 #endif
+            }  /* End of ancillary chunk handling */
                 /* } GRR:  added for %-navigation (2) */
 
                 if (nosave == 0) {
@@ -5646,9 +5698,7 @@ int main(int argc, char *argv[])
             if (nosave)
                 break;
 
-            first_trial = 0;
-
-            if (nosave == 0)
+            else
             {
                 P1( "Opening file for length measurement\n");
                 if ((fpin = FOPEN(outname, "rb")) == NULL)
@@ -5676,7 +5726,6 @@ int main(int argc, char *argv[])
                   (unsigned long)idat_length[trial]);
                 fflush(STDERR);
             }
-
         } /* end of trial-loop */
        
         P1("\n\nFINISHED MAIN LOOP OVER %d METHODS\n\n\n", MAX_METHODS);
