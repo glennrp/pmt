@@ -59,7 +59,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.33"
+#define PNGCRUSH_VERSION "1.7.34"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -154,12 +154,6 @@
  *
  *   Finish pplt (partial palette) feature.
  *
- *   Use an alternate write function for the trial passes, that
- *   simply counts bytes rather than actually writing to a file, to save wear
- *   and tear on disk drives (actually, on modern operating systems it
- *   will only save wear and tear on the memory cache) and possibly some
- *   CPU time.
- *
  *   Remove text-handling and color-handling features and put
  *   those in a separate program or programs, to avoid unnecessary
  *   recompressing.
@@ -189,10 +183,22 @@
 
 Change log:
 
+Version 1.7.34 (built with libpng-1.5.12 and zlib-1.2.7)
+  Compute and report sum of critical chunk lengths IHDR, PLTE, IDAT, and IEND,
+    plus the 8-byte PNG signature instead of just the total IDAT data length.
+    Simplify finding the lengths from the trial compressions, by replacing
+    the write function with one that simply counts the bytes that would have
+    been written to a trial PNG, instead of actually writing a PNG, reading it
+    back, and counting the IDAT bytes.  The savings, while measurable, are
+    not very significant -- The "-brute" and default pngcrush runs that I
+    tried are between one and five percent faster.  Most of the time is
+    expended in zlib compression of the IDATs, which is not affected by
+    the change.
+
 Version 1.7.33  (built with libpng-1.5.12 and zlib-1.2.7)
   Ignore all ancillary chunks except during the final trial.  This can be
-    significantly faster when large ancillary chunks such as iCCP are
-    present.
+    significantly faster when large ancillary chunks such as iCCP and zTXt
+    are present.
 
 Version 1.7.32  (built with libpng-1.5.12 and zlib-1.2.7)
   Fixed bug introduced in 1.7.30: Do not call png_set_check_for_invalid_index()
@@ -817,6 +823,10 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
    /* Not provided by libpng15 */
 #  include <zlib.h>
 
+#  ifndef PNG_UNUSED
+#    define PNG_UNUSED(param) (void)param;
+#  endif
+
    /* Not provided by libpng16 */
 #  include <string.h>
 
@@ -1223,6 +1233,7 @@ static int input_color_type;
 static int input_bit_depth;
 static int trial;
 static int last_trial = 0;
+static png_uint_32 pngcrush_write_byte_count;
 static int verbose = 1;
 static int fix = 0;
 static int things_have_changed = 0;
@@ -1362,8 +1373,11 @@ void PNGAPI pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
 void png_read_transform_info(png_structp png_ptr, png_infop info_ptr);
 #endif
 
-void PNGAPI png_defaultwrite_data(png_structp png_ptr, png_bytep data,
+void PNGAPI pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
   png_size_t length);
+
+void pngcrush_write_png(png_structp write_pointer, png_bytep data,
+     png_size_t length);
 
 #ifdef PNGCRUSH_H
 void png_reset_crc(png_structp png_ptr);
@@ -1630,7 +1644,8 @@ pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
  */
 #ifndef USE_FAR_KEYWORD
 void PNGAPI
-png_defaultwrite_data(png_structp png_ptr, png_bytep data, png_size_t length)
+pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
+   png_size_t length)
 {
    png_uint_32 check;
    png_FILE_p io_ptr;
@@ -1652,7 +1667,8 @@ png_defaultwrite_data(png_structp png_ptr, png_bytep data, png_size_t length)
 #define MIN(a,b) (a <= b ? a : b)
 
 void PNGAPI
-png_defaultwrite_data(png_structp png_ptr, png_bytep data, png_size_t length)
+pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
+   png_size_t length)
 {
    png_uint_32 check;
    png_byte *near_data;  /* Needs to be "png_byte *" instead of "png_bytep" */
@@ -2132,6 +2148,20 @@ void show_result(void)
       if (verbose > 0)
         fprintf(STDERR,
         "   **** Discarded APNG chunks. ****\n");
+}
+
+void pngcrush_write_png(png_structp write_pointer, png_bytep data,
+     png_size_t length)
+{
+    pngcrush_write_byte_count += (int) length;
+    if (last_trial)
+      pngcrush_default_write_data(write_pointer, data, length);
+}
+
+static void pngcrush_flush(png_structp png_ptr)
+{
+   /* Do nothing. */
+   PNG_UNUSED(png_ptr)
 }
 
 
@@ -3219,8 +3249,8 @@ int main(int argc, char *argv[])
                number_of_open_files++;
                png_init_io(mng_ptr, mng_out);
                png_set_write_fn(mng_ptr, (png_voidp) mng_out,
-                               (png_rw_ptr) NULL,
-                               NULL);
+                                (png_rw_ptr) pngcrush_write_png,
+                                pngcrush_flush);
 #endif /* PNGCRUSH_LOCO */
 
             }
@@ -3405,6 +3435,8 @@ int main(int argc, char *argv[])
         {
             if (nosave || trial == MAX_METHODS)
                last_trial = 1;
+
+            pngcrush_write_byte_count=0;
 
             idat_length[trial] = (png_uint_32) 0xffffffff;
 
@@ -3689,20 +3721,15 @@ int main(int argc, char *argv[])
                 P1( "Initializing input and output streams\n");
 #ifdef PNG_STDIO_SUPPORTED
                 png_init_io(read_ptr, fpin);
-                if (nosave == 0)
-                    png_init_io(write_ptr, fpout);
 #else
                 png_set_read_fn(read_ptr, (png_voidp) fpin,
                                 (png_rw_ptr) NULL);
+#endif /* PNG_STDIO_SUPPORTED */
+
                 if (nosave == 0)
                     png_set_write_fn(write_ptr, (png_voidp) fpout,
-                                     (png_rw_ptr) NULL,
-#ifdef PNG_WRITE_FLUSH_SUPPORTED
-                                     png_default_flush);
-#else
-                                     NULL);
-#endif
-#endif /* PNG_STDIO_SUPPORTED */
+                                     (png_rw_ptr) pngcrush_write_png,
+                                     pngcrush_flush);
 
                 P2("io has been initialized.\n");
                 pngcrush_pause();
@@ -5033,7 +5060,7 @@ int main(int argc, char *argv[])
                         png_free(write_ptr, unknowns_keep);
                     }
                 }
-              P1("unknown chunk handling done.\n");
+              P1( "Finished handling ancillary chunks after IDAT\n");
 #endif /* PNG_WRITE_UNKNOWN_CHUNKS_SUPPORTED */
             }  /* End of ancillary chunk handling */
 
@@ -5093,7 +5120,8 @@ int main(int argc, char *argv[])
                         if (outname[strlen(outname) - 3] == 'p')
                             png_warning(read_ptr,
                               "  Writing a MNG file with a .png extension");
-                        png_defaultwrite_data(write_ptr, &mng_signature[0],
+                        pngcrush_default_write_data(write_ptr,
+                                       &mng_signature[0],
                                        (png_size_t) 8);
                         png_set_sig_bytes(write_ptr, 8);
 
@@ -5573,6 +5601,7 @@ int main(int argc, char *argv[])
 
                     if (png_get_tIME(read_ptr, end_info_ptr, &mod_time))
                     {
+                        P1( "Handling tIME chunk after IDAT\n");
                         if (keep_chunk("tIME", argv))
                             png_set_tIME(write_ptr, write_end_info_ptr,
                                          mod_time);
@@ -5590,7 +5619,7 @@ int main(int argc, char *argv[])
                                                      &unknowns);
                     if (num_unknowns && nosave == 0)
                     {
-                        printf("setting %d unknown chunks after IDAT\n",
+                        printf("Handling %d unknown chunks after IDAT\n",
                                num_unknowns);
                         png_set_unknown_chunks(write_ptr,
                                                write_end_info_ptr,
@@ -5713,7 +5742,7 @@ int main(int argc, char *argv[])
                 }
                 number_of_open_files++;
 
-                idat_length[trial] = measure_idats(fpin);
+                idat_length[trial] = pngcrush_write_byte_count;
 
                 FCLOSE(fpin);
             }
@@ -5721,7 +5750,8 @@ int main(int argc, char *argv[])
             if (verbose > 0 && trial != MAX_METHODS)
             {
                 fprintf(STDERR,
-                  "   IDAT length with method %3d (fm %d zl %d zs %d) = %8lu\n",
+                  "   Critical chunk length with method %3d"
+                  " (fm %d zl %d zs %d) = %8lu\n",
                   trial, filter_type, zlib_level, z_strategy,
                   (unsigned long)idat_length[trial]);
                 fflush(STDERR);
@@ -5797,16 +5827,16 @@ int main(int argc, char *argv[])
                 {
                 fprintf(STDERR,
                   "   Best pngcrush method = %d (fm %d zl %d zs %d)\n"
-                  "for %s\n", best, fm[best], lv[best], zs[best], outname);
+                  "     for %s\n", best, fm[best], lv[best], zs[best], outname);
                 }
 
                 if (idat_length[0] == idat_length[best])
-                    fprintf(STDERR, "     (no IDAT change)\n");
+                    fprintf(STDERR, "     (no critical chunk change)\n");
                 else if (idat_length[0] > idat_length[best])
-                    fprintf(STDERR, "     (%4.2f%% IDAT reduction)\n",
+                    fprintf(STDERR, "     (%4.2f%% critical chunk reduction)\n",
                       (100.0 - (100.0 * idat_length[best]) / idat_length[0]));
                 else
-                    fprintf(STDERR, "     (%4.2f%% IDAT increase)\n",
+                    fprintf(STDERR, "     (%4.2f%% critical chunk increase)\n",
                       -(100.0 - (100.0 * idat_length[best]) / idat_length[0]));
                 if (input_length == output_length)
                     fprintf(STDERR, "     (no filesize change)\n\n");
@@ -5897,7 +5927,10 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
 {
     /* Copyright (C) 1999-2002,2006 Glenn Randers-Pehrson (glennrp@users.sf.net)
        See notice in pngcrush.c for conditions of use and distribution */
-    png_uint_32 sum_idat_length = 0;
+
+    /* Signature + IHDR + IEND; we'll add PLTE + IDAT lengths */
+    png_uint_32 sum_idat_length = 45;
+
     png_byte *bb = NULL;
     png_uint_32 malloced_length=0;
 
@@ -5948,7 +5981,7 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
             if (new_mng)
             {
                 /* write the MNG 8-byte signature */
-                png_defaultwrite_data(mng_ptr, &mng_signature[0],
+                pngcrush_write_png(mng_ptr, &mng_signature[0],
                                   (png_size_t) 8);
 
                 /* Write a MHDR chunk */
@@ -6117,12 +6150,19 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
         else
         {
 #ifdef PNG_UINT_IDAT
-            if (png_get_uint_32(chunk_name) == PNG_UINT_IDAT)
-#else
-            if (!png_memcmp(chunk_name, png_IDAT, 4))
+            if ((png_get_uint_32(chunk_name) == PNG_UINT_IDAT) ||
+#endif
+#ifndef PNG_UINT_IDAT
+            if ((!png_memcmp(chunk_name, png_IDAT, 4)) ||
+#endif
+#ifdef PNG_UINT_PLTE
+               (png_get_uint_32(chunk_name) == PNG_UINT_PLTE))
+#endif
+#ifndef PNG_UINT_PLTE
+               (!png_memcmp(chunk_name, png_PLTE, 4)))
 #endif
             {
-                sum_idat_length += length;
+                sum_idat_length += (length + 12);
                 if (length > crushed_idat_size)
                     already_crushed++;
             }
