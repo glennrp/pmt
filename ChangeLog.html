@@ -3,10 +3,24 @@
 
 Change log:
 
+Version 1.7.34 (built with libpng-1.5.12 and zlib-1.2.7)
+  Compute and report sum of critical chunk lengths IHDR, PLTE, IDAT, and IEND,
+    plus the 8-byte PNG signature instead of just the total IDAT data length.
+    Simplify finding the lengths from the trial compressions, by replacing
+    the write function with one that simply counts the bytes that would have
+    been written to a trial PNG, instead of actually writing a PNG, reading it
+    back, and counting the IDAT bytes.  The savings, while measurable, are
+    not very significant -- The "-brute" and default pngcrush runs that I
+    tried are between one and five percent faster.  Most of the time is
+    expended in zlib compression of the IDATs, which is not affected by
+    the change.
+  Removed comments about the system library having to be libpng14 or earlier.
+    This restriction was fixed in version 1.7.20.
+
 Version 1.7.33  (built with libpng-1.5.12 and zlib-1.2.7)
   Ignore all ancillary chunks except during the final trial.  This can be
-    significantly faster when large ancillary chunks such as iCCP are
-    present.
+    significantly faster when large ancillary chunks such as iCCP and zTXt
+    are present.
 
 Version 1.7.32  (built with libpng-1.5.12 and zlib-1.2.7)
   Fixed bug introduced in 1.7.30: Do not call png_set_check_for_invalid_index()
