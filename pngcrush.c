@@ -2,7 +2,7 @@
  * pngcrush.c - recompresses png files
  * Copyright (C) 1998-2002,2006-2012 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
- * Portions copyright (C) 2005      Greg Roelofs
+ * Portions copyright (C) 2005       Greg Roelofs
  *
  * This software is released under a license derived from the libpng
  * license (see LICENSE, below).
@@ -13,8 +13,7 @@
  * This program reads in a PNG image, and writes it out again, with the
  * optimum filter_method and zlib_level.  It uses brute force (trying
  * filter_method none, and libpng adaptive filtering, with compression
- * levels 3 and 9).  It does the most time-consuming method last in case
- * it turns out to be the best.
+ * levels 3 and 9).
  *
  * Optionally, it can remove unwanted chunks or add gAMA, sRGB, bKGD,
  * tEXt/zTXt, and tRNS chunks.  It will remove some chunks such as gAMA,
@@ -23,7 +22,8 @@
  *
  * Uses libpng and zlib.  This program was based upon libpng's pngtest.c.
  * If using a "system" libpng and not the bundled libpng15 that comes
- * with pngcrush, this must at present be libpng14 or earlier.
+ * with pngcrush, this must at present be libpng14 or earlier. ** CHECK THIS,
+ * is this still true?
  *
  * Thanks to Greg Roelofs for various bug fixes, suggestions, and
  * occasionally creating Linux executables.
@@ -52,6 +52,11 @@
  * when PNG files are prepared for downloading to the iPhone unless the
  * user takes special measures to prevent it.
  *
+ * It is said that the Xcode pngcrush does have a command to undo the
+ * premultiplied alpha.  It's not theoretically possible, however, to recover
+ * the original file without loss.  The underlying color data must either be
+ * reduced in precision or, in the case of alpha==0, completely lost.
+ *
  * I have not seen the source for the Xcode version of pngcrush.  All I
  * know, for now, is from running "strings -a" on a copy of the executable,
  * looking at two Xcode-PNG files, and reading Apple's patent application
@@ -77,7 +82,7 @@
  *
  * Copyright (C) 1998-2002,2006-2012 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
- * Portions copyright (C) 2005      Greg Roelofs
+ * Portions copyright (C) 2005       Greg Roelofs
  *
  * DISCLAIMERS:
  *
@@ -121,6 +126,8 @@
  *         ...
  *       #endif
  *
+ *   CHECK THIS: This may have been fixed in pngcrush-1.7.20
+ *
  *   Reset CINFO to reflect decoder's required window size (instead of
  *   libz-1.1.3 encoder's required window size, which is 262 bytes larger).
  *   See discussion about zlib in png-list archives for April 2001.
@@ -156,7 +163,8 @@
  *
  *   Remove text-handling and color-handling features and put
  *   those in a separate program or programs, to avoid unnecessary
- *   recompressing.
+ *   recompressing.  Note that in pngcrush-1.7.34, pngcrush began doing
+ *   this extra work only once instead of for every trial.
  *
  *   Move the Photoshop-fixing stuff into a separate program.
  *
@@ -969,6 +977,7 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 #  define PNG_UINT_sRGB PNG_UINT_32_NAME(115, 82, 71, 66)
 #endif
 
+/* glennrp added sTER at pngcrush-1.6.10 */
 #ifndef PNG_UINT_sTER
 #  define PNG_UINT_sTER PNG_UINT_32_NAME(115, 84, 69, 82)
 #endif
@@ -2296,7 +2305,6 @@ int main(int argc, char *argv[])
 #endif /* Z_RLE */
 
     num_methods = method;   /* GRR */
-
 
 #define BUMP_I i++;if(i >= argc) {printf("insufficient parameters\n");exit(1);}
     names = 1;
@@ -5718,7 +5726,7 @@ int main(int argc, char *argv[])
             read_ptr = NULL;
             write_ptr = NULL;
             FCLOSE(fpin);
-            if (nosave == 0)
+            if (last_trial && nosave == 0)
             {
                 FCLOSE(fpout);
                 setfiletype(outname);
@@ -5728,24 +5736,7 @@ int main(int argc, char *argv[])
                 break;
 
             else
-            {
-                P1( "Opening file for length measurement\n");
-                if ((fpin = FOPEN(outname, "rb")) == NULL)
-                {
-                    fprintf(STDERR, "Could not find output file %s\n", outname);
-                    if (png_row_filters != NULL)
-                    {
-                        free(png_row_filters);
-                        png_row_filters = NULL;
-                    }
-                    exit(1);
-                }
-                number_of_open_files++;
-
                 idat_length[trial] = pngcrush_write_byte_count;
-
-                FCLOSE(fpin);
-            }
 
             if (verbose > 0 && trial != MAX_METHODS)
             {
@@ -7065,7 +7056,7 @@ struct options_help pngcrush_options[] = {
     {2, "               and -e _C.png means *.png => *_C.png"},
     {2, ""},
 
-    {0, "            -f user_filter [0-5]"},
+    {0, "            -f user_filter [0-5] for specified method"},
     {2, ""},
     {2, "               filter to use with the method specified in the"},
     {2, "               preceding '-m method' or '-brute_force' argument."},
@@ -7125,7 +7116,7 @@ struct options_help pngcrush_options[] = {
     {2, ""},
 
 
-    {0, "            -l zlib_compression_level [0-9]"},
+    {0, "            -l zlib_compression_level [0-9] for specified method"},
     {2, ""},
     {2, "               zlib compression level to use with method specified"},
     {2, "               with the preceding '-m method' or '-brute_force'"},
@@ -7330,9 +7321,9 @@ struct options_help pngcrush_options[] = {
     {2, ""},
 
 #ifdef Z_RLE
-    {0, "            -z zlib_strategy [0, 1, 2, or 3]"},
+    {0, "            -z zlib_strategy [0, 1, 2, or 3] for specified method"},
 #else
-    {0, "            -z zlib_strategy [0, 1, or 2]"},
+    {0, "            -z zlib_strategy [0, 1, or 2] for specified method"},
 #endif
     {2, ""},
     {2, "               zlib compression strategy to use with the preceding"},
