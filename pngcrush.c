@@ -21,9 +21,6 @@
  * mistake.
  *
  * Uses libpng and zlib.  This program was based upon libpng's pngtest.c.
- * If using a "system" libpng and not the bundled libpng15 that comes
- * with pngcrush, this must at present be libpng14 or earlier. ** CHECK THIS,
- * is this still true?
  *
  * Thanks to Greg Roelofs for various bug fixes, suggestions, and
  * occasionally creating Linux executables.
@@ -117,17 +114,6 @@
 
 /* To do:
  *
- *   Eliminate direct access to png_info members so pngcrush will work
- *   with the system libpng15.  For now, it works with the bundled libpng15,
- *   but requires libpng14 or an earlier system library, or libpng-1.5.6
- *   or later.  See about 300 lines enclosed in
- *
- *       #if (!defined(PNGCRUSH_H))
- *         ...
- *       #endif
- *
- *   CHECK THIS: This may have been fixed in pngcrush-1.7.20
- *
  *   Reset CINFO to reflect decoder's required window size (instead of
  *   libz-1.1.3 encoder's required window size, which is 262 bytes larger).
  *   See discussion about zlib in png-list archives for April 2001.
@@ -202,6 +188,8 @@ Version 1.7.34 (built with libpng-1.5.12 and zlib-1.2.7)
     tried are between one and five percent faster.  Most of the time is
     expended in zlib compression of the IDATs, which is not affected by
     the change.
+  Removed comments about the system library having to be libpng14 or earlier.
+    This restriction was fixed in version 1.7.20.
 
 Version 1.7.33  (built with libpng-1.5.12 and zlib-1.2.7)
   Ignore all ancillary chunks except during the final trial.  This can be
