@@ -3,17 +3,18 @@
 
 Change log:
 
+Version 1.7.35 (built with libpng-1.5.12 and zlib-1.2.7)
+  Removed FOPEN of fpout except for the last trial.  The open files caused
+    "pngcrush -brute -e _ext.png *.png" to fail on the 10th file (about the
+    1024th compression trial) due to being unable to open the output file.
+
 Version 1.7.34 (built with libpng-1.5.12 and zlib-1.2.7)
   Compute and report sum of critical chunk lengths IHDR, PLTE, IDAT, and IEND,
     plus the 8-byte PNG signature instead of just the total IDAT data length.
     Simplify finding the lengths from the trial compressions, by replacing
     the write function with one that simply counts the bytes that would have
     been written to a trial PNG, instead of actually writing a PNG, reading it
-    back, and counting the IDAT bytes.  The savings, while measurable, are
-    not very significant -- The "-brute" and default pngcrush runs that I
-    tried are between one and five percent faster.  Most of the time is
-    expended in zlib compression of the IDATs, which is not affected by
-    the change.
+    back, and counting the IDAT bytes.
   Removed comments about the system library having to be libpng14 or earlier.
     This restriction was fixed in version 1.7.20.
 
@@ -41,7 +42,8 @@ Version 1.7.29  (built with libpng-1.5.10 and zlib-1.2.7)
     file.
   Direct usage message and error messages to stderr instead of stdout. If
     anyone is still using DOS they may have to change the "if 0" at line
-    990 to "if 1".
+    990 to "if 1".  If you need to have the messages on standard output
+    as in the past, use 2>&1 to redirect them.
   Added "pngcrush -n -v files.png" to the usage message.
 
 Version 1.7.28  (built with libpng-1.5.10 and zlib-1.2.7)
