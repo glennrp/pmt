@@ -61,7 +61,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.34"
+#define PNGCRUSH_VERSION "1.7.35"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -177,17 +177,18 @@
 
 Change log:
 
+Version 1.7.35 (built with libpng-1.5.12 and zlib-1.2.7)
+  Removed FOPEN of fpout except for the last trial.  The open files caused
+    "pngcrush -brute -e _ext.png *.png" to fail on the 10th file (about the
+    1024th compression trial) due to being unable to open the output file.
+
 Version 1.7.34 (built with libpng-1.5.12 and zlib-1.2.7)
   Compute and report sum of critical chunk lengths IHDR, PLTE, IDAT, and IEND,
     plus the 8-byte PNG signature instead of just the total IDAT data length.
     Simplify finding the lengths from the trial compressions, by replacing
     the write function with one that simply counts the bytes that would have
     been written to a trial PNG, instead of actually writing a PNG, reading it
-    back, and counting the IDAT bytes.  The savings, while measurable, are
-    not very significant -- The "-brute" and default pngcrush runs that I
-    tried are between one and five percent faster.  Most of the time is
-    expended in zlib compression of the IDATs, which is not affected by
-    the change.
+    back, and counting the IDAT bytes.
   Removed comments about the system library having to be libpng14 or earlier.
     This restriction was fixed in version 1.7.20.
 
@@ -215,7 +216,8 @@ Version 1.7.29  (built with libpng-1.5.10 and zlib-1.2.7)
     file.
   Direct usage message and error messages to stderr instead of stdout. If
     anyone is still using DOS they may have to change the "if 0" at line
-    990 to "if 1".
+    990 to "if 1".  If you need to have the messages on standard output
+    as in the past, use 2>&1 to redirect them.
   Added "pngcrush -n -v files.png" to the usage message.
 
 Version 1.7.28  (built with libpng-1.5.10 and zlib-1.2.7)
@@ -2570,15 +2572,21 @@ int main(int argc, char *argv[])
             else
             {
                 int ic;
+                number_of_open_files++;
                 iccp_text = (char*)malloc(iccp_length);
+
                 for (ic = 0; ic < iccp_length; ic++)
                 {
                     png_size_t num_in;
                     num_in = fread(buffer, 1, 1, iccp_fn);
+
                     if (!num_in)
                         break;
+
                     iccp_text[ic] = buffer[0];
                 }
+
+                FCLOSE(iccp_fn);
             }
         }
 #endif /* PNG_iCCP_SUPPORTED */
@@ -3269,7 +3277,7 @@ int main(int argc, char *argv[])
                 
                 fprintf(STDERR, "   Recompressing %s\n", inname);
                 fprintf(STDERR,
-                  "   Total length of data found in IDAT chunks    = %8lu\n",
+                  "   Total length of data found in critical chunks = %8lu\n",
                   (unsigned long)idat_length[0]);
                 fflush(STDERR);
             }
@@ -3582,7 +3590,8 @@ int main(int argc, char *argv[])
                 continue;
             }
             number_of_open_files++;
-            if (nosave == 0)
+
+            if (last_trial && nosave == 0)
             {
 #ifndef __riscos
                 /* Can't sensibly check this on RISC OS without opening a file
@@ -3738,18 +3747,19 @@ int main(int argc, char *argv[])
                                    PNG_CRC_QUIET_USE);
 #endif
 
-            if (last_trial == 1)
-            {
 #ifdef PNG_READ_CHECK_FOR_INVALID_INDEX_SUPPORTED
                 /* Only run this test (new in libpng-1.5.10) during the
-                 * first trial
+                 * final trial
                  */
                 png_set_check_for_invalid_index (read_ptr, last_trial);
 #endif
 #ifdef PNG_WRITE_CHECK_FOR_INVALID_INDEX_SUPPORTED
-                if (nosave == 0)
+                if (last_trial && nosave == 0)
                    png_set_check_for_invalid_index (write_ptr, last_trial);
 #endif
+
+            if (last_trial == 1)
+            {
 
 #ifdef PNG_READ_UNKNOWN_CHUNKS_SUPPORTED
                 png_set_keep_unknown_chunks(read_ptr, PNG_HANDLE_CHUNK_ALWAYS,
@@ -4187,8 +4197,10 @@ int main(int argc, char *argv[])
                             {
                                 output_format = 1;
                                 filter_method = 64;
-                                png_permit_mng_features(write_ptr,
-                                                        PNG_FLAG_MNG_FILTER_64);
+                                if (nosave == 0 && last_trial == 1)
+                                   png_permit_mng_features(write_ptr,
+                                       PNG_FLAG_MNG_FILTER_64);
+                       
                             }
                         } else
                             filter_method = 0;
@@ -4196,7 +4208,8 @@ int main(int argc, char *argv[])
                             things_have_changed = 1;
 #endif
 
-                        png_set_IHDR(write_ptr, write_info_ptr, width,
+                        if (nosave == 0)
+                           png_set_IHDR(write_ptr, write_info_ptr, width,
                                      height, output_bit_depth,
                                      output_color_type, interlace_method,
                                      compression_method, filter_method);
@@ -4713,12 +4726,17 @@ int main(int argc, char *argv[])
                         printf("PPLT: %s\n", pplt_string);
                         printf("Sorry, PPLT is not implemented yet.\n");
                     }
+
+                    if (nosave == 0 && last_trial == 1)
+                    {
                     if (output_color_type == 3)
                         png_set_PLTE(write_ptr, write_info_ptr, palette,
                                      num_palette);
                     else if (keep_chunk("PLTE", argv))
                         png_set_PLTE(write_ptr, write_info_ptr, palette,
                                      num_palette);
+
+                    }
                     if (verbose > 1 && last_trial)
                     {
                         png_colorp p = palette;
@@ -4771,7 +4789,8 @@ int main(int argc, char *argv[])
                                     || output_color_type == 6))
                                 sig_bit->alpha = 1;
 
-                            png_set_sBIT(write_ptr, write_info_ptr,
+                            if (nosave == 0)
+                               png_set_sBIT(write_ptr, write_info_ptr,
                                          sig_bit);
                         }
                     }
@@ -5750,13 +5769,13 @@ int main(int argc, char *argv[])
         {
             FCLOSE(fpin);
         }
-        if (nosave == 0 && fpout)
+        if (last_trial && nosave == 0 && fpout)
         {
             FCLOSE(fpout);
             setfiletype(outname);
         }
         
-        if (nosave == 0 && overwrite != 0)
+        if (last_trial && nosave == 0 && overwrite != 0)
         {
             /* rename the new file , outname = inname */
             if (rename(outname, inname) != 0 )
@@ -5769,7 +5788,7 @@ int main(int argc, char *argv[])
                 P2("rename %s to %s complete.\n",outname,inname);
         }
 
-        if (nosave == 0)
+        if (last_trial && nosave == 0)
         {
             png_uint_32 input_length, output_length;
 #ifndef __riscos
