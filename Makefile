@@ -17,19 +17,23 @@
 CC = gcc
 LD = gcc
 RM = rm -f
-#CFLAGS = -I. -O -Wall
-#CFLAGS = -I. -O2
-#CFLAGS = -I. -O3 -fomit-frame-pointer -Wall
-#CFLAGS = -I. -Os -fomit-frame-pointer -Wall
-#CFLAGS = -I. -O3 -funroll-loops -fomit-frame-pointer -Wall -Wshadow
+
+CPPFLAGS = -I.
+# CPPFLAGS = -I${ZINC} -I.
+
 # Work around zlib compiler bug in 1.2.6
-CFLAGS = -I. -O3 -funroll-loops -fomit-frame-pointer -Wall -Wshadow -DZ_SOLO
-#CFLAGS = -I${ZINC} -I. -O3 -fomit-frame-pointer -Wall
-# [note that -Wall is a gcc-specific compilation flag ("all warnings on")]
+CPPFLAGS += -DZ_SOLO
 
 # Cannot use this with libpng15
 # TOOFAR_OK=-DINFLATE_ALLOW_INVALID_DISTANCE_TOOFAR_ARRR
 TOOFAR_OK=
+
+#CFLAGS = -O -Wall
+#CFLAGS = -O2
+#CFLAGS = -O3 -fomit-frame-pointer -Wall
+#CFLAGS = -Os -fomit-frame-pointer -Wall
+CFLAGS = -O3 -funroll-loops -fomit-frame-pointer -Wall -Wshadow
+# [note that -Wall is a gcc-specific compilation flag ("all warnings on")]
 
 LDFLAGS =
 O = .o
@@ -38,6 +42,7 @@ E =
 PNGCRUSH  = pngcrush
 
 LIBS = -lm
+# uncomment one of these 2 lines only if you are using an external zlib:
 #LIBS = -L${ZLIB} -lz -lm
 #LIBS = ${ZLIB}/libz.a -lm
 
@@ -58,7 +63,7 @@ EXES = $(PNGCRUSH)$(E)
 # implicit make rules -------------------------------------------------------
 
 .c$(O): png.h pngconf.h pngcrush.h cexcept.h pngpriv.h $(ZHDR)
-	$(CC) -c $(CFLAGS) $(TOOFAR_OK) $<
+	$(CC) -c $(TOOFAR_OK) $(CPPFLAGS) $(CFLAGS) $<
 
 
 # dependencies --------------------------------------------------------------
@@ -66,16 +71,16 @@ EXES = $(PNGCRUSH)$(E)
 all:  $(EXES)
 
 inffast$(O): inffast.c
-	$(CC) -c $(TOOFAR_OK) $(CFLAGS) $<
+	$(CC) -c $(TOOFAR_OK) $(CPPFLAGS) $(CFLAGS) $<
 
 inflate$(O): inflate.c
-	$(CC) -c $(TOOFAR_OK) $(CFLAGS) $<
+	$(CC) -c $(TOOFAR_OK) $(CPPFLAGS) $(CFLAGS) $<
 
 deflate$(O): deflate.c
-	$(CC) -c -DTOO_FAR=32767 $(CFLAGS) $<
+	$(CC) -c -DTOO_FAR=32767 $(CPPFLAGS) $(CFLAGS) $<
 
 pngcrush$(O): pngcrush.c png.h pngconf.h pngcrush.h cexcept.h $(ZHDR)
-	$(CC) -c $(CFLAGS) $(TOOFAR_OK) $<
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) $(TOOFAR_OK) $<
 
 $(PNGCRUSH)$(E): $(OBJS)
 	$(LD) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
