@@ -61,7 +61,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.36"
+#define PNGCRUSH_VERSION "1.7.37"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -179,6 +179,9 @@ Change log:
 
 Version 1.7.37 (built with libpng-1.5.12 and zlib-1.2.7)
   Reverted pngcrush.c back to 1.7.35 and fixed the bug with PLTE handling.
+  Bail out of a trial if byte count exceeds best byte count so far.
+  Added -bail and -nobail options.  Use -nobail to get a complete report
+    of filesizes.
 
 Version 1.7.36 (built with libpng-1.5.12 and zlib-1.2.7)
   Reverted pngcrush.c to version 1.7.34 because pngcrush is failing with
@@ -1242,8 +1245,11 @@ static int input_bit_depth;
 static int trial;
 static int last_trial = 0;
 static png_uint_32 pngcrush_write_byte_count;
+static png_uint_32 pngcrush_best_byte_count=0xffffffff;
+            
 static int verbose = 1;
 static int fix = 0;
+static int bail = 0; /* if 0, bail out of trial early */
 static int things_have_changed = 0;
 static int global_things_have_changed = 0;
 static int default_compression_window = 15;
@@ -2351,6 +2357,12 @@ int main(int argc, char *argv[])
             BUMP_I;
             crushed_idat_size = (png_uint_32) atoi(argv[i]);
         }
+
+        else if (!strncmp(argv[i], "-bail", 5))
+            bail=0;
+ 
+        else if (!strncmp(argv[i], "-nobail", 7))
+            bail=1;
 
         else if (!strncmp(argv[i], "-bkgd", 5) ||
                  !strncmp(argv[i], "-bKGD", 5))
@@ -5423,9 +5435,19 @@ int main(int argc, char *argv[])
                             }
                             t_start = t_stop;
                         }
+                        /* Bail if byte count exceeds best so far */
+                        if (bail == 0 && trial != MAX_METHODS &&
+                            pngcrush_write_byte_count >
+                            pngcrush_best_byte_count)
+                           break;
                     }
                     P2( "End interlace pass %d\n\n", pass);
+                    if (bail == 0 && trial != MAX_METHODS &&
+                        pngcrush_write_byte_count >
+                        pngcrush_best_byte_count)
+                       break;
                 }
+
                 if (nosave)
                 {
                     t_stop = (TIME_T) clock();
@@ -5467,10 +5489,14 @@ int main(int argc, char *argv[])
                 png_free_unknown_chunks(write_ptr, write_info_ptr, -1);
 #  endif
 #endif /* PNG_FREE_UNKN */
-                P1( "Reading and writing end_info data\n");
-                png_read_end(read_ptr, end_info_ptr);
 
                 /* { GRR:  added for %-navigation (2) */
+                if (!(bail == 0 && trial != MAX_METHODS &&
+                    pngcrush_write_byte_count >
+                    pngcrush_best_byte_count))
+                {
+                   P1( "Reading and writing end_info data\n");
+                   png_read_end(read_ptr, end_info_ptr);
 
             /* Handle ancillary chunks */
             if (last_trial == 1)
@@ -5658,7 +5684,6 @@ int main(int argc, char *argv[])
                 }
 #endif
             }  /* End of ancillary chunk handling */
-                /* } GRR:  added for %-navigation (2) */
 
                 if (nosave == 0) {
 #if 0 /* doesn't work; compression level has to be the same as in IDAT */
@@ -5671,6 +5696,8 @@ int main(int argc, char *argv[])
 #endif /* 0 */
                     png_write_end(write_ptr, write_end_info_ptr);
                 }
+                }
+                /* } GRR:  added for %-navigation (2) */
 
                 P1( "Destroying data structs\n");
                 if (row_buf != (png_bytep) NULL)
@@ -5750,18 +5777,29 @@ int main(int argc, char *argv[])
             if (nosave)
                 break;
 
-            else
-                idat_length[trial] = pngcrush_write_byte_count;
+            idat_length[trial] = pngcrush_write_byte_count;
+
+            if (pngcrush_write_byte_count < pngcrush_best_byte_count)
+               pngcrush_best_byte_count = pngcrush_write_byte_count;
 
             if (verbose > 0 && trial != MAX_METHODS)
             {
-                fprintf(STDERR,
-                  "   Critical chunk length with method %3d"
-                  " (fm %d zl %d zs %d) = %8lu\n",
-                  trial, filter_type, zlib_level, z_strategy,
-                  (unsigned long)idat_length[trial]);
+                if (bail==0 &&
+                    pngcrush_write_byte_count > pngcrush_best_byte_count)
+                   fprintf(STDERR,
+                     "   Critical chunk length with method %3d"
+                     " (fm %d zl %d zs %d) > %8lu\n",
+                     trial, filter_type, zlib_level, z_strategy,
+                     (unsigned long)pngcrush_best_byte_count);
+                else
+                   fprintf(STDERR,
+                     "   Critical chunk length with method %3d"
+                     " (fm %d zl %d zs %d) = %8lu\n",
+                     trial, filter_type, zlib_level, z_strategy,
+                     (unsigned long)idat_length[trial]);
                 fflush(STDERR);
             }
+            
         } /* end of trial-loop */
        
         P1("\n\nFINISHED MAIN LOOP OVER %d METHODS\n\n\n", MAX_METHODS);
@@ -7011,6 +7049,11 @@ struct options_help pngcrush_options[] = {
     {2, "               or the \"-force\" option is present."},
     {2, ""},
 
+    {0, "         -bail (bail out of trial when size exceeds best size found"},
+    {2, ""},
+    {2, "               Default is to bail out -- use -nobail to prevent that"},
+    {2, ""},
+
     {0, "    -bit_depth depth (bit_depth to use in output file)"},
     {2, ""},
     {2, "               Default output depth is same as input depth."},
@@ -7173,6 +7216,9 @@ struct options_help pngcrush_options[] = {
     {0, " -newtimestamp"},
     {2, ""},
     {2, "               Reset file modification time [default]."},
+    {2, ""},
+
+    {0, "       -nobail (do not bail out early from trial -- see -bail)"},
     {2, ""},
 
 #ifdef PNGCRUSH_COUNT_COLORS
