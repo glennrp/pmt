@@ -61,7 +61,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.37"
+#define PNGCRUSH_VERSION "1.7.38"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -143,7 +143,8 @@
  *   from truecolor to grayscale.
  *
  *   Rearrange palette to put most-used color first and transparent color
- *   second (see ImageMagick 5.1.1 and later).
+ *   second (see ImageMagick 5.1.1 and later -- actually ImageMagick puts
+ *   the transparent colors first but does not sort colors by frequency of use).
  *
  *   Finish pplt (partial palette) feature.
  *
@@ -168,20 +169,22 @@
  *   according to args table.  Could start with static table of ~20-30 slots,
  *   then double size & copy if run out of room:  still O(n) algorithm.
  *
- *   Blacken underlying colors of fully transparent pixels using a
- *     png user transform callback function, if "-blacken" option is present.
- *
  */
 
 #if 0 /* changelog */
 
 Change log:
 
-Version 1.7.37 (built with libpng-1.5.12 and zlib-1.2.7)
-  Reverted pngcrush.c back to 1.7.35 and fixed the bug with PLTE handling.
+Version 1.7.38 (built with libpng-1.5.12 and zlib-1.2.7)
   Bail out of a trial if byte count exceeds best byte count so far.
   Added -bail and -nobail options.  Use -nobail to get a complete report
     of filesizes.
+  Added -blacken option, to enable changing the color samples of any
+    fully-transparent pixels to zero in PNG files with color-type 4 or 6,
+    potentially improving their compressibility.
+
+Version 1.7.37 (built with libpng-1.5.12 and zlib-1.2.7)
+  Reverted pngcrush.c back to 1.7.35 and fixed the bug with PLTE handling.
 
 Version 1.7.36 (built with libpng-1.5.12 and zlib-1.2.7)
   Reverted pngcrush.c to version 1.7.34 because pngcrush is failing with
@@ -1250,6 +1253,7 @@ static png_uint_32 pngcrush_best_byte_count=0xffffffff;
 static int verbose = 1;
 static int fix = 0;
 static int bail = 0; /* if 0, bail out of trial early */
+static int blacken = 0; /* if 0, do not blacken color samples */
 static int things_have_changed = 0;
 static int global_things_have_changed = 0;
 static int default_compression_window = 15;
@@ -2179,6 +2183,79 @@ static void pngcrush_flush(png_structp png_ptr)
 }
 
 
+void blacken_fn(png_structp png_ptr, png_row_infop
+    row_info, png_bytep data)
+{
+   /* change the underlying color of any fully transparent pixels to black */
+   
+   png_size_t i;
+
+   if (row_info->color_type < 4)
+     return;
+
+   i=row_info->rowbytes;
+
+   if (row_info->color_type == 4) /* GA */
+   {
+     if (row_info->bit_depth == 8)
+       {
+         for ( ; i; )
+         {
+            if (data[i--] == 0)
+                 data[i--]=0;
+            else
+                 i--;
+         }
+       }
+     else /* bit depth == 16 */
+       {
+         for ( ; i; )
+         {
+            if (data[i] && data[i-1]== 0)
+                 i-=2;
+                 data[i--]=0;
+                 data[i--]=0;
+         }
+       }
+   }
+
+   else /* color_type == 6, RGBA */
+   {
+     if (row_info->bit_depth == 8)
+       {
+         for ( ; i; )
+         {
+            if (data[i] == 0)
+              {
+                 i--;
+                 data[i--]=0;
+                 data[i--]=0;
+                 data[i--]=0;
+              }
+            else
+                 i-=4;
+         }
+       }
+     else /* bit depth == 16 */
+       {
+         for ( ; i; )
+         {
+            if (data[i] && data[i-1]== 0)
+              {
+                 i-=2;
+                 data[i--]=0;
+                 data[i--]=0;
+                 data[i--]=0;
+                 data[i--]=0;
+                 data[i--]=0;
+                 data[i--]=0;
+              }
+            else
+                 i-=8;
+         }
+       }
+   }
+}
 
 
 int main(int argc, char *argv[])
@@ -2373,6 +2450,9 @@ int main(int argc, char *argv[])
             bkgd_green = (png_uint_16) atoi(argv[++i]);
             bkgd_blue = (png_uint_16) atoi(argv[++i]);
         }
+
+        else if (!strncmp(argv[i], "-blacken", 8))
+            blacken=1;
 
         else if (!strncmp(argv[i], "-brute", 6))
             /* brute force:  try everything */
@@ -3695,6 +3775,10 @@ int main(int argc, char *argv[])
                     (png_size_t)256);
 #endif /* 0 */
 
+    /* Change the underlying color of any fully transparent pixel to black */
+    if (blacken)
+      png_set_read_user_transform_fn(read_ptr, blacken_fn);
+
 #ifdef PNG_READ_UNKNOWN_CHUNKS_SUPPORTED
                 if (last_trial == 0)
                 {
@@ -3792,6 +3876,7 @@ int main(int argc, char *argv[])
                 {
                     if (save_apng_chunks == 1)
                     {
+                       /* To do: Why use write_ptr not read_ptr here? */
                        png_set_keep_unknown_chunks(write_ptr,
                                                 PNG_HANDLE_CHUNK_ALWAYS,
                                                 (png_bytep) "acTL", 1);
@@ -3832,6 +3917,8 @@ int main(int argc, char *argv[])
                         png_byte chunk_name[5];
                         chunk_name[4] = '\0';
 #endif
+
+                        /* To do: Why use write_ptr not read_ptr here? */
 
                         if (keep_unknown_chunk("alla", argv) &&
                             keep_unknown_chunk("allb", argv))
@@ -7057,6 +7144,13 @@ struct options_help pngcrush_options[] = {
     {0, "    -bit_depth depth (bit_depth to use in output file)"},
     {2, ""},
     {2, "               Default output depth is same as input depth."},
+    {2, ""},
+
+    {0, "      -blacken (zero samples underlying fully-transparent pixels)"},
+    {2, ""},
+    {2, "               Changing the color samples to zero can improve the"},
+    {2, "               compressibility.  Since this is a lossy operation,"},
+    {2, "               blackening is off by default."},
     {2, ""},
 
 #ifdef Z_RLE
