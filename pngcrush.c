@@ -2183,38 +2183,43 @@ static void pngcrush_flush(png_structp png_ptr)
 }
 
 
-void blacken_fn(png_structp png_ptr, png_row_infop
-    row_info, png_bytep data)
+void blacken_fn(png_structp png_ptr, png_row_infop row_info, png_bytep data)
 {
    /* change the underlying color of any fully transparent pixels to black */
    
-   png_size_t i;
+   int i;
 
    if (row_info->color_type < 4)
      return;
 
-   i=row_info->rowbytes;
+   i=(int) row_info->rowbytes-1;
 
    if (row_info->color_type == 4) /* GA */
    {
      if (row_info->bit_depth == 8)
        {
-         for ( ; i; )
+         for ( ; i > 0 ; )
          {
             if (data[i--] == 0)
-                 data[i--]=0;
+                data[i--]=0;
+
             else
-                 i--;
+                i--;
          }
        }
+
      else /* bit depth == 16 */
        {
-         for ( ; i; )
+         for ( ; i > 0 ; )
          {
-            if (data[i] && data[i-1]== 0)
+            if (data[i] && data[i]== 0)
+              {
                  i-=2;
                  data[i--]=0;
                  data[i--]=0;
+              }
+            else
+                 i-=4;
          }
        }
    }
@@ -2223,7 +2228,7 @@ void blacken_fn(png_structp png_ptr, png_row_infop
    {
      if (row_info->bit_depth == 8)
        {
-         for ( ; i; )
+         for ( ; i > 0 ; )
          {
             if (data[i] == 0)
               {
@@ -2236,11 +2241,12 @@ void blacken_fn(png_structp png_ptr, png_row_infop
                  i-=4;
          }
        }
+
      else /* bit depth == 16 */
        {
-         for ( ; i; )
+         for ( ; i > 0 ; )
          {
-            if (data[i] && data[i-1]== 0)
+            if (data[i]==0 && data[i-1]== 0)
               {
                  i-=2;
                  data[i--]=0;
