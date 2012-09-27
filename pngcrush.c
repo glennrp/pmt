@@ -175,7 +175,7 @@
 
 Change log:
 
-Version 1.7.38 (built with libpng-1.5.12 and zlib-1.2.7)
+Version 1.7.38 (built with libpng-1.5.13 and zlib-1.2.7)
   Bail out of a trial if byte count exceeds best byte count so far.
   Added -bail and -nobail options.  Use -nobail to get a complete report
     of filesizes.

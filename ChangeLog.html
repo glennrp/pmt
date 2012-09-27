@@ -3,6 +3,14 @@
 
 Change log:
 
+Version 1.7.38 (built with libpng-1.5.13 and zlib-1.2.7)
+  Bail out of a trial if byte count exceeds best byte count so far.
+  Added -bail and -nobail options.  Use -nobail to get a complete report
+    of filesizes.
+  Added -blacken option, to enable changing the color samples of any
+    fully-transparent pixels to zero in PNG files with color-type 4 or 6,
+    potentially improving their compressibility.
+
 Version 1.7.37 (built with libpng-1.5.12 and zlib-1.2.7)
   Reverted pngcrush.c back to 1.7.35 and fixed the bug with PLTE handling.
 
