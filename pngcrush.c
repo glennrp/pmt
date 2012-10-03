@@ -28,11 +28,20 @@
  * Thanks to Stephan Levavej for some helpful suggestions about gcc compiler
  * options and for a suggestion to increase the Z_MEM_LEVEL from default.
  *
- * Caution: there is another version of pngcrush that has been distributed by
+ */
+
+/*
+ * CAUTION:
+ *
+ * There is another version of pngcrush that has been distributed by
  * Apple since mid-2008 as a part of the Xcode SDK.   Although it claims
  * to be pngcrush by Glenn Randers-Pehrson, it has additional options
- * "-iPhone" * and "-speed".  It writes files that have the PNG 8-byte signature
- * but are not valid PNG files, due to at least
+ * "-iPhone", "-speed", "-revert-iphone-optimizations", and perhaps others.
+ * It is an "altered version" but is not "plainly marked as such" as
+ * required by the license.
+ *
+ * It writes files that have the PNG 8-byte signature but are not valid PNG
+ * files (instead they are "IOS-optimized PNG files"), due to at least
  *
  *   o the presence of the CgBI chunk ahead of the IHDR chunk,
  *   o nonstandard deflate compression in IDAT, iCCP, and perhaps zTXt chunks,
@@ -40,7 +49,12 @@
  *   o the sample order is ARGB instead of RGBA in color_type 6 files.
  *
  * The original PNG file cannot be losslessly recovered from such files
- * because of the use of premultiplied alpha.
+ * because of the use of premultiplied alpha, and I can't implement
+ * "-revert-iphone-optimizations" or equivalent because as I understand
+ * it, that would require using proprietary code belonging to Apple to
+ * read the non-standard "deflated" data, or perhaps violating  Apple's
+ * patent-applied-for which I believe only amounts to omitting the
+ * zlib header bytes and CRC.
  *
  * Most PNG decoders will recognize the fact that an unknown critical
  * chunk "CgBI" is present and will immediately reject the file.
@@ -52,12 +66,15 @@
  * It is said that the Xcode pngcrush does have a command to undo the
  * premultiplied alpha.  It's not theoretically possible, however, to recover
  * the original file without loss.  The underlying color data must either be
- * reduced in precision or, in the case of alpha==0, completely lost.
+ * reduced in precision or, in the case of pixels with alpha==0, completely
+ * lost.
  *
  * I have not seen the source for the Xcode version of pngcrush.  All I
  * know, for now, is from running "strings -a" on a copy of the executable,
  * looking at two Xcode-PNG files, and reading Apple's patent application
- * <http://www.freepatentsonline.com/y2008/0177769.html>.
+ * <http://www.freepatentsonline.com/y2008/0177769.html>.  Anyone who does
+ * have access to the revised pngcrush code cannot show it to me because
+ * of their Non-Disclosure Agreement with Apple.
  *
  */
 
@@ -152,7 +169,8 @@
  *   Remove text-handling and color-handling features and put
  *   those in a separate program or programs, to avoid unnecessary
  *   recompressing.  Note that in pngcrush-1.7.34, pngcrush began doing
- *   this extra work only once instead of for every trial.
+ *   this extra work only once instead of for every trial, so the potential
+ *   benefit in CPU savings is much smaller now.
  *
  *   Move the Photoshop-fixing stuff into a separate program.
  *
@@ -178,16 +196,22 @@ Change log:
 
 Version 1.7.39 (built with libpng-1.5.13 and zlib-1.2.7)
   Removed "PNGCRUSH_COUNT_COLORS" blocks which I no longer intend to
-    implement.  Kept reduce_to_gray and it_is_opaque flags which I do hope
-    to implement soon.
+    implement because that feature is already available in ImageMagick.  Kept
+    "reduce_to_gray" and "it_is_opaque" flags which I do hope to implement
+    soon.
 
 Version 1.7.38 (built with libpng-1.5.13 and zlib-1.2.7)
-  Bail out of a trial if byte count exceeds best byte count so far.
+  Bail out of a trial if byte count exceeds best byte count so far.  This
+    avoids wasting CPU time on trial compressions of trials that exceed the
+    best compression found so far.
   Added -bail and -nobail options.  Use -nobail to get a complete report
-    of filesizes.
+    of filesizes; otherwise the report just says ">N" for any trial
+    that exceeds size N where N is the best size achieved so far.
   Added -blacken option, to enable changing the color samples of any
     fully-transparent pixels to zero in PNG files with color-type 4 or 6,
-    potentially improving their compressibility.
+    potentially improving their compressibility.  Note that this is an
+    irreversible lossy change: the underlying colors of all fully transparent
+    pixels are lost, if they were not already black.
 
 Version 1.7.37 (built with libpng-1.5.12 and zlib-1.2.7)
   Reverted pngcrush.c back to 1.7.35 and fixed the bug with PLTE handling.
