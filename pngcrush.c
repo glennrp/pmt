@@ -48,6 +48,9 @@
  *   o the use of premultiplied alpha in color_type 6 files, and
  *   o the sample order is ARGB instead of RGBA in color_type 6 files.
  *
+ * These "CgBI" PNG files are described in
+ * http://iphonedevwiki.net/index.php/CgBI_file_format
+ *
  * The original PNG file cannot be losslessly recovered from such files
  * because of the use of premultiplied alpha, and I can't implement
  * "-revert-iphone-optimizations" or equivalent because as I understand
