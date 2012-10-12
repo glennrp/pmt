@@ -44,20 +44,19 @@
  * files (instead they are "IOS-optimized PNG files"), due to at least
  *
  *   o the presence of the CgBI chunk ahead of the IHDR chunk,
- *   o nonstandard deflate compression in IDAT, iCCP, and perhaps zTXt chunks,
+ *   o nonstandard deflate compression in IDAT, iCCP, and perhaps zTXt chunks;
+ *     I believe this only amounts to the omission of the zlib header from
+ *     the IDAT and perhaps other compressed chunks.
+ *   o Omission of the CRC bytes from the IDAT chunk and perhaps other chunks.
  *   o the use of premultiplied alpha in color_type 6 files, and
- *   o the sample order is ARGB instead of RGBA in color_type 6 files.
+ *   o the sample order, which is ARGB instead of RGBA in color_type 6 files.
  *
- * These "CgBI" PNG files are described in
- * http://iphonedevwiki.net/index.php/CgBI_file_format
+ * See http://iphonedevwiki.net/index.php/CgBI_file_format for more info.
  *
- * The original PNG file cannot be losslessly recovered from such files
- * because of the use of premultiplied alpha, and I can't implement
- * "-revert-iphone-optimizations" or equivalent because as I understand
- * it, that would require using proprietary code belonging to Apple to
- * read the non-standard "deflated" data, or perhaps violating  Apple's
- * patent-applied-for which I believe only amounts to omitting the
- * zlib header bytes and CRC.
+ * Although there is no loss in converting a CgBI PNG back to a regular
+ * PNG file, the original PNG file cannot be losslessly recovered from such
+ * files because of the losses that occurred during the conversion to
+ * premultiplied alpha.
  *
  * Most PNG decoders will recognize the fact that an unknown critical
  * chunk "CgBI" is present and will immediately reject the file.
@@ -69,15 +68,15 @@
  * It is said that the Xcode pngcrush does have a command to undo the
  * premultiplied alpha.  It's not theoretically possible, however, to recover
  * the original file without loss.  The underlying color data must either be
- * reduced in precision or, in the case of pixels with alpha==0, completely
- * lost.
+ * reduced in precision, or, in the case of fully-transparent pixels,
+ * completely lost.
  *
  * I have not seen the source for the Xcode version of pngcrush.  All I
- * know, for now, is from running "strings -a" on a copy of the executable,
- * looking at two Xcode-PNG files, and reading Apple's patent application
- * <http://www.freepatentsonline.com/y2008/0177769.html>.  Anyone who does
- * have access to the revised pngcrush code cannot show it to me because
- * of their Non-Disclosure Agreement with Apple.
+ * know, for now, is from running "strings -a" on an old copy of the
+ * executable, looking at two Xcode-PNG files, and reading Apple's patent
+ * application <http://www.freepatentsonline.com/y2008/0177769.html>.  Anyone
+ * who does have access to the revised pngcrush code cannot show it to me
+ * anyhow because of their Non-Disclosure Agreement with Apple.
  *
  */
 
@@ -157,7 +156,7 @@
  *
  *   Try both transformed and untransformed colors when "-loco" is used.
  *
- *   Check for unused alpha channel, equal R-G-B channels,  and
+ *   Check for unused alpha channel, equal R-G-B channels, and
  *   ok-to-reduce-depth.
  *
  *   Take care that sBIT and bKGD data are not lost when reducing images
@@ -188,7 +187,7 @@
  *   _one_ pass through args list, creating table of PNG_UINTs for removal;
  *   then make initial pass through PNG image, creating (in-order) table of
  *   all chunks (and byte offsets?) and marking each as "keep" or "remove"
- *   according to args table.  Could start with static table of ~20-30 slots,
+ *   according to args table.  Could start with static table of 16 or 32 slots,
  *   then double size & copy if run out of room:  still O(n) algorithm.
  *
  */
@@ -202,6 +201,10 @@ Version 1.7.39 (built with libpng-1.5.13 and zlib-1.2.7)
     implement because that feature is already available in ImageMagick.  Kept
     "reduce_to_gray" and "it_is_opaque" flags which I do hope to implement
     soon.
+  Changed NULL to pngcrush_default_read_data in png_set_read_fn() calls, to fix
+    an insignificant error introduced in pngcrush-1.7.14, that caused most
+    reads to not go through the alternate read function.  Also always set this
+    function, instead of depending on STDIO_SUPPORTED.
 
 Version 1.7.38 (built with libpng-1.5.13 and zlib-1.2.7)
   Bail out of a trial if byte count exceeds best byte count so far.  This
@@ -352,6 +355,8 @@ Version 1.7.14  (built with libpng-1.5.1beta08 and zlib-1.2.5)
     with bundled libpng-1.5.x.  Pngcrush cannot be built yet with
     a system libpng-1.5.x.
   Dropped most of pngcrush.h, that eliminates various parts of libpng.
+  Renamed png_default_read_data() to pngcrush_default_read_data() and
+    png_crush_pause() to pngcrush_pause()
 
 Version 1.7.13  (built with libpng-1.4.5 and zlib-1.2.5)
 
@@ -1633,6 +1638,33 @@ pngcrush_default_read_data(png_structp png_ptr, png_bytep data, png_size_t lengt
 
    if (check != length)
       png_error(png_ptr, "Read Error");
+
+   if (fix)
+   {
+      int i;
+      printf(" Read %d bytes: ",(int) length);
+      if (length <= 8)
+         for (i=0; i< length; i++)
+            printf(" %c",data[i]);
+      printf("\n");
+   }
+
+   /* To do: fix CgBI files */
+   if (fix && found_CgBI)
+   {
+      /* If this is the first IDAT insert the 2-byte zlib header */
+
+      /* We could do this either by injecting the 2-byte header at the
+         beginning of the first IDAT or by injecting a complete IDAT chunk
+         containing only the 2-byte zlib header ahead of the first IDAT
+         chunk. */
+
+      /* The bytes for 32k window and level 9 compression are 'x', octal 332 */
+
+      /* Add a 0000 CRC, which we will ignore, to the end of each IDAT chunk,
+         if necessary */
+   }
+
 }
 #else /* USE_FAR_KEYWORD */
 /*
@@ -2298,6 +2330,7 @@ void pngcrush_transform_pixels(png_structp png_ptr, png_row_infop row_info,
      }
    }
 
+   /* To do: move this into a separate read_fn */
    if (rerun_first_trial)
    {
       /* To do: first trial only, check image to see if it is all opaque.
@@ -3819,12 +3852,8 @@ int main(int argc, char *argv[])
                 pngcrush_pause();
 
                 P1( "Initializing input and output streams\n");
-#ifdef PNG_STDIO_SUPPORTED
-                png_init_io(read_ptr, fpin);
-#else
                 png_set_read_fn(read_ptr, (png_voidp) fpin,
-                                (png_rw_ptr) NULL);
-#endif /* PNG_STDIO_SUPPORTED */
+                                (png_rw_ptr) pngcrush_default_read_data);
 
                 if (nosave == 0)
                     png_set_write_fn(write_ptr, (png_voidp) fpout,
@@ -4039,7 +4068,7 @@ int main(int argc, char *argv[])
                         png_error(read_ptr,
                             "PNG file corrupted by ASCII conversion");
                     }
-                    if(fix && found_CgBI)
+                    if (fix && found_CgBI)
                     {
                         /* Skip the CgBI chunk */
 
@@ -5261,9 +5290,7 @@ int main(int argc, char *argv[])
                     if (found_CgBI)
                     {
                         png_warning(read_ptr,
-                            "Cannot read Xcode CgBI PNG. Even if we could,");
-                        png_error(read_ptr,
-                            "the original PNG could not be recovered.");
+                            "Cannot read Xcode CgBI PNG");
                     }
                     P1( "\nWriting info struct\n");
 
@@ -6013,11 +6040,8 @@ png_uint_32 measure_idats(FILE * fp_in)
         read_info_ptr = png_create_info_struct(read_ptr);
         end_info_ptr = png_create_info_struct(read_ptr);
 
-#ifdef PNG_STDIO_SUPPORTED
-        png_init_io(read_ptr, fp_in);
-#else
-        png_set_read_fn(read_ptr, (png_voidp) fp_in, (png_rw_ptr) NULL);
-#endif
+        png_set_read_fn(read_ptr, (png_voidp) fp_in,
+            (png_rw_ptr) pngcrush_default_read_data);
 
         png_set_sig_bytes(read_ptr, 0);
         measured_idat_length = png_measure_idat(read_ptr);
@@ -6042,8 +6066,9 @@ png_uint_32 measure_idats(FILE * fp_in)
 
 png_uint_32 png_measure_idat(png_structp png_ptr)
 {
-    /* Copyright (C) 1999-2002,2006 Glenn Randers-Pehrson (glennrp@users.sf.net)
-       See notice in pngcrush.c for conditions of use and distribution */
+    /* Copyright (C) 1999-2002,2006-2012 Glenn Randers-Pehrson
+       (glennrp@users.sf.net) See notice in pngcrush.c for conditions of
+       use and distribution */
 
     /* Signature + IHDR + IEND; we'll add PLTE + IDAT lengths */
     png_uint_32 sum_idat_length = 45;
@@ -6293,7 +6318,7 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
 
             if (png_get_uint_32(chunk_name) == PNG_UINT_CgBI)
             {
-                printf(" This is an Xcode CGBI file, not a PNG file.\n");
+                printf(" This is an Xcode CgBI file, not a PNG file.\n");
                 if (fix)
                 {
                     printf (" Removing the CgBI chunk.\n");
@@ -6370,7 +6395,7 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
                 if (!strncmp((png_const_charp) buff, "Photoshop ICC profile",
                      21))
                 {
-                    printf("   Replacing bad Photoshop ICCP chunk with an "
+                    printf("   Replacing bad Photoshop iCCP chunk with an "
                       "sRGB chunk\n");
 #ifdef PNG_gAMA_SUPPORTED
 #  ifdef PNG_FIXED_POINT_SUPPORTED
