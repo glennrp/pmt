@@ -1639,16 +1639,6 @@ pngcrush_default_read_data(png_structp png_ptr, png_bytep data, png_size_t lengt
    if (check != length)
       png_error(png_ptr, "Read Error");
 
-   if (fix)
-   {
-      int i;
-      printf(" Read %d bytes: ",(int) length);
-      if (length <= 8)
-         for (i=0; i< length; i++)
-            printf(" %c",data[i]);
-      printf("\n");
-   }
-
    /* To do: fix CgBI files */
    if (fix && found_CgBI)
    {
