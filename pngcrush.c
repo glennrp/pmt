@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.40"
+#define PNGCRUSH_VERSION "1.7.41"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_MULTIPLE_ROWS
@@ -219,6 +219,8 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.41 (built with libpng-1.5.13 and zlib-1.2.7)
 
 Version 1.7.40 (built with libpng-1.5.13 and zlib-1.2.7)
   Revised the "To do" list.
