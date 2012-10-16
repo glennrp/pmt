@@ -6762,9 +6762,7 @@ struct options_help pngcrush_options[] = {
     {2, ""},
 #endif
 
-    {0, " -newtimestamp"},
-    {2, ""},
-    {2, "               Reset file modification time [default]."},
+    {0, " -newtimestamp (Reset file modification time [default])"},
     {2, ""},
 
     {0, "       -nobail (do not bail out early from trial -- see -bail)"},
@@ -6783,9 +6781,7 @@ struct options_help pngcrush_options[] = {
     {2, ""},
 
 
-    {0, " -oldtimestamp"},
-    {2, ""},
-    {2, "               Don't reset file modification time."},
+    {0, " -oldtimestamp (Do not reset file modification time)"},
     {2, ""},
     
     {0, "           -ow (Overwrite)"},
