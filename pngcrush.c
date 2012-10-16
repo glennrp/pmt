@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.39"
+#define PNGCRUSH_VERSION "1.7.40"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_MULTIPLE_ROWS
@@ -195,6 +195,8 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.40 (built with libpng-1.5.13 and zlib-1.2.7)
 
 Version 1.7.39 (built with libpng-1.5.13 and zlib-1.2.7)
   Removed "PNGCRUSH_COUNT_COLORS" blocks which I no longer intend to
