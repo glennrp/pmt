@@ -132,7 +132,7 @@
 
 /* To do:
  *
- *   Reset CINFO to reflect decoder's required window size (instead of
+ *   1. Reset CINFO to reflect decoder's required window size (instead of
  *   libz-1.1.3 encoder's required window size, which is 262 bytes larger).
  *   See discussion about zlib in png-list archives for April 2001.
  *   libpng-1.2.9 does some of this and libpng-1.5.4 does better.
@@ -148,37 +148,61 @@
  *      pngcrush -m <best_pngcrush_method> -w $w $1 w-$w.png
  *      done
  *
- *   Use pngcheck -v and look at the IDAT report to find out what window
- *   size is actually set in a png file.
+ *   then use pngcheck -v and look at the IDAT report to find out what window
+ *   size is actually set in a png file (or revise pngcrush -v to report
+ *   the window size).
  *
- *   Add a "pcRu" ancillary chunk that keeps track of the best method,
- *   methods already tried, and whether "loco crushing" was effective.
+ *   2. Check for unused alpha channel in color-type 4 and 6.
  *
- *   Try both transformed and untransformed colors when "-loco" is used.
+ *   If the image is entirely opaque, reduce the color-type to 0 or 2.
  *
- *   Check for unused alpha channel, equal R-G-B channels, and
- *   ok-to-reduce-depth.
+ *   3. Check for equal R-G-B channels in color-type 2 or 6.
  *
- *   Take care that sBIT and bKGD data are not lost when reducing images
- *   from truecolor to grayscale.
+ *   If this is true for all pixels, reduce the color-type to 0 or 4.
  *
- *   Rearrange palette to put most-used color first and transparent color
+ *   4. Check for ok-to-reduce-depth (i.e., every pixel has color samples
+ *   that can be expressed exactly using a smaller depth).
+ *
+ *   If so, reduce the bit depth accordingly.
+ *
+ *   Note for 2, 3, 4: Take care that sBIT and bKGD data are not lost when
+ *   reducing images from truecolor to grayscale or when reducing the
+ *   bit depth.
+ *
+ *   5. Use a better compression algorithm for "deflating" (result must
+ *   still be readable with zlib!)  e.g., http://en.wikipedia.org/wiki/7-Zip
+ *   says that the 7-zip deflate compressor achieves better compression
+ *   (smaller files) than zlib.  If tests show that this would be worth
+ *   while, incorporate the 7-zip compressor as an optional alternative
+ *   or additional method of pngcrush compression. See the GPL-licensed code
+ *   at http://en.wikipedia.org/wiki/AdvanceCOMP and note that if this
+ *   is incorporated in pngcrush, then pngcrush would have to be re-licensed,
+ *   or released in two versions, one libpng-licensed and one gpl-licensed!
+ *
+ *   6. Improve the -help output and/or write a good man page.
+ *
+ *   7. Rearrange palette to put most-used color first and transparent color
  *   second (see ImageMagick 5.1.1 and later -- actually ImageMagick puts
  *   the transparent colors first but does not sort colors by frequency of use).
  *
- *   Finish pplt (partial palette) feature.
+ *   8. Finish pplt (partial palette) feature.
  *
- *   Remove text-handling and color-handling features and put
+ *   9. Remove text-handling and color-handling features and put
  *   those in a separate program or programs, to avoid unnecessary
  *   recompressing.  Note that in pngcrush-1.7.34, pngcrush began doing
  *   this extra work only once instead of for every trial, so the potential
  *   benefit in CPU savings is much smaller now.
  *
- *   Move the Photoshop-fixing stuff into a separate program.
+ *   10. Add a "pcRu" ancillary chunk that keeps track of the best method,
+ *   methods already tried, and whether "loco crushing" was effective.
  *
- *   GRR: More generally (superset of previous 3 items):  split into separate
- *   "edit" and "crush" programs (or functions).  Former is fully libpng-
- *   aware, much like current pngcrush; latter makes little or no use of
+ *   11. Try both transformed and untransformed colors when "-loco" is used.
+ *
+ *   12. Move the Photoshop-fixing stuff into a separate program.
+ *
+ *   13. GRR: More generally (superset of previous 3 items):  split into
+ *   separate *   "edit" and "crush" programs (or functions).  Former is fully
+ *   libpng-aware, much like current pngcrush; latter makes little or no use of
  *   libpng (maybe IDAT-compression parts only?), instead handling virtually
  *   all chunks as opaque binary blocks that are copied to output file _once_,
  *   with IDATs alone replaced (either by best in-memory result or by original
@@ -197,6 +221,7 @@
 Change log:
 
 Version 1.7.40 (built with libpng-1.5.13 and zlib-1.2.7)
+  Revised the "To do" list.
 
 Version 1.7.39 (built with libpng-1.5.13 and zlib-1.2.7)
   Removed "PNGCRUSH_COUNT_COLORS" blocks which I no longer intend to
