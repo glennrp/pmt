@@ -139,6 +139,11 @@
  *   But neither has access to the entire datastream, so pngcrush could
  *   do even better.
  *
+ *   This has no effect on the "crushed" filesize.  The reason for setting
+ *   CINFO properly is to proved the *decoder* with information that will
+ *   allow it to request only the minimum amount of memory required to decode
+ *   the image.
+ *
  *   In the meantime, one can just do the following and select the smallest
  *   window that does not increase the filesize, after running pngcrush once
  *   and observing what was the best pngcrush method:
@@ -151,6 +156,25 @@
  *   then use pngcheck -v and look at the IDAT report to find out what window
  *   size is actually set in a png file (or revise pngcrush -v to report
  *   the window size).
+ *
+ *   There are several ways that pngcrush could implement this.
+ *
+ *      a. Revise the bundled zlib to report the maximum window size that
+ *      it actually used, then rewrite CINFO to contain the next power-of-two
+ *      size equal or larger than the size.  This method would of course
+ *      only work when pngcrush is built with the bundled zlib.
+ *
+ *      b. Do additional trials after the best filter method, strategy,
+ *      and compression level have been determined, using those settings
+ *      and reducing the window size until the measured filesize increases,
+ *      then choosing the smallest size which did not cause the filesize
+ *      to increase.
+ *
+ *      c. After the trials are complete, replace CINFO with smaller
+ *      settings, then attempt to decode the zlib datastream, and choose
+ *      the smallest setting whose datastream can still be decoded
+ *      successfully.  This is likely to be the simplest and fastest
+ *      solution.
  *
  *   2. Check for unused alpha channel in color-type 4 and 6.
  *
@@ -165,9 +189,9 @@
  *
  *   If so, reduce the bit depth accordingly.
  *
- *   Note for 2, 3, 4: Take care that sBIT and bKGD data are not lost when
- *   reducing images from truecolor to grayscale or when reducing the
- *   bit depth.
+ *   Note for 2, 3, 4: Take care that sBIT and bKGD data are not lost or
+ *   become invalid when reducing images from truecolor to grayscale or
+ *   when reducing the bit depth.
  *
  *   5. Use a better compression algorithm for "deflating" (result must
  *   still be readable with zlib!)  e.g., http://en.wikipedia.org/wiki/7-Zip
@@ -177,13 +201,18 @@
  *   or additional method of pngcrush compression. See the GPL-licensed code
  *   at http://en.wikipedia.org/wiki/AdvanceCOMP and note that if this
  *   is incorporated in pngcrush, then pngcrush would have to be re-licensed,
- *   or released in two versions, one libpng-licensed and one gpl-licensed!
+ *   or released in two versions, one libpng-licensed and one GPL-licensed!
  *
  *   6. Improve the -help output and/or write a good man page.
  *
- *   7. Rearrange palette to put most-used color first and transparent color
- *   second (see ImageMagick 5.1.1 and later -- actually ImageMagick puts
- *   the transparent colors first but does not sort colors by frequency of use).
+ *   7. Implement palette-building (from ImageMagick-6.7.0 or later, minus
+ *   the "PNG8" part) -- actually ImageMagick puts the transparent colors
+ *   first, then the semitransparent colors, and finally the opaque colors,
+ *   and does not sort colors by frequency of use but just adds them
+ *   to the palette/colormap as it encounters them, so it might be improved.
+ *   Also it might be made faster by using a hash table as was partially
+ *   implemented in pngcrush-1.6.x.  If the latter is done, also port that
+ *   back to ImageMagick/GraphicsMagick.
  *
  *   8. Finish pplt (partial palette) feature.
  *
@@ -221,6 +250,7 @@
 Change log:
 
 Version 1.7.41 (built with libpng-1.5.13 and zlib-1.2.7)
+  Further revised the "To do" list.
 
 Version 1.7.40 (built with libpng-1.5.13 and zlib-1.2.7)
   Revised the "To do" list.
