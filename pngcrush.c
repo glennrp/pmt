@@ -83,6 +83,7 @@
 #define PNGCRUSH_VERSION "1.7.41"
 
 /* Experimental: define these if you wish, but, good luck.
+#define PNGCRUSH_COUNT_COLORS
 #define PNGCRUSH_MULTIPLE_ROWS
 */
 #define PNGCRUSH_LARGE
@@ -212,7 +213,9 @@
  *   to the palette/colormap as it encounters them, so it might be improved.
  *   Also it might be made faster by using a hash table as was partially
  *   implemented in pngcrush-1.6.x.  If the latter is done, also port that
- *   back to ImageMagick/GraphicsMagick.
+ *   back to ImageMagick/GraphicsMagick.  See also ppmhist from the NetPBM
+ *   package which counts RGB pixels in an image; this and its supporting
+ *   lib/libppmcmap.c would need to be revised to count RGBA pixels instead.
  *
  *   8. Finish pplt (partial palette) feature.
  *
@@ -250,7 +253,8 @@
 Change log:
 
 Version 1.7.41 (built with libpng-1.5.13 and zlib-1.2.7)
-  Further revised the "To do" list.
+  Reverted to version 1.7.38.  Versions 1.7.39 and 40 failed to open an
+    output file.
 
 Version 1.7.40 (built with libpng-1.5.13 and zlib-1.2.7)
   Revised the "To do" list.
@@ -266,17 +270,12 @@ Version 1.7.39 (built with libpng-1.5.13 and zlib-1.2.7)
     function, instead of depending on STDIO_SUPPORTED.
 
 Version 1.7.38 (built with libpng-1.5.13 and zlib-1.2.7)
-  Bail out of a trial if byte count exceeds best byte count so far.  This
-    avoids wasting CPU time on trial compressions of trials that exceed the
-    best compression found so far.
+  Bail out of a trial if byte count exceeds best byte count so far.
   Added -bail and -nobail options.  Use -nobail to get a complete report
-    of filesizes; otherwise the report just says ">N" for any trial
-    that exceeds size N where N is the best size achieved so far.
+    of filesizes.
   Added -blacken option, to enable changing the color samples of any
     fully-transparent pixels to zero in PNG files with color-type 4 or 6,
-    potentially improving their compressibility.  Note that this is an
-    irreversible lossy change: the underlying colors of all fully transparent
-    pixels are lost, if they were not already black.
+    potentially improving their compressibility.
 
 Version 1.7.37 (built with libpng-1.5.12 and zlib-1.2.7)
   Reverted pngcrush.c back to 1.7.35 and fixed the bug with PLTE handling.
@@ -414,8 +413,6 @@ Version 1.7.14  (built with libpng-1.5.1beta08 and zlib-1.2.5)
     with bundled libpng-1.5.x.  Pngcrush cannot be built yet with
     a system libpng-1.5.x.
   Dropped most of pngcrush.h, that eliminates various parts of libpng.
-  Renamed png_default_read_data() to pngcrush_default_read_data() and
-    png_crush_pause() to pngcrush_pause()
 
 Version 1.7.13  (built with libpng-1.4.5 and zlib-1.2.5)
 
@@ -1344,7 +1341,6 @@ static int input_color_type;
 static int input_bit_depth;
 static int trial;
 static int last_trial = 0;
-static int rerun_first_trial = 0;
 static png_uint_32 pngcrush_write_byte_count;
 static png_uint_32 pngcrush_best_byte_count=0xffffffff;
             
@@ -1437,13 +1433,12 @@ static int do_loco = 0;
 static int input_format = 0;    /* 0: PNG  1: MNG */
 static int output_format = 0;
 #endif
+static int do_color_count;
 static int reduction_ok = 0;
 #ifdef PNGCRUSH_COUNT_COLORS
 int count_colors(FILE * fpin);
-static int num_rgba;
+static int num_rgba, reduce_to_gray, it_is_opaque;
 #endif
-
-static int reduce_to_gray, it_is_opaque;
 png_uint_32 png_measure_idat(png_structp png_ptr);
 
 static png_uint_32 idat_length[MAX_METHODSP1];
@@ -1542,6 +1537,9 @@ void show_result(void);
 png_uint_32 measure_idats(FILE * fp);
 png_uint_32 png_measure_idat(png_structp png_ptr);
 
+#ifdef PNGCRUSH_COUNT_COLORS
+int count_colors(FILE * fpin);
+#endif
 void print_version_info(void);
 void print_usage(int retval);
 
@@ -1697,23 +1695,6 @@ pngcrush_default_read_data(png_structp png_ptr, png_bytep data, png_size_t lengt
 
    if (check != length)
       png_error(png_ptr, "Read Error");
-
-   /* To do: fix CgBI files */
-   if (fix && found_CgBI)
-   {
-      /* If this is the first IDAT insert the 2-byte zlib header */
-
-      /* We could do this either by injecting the 2-byte header at the
-         beginning of the first IDAT or by injecting a complete IDAT chunk
-         containing only the 2-byte zlib header ahead of the first IDAT
-         chunk. */
-
-      /* The bytes for 32k window and level 9 compression are 'x', octal 332 */
-
-      /* Add a 0000 CRC, which we will ignore, to the end of each IDAT chunk,
-         if necessary */
-   }
-
 }
 #else /* USE_FAR_KEYWORD */
 /*
@@ -2296,107 +2277,83 @@ static void pngcrush_flush(png_structp png_ptr)
 }
 
 
-void pngcrush_transform_pixels(png_structp png_ptr, png_row_infop row_info,
-   png_bytep data)
+void blacken_fn(png_structp png_ptr, png_row_infop row_info, png_bytep data)
 {
-   if (blacken)
+   /* change the underlying color of any fully transparent pixels to black */
+   
+   int i;
+
+   if (row_info->color_type < 4)
+     return;
+
+   i=(int) row_info->rowbytes-1;
+
+   if (row_info->color_type == 4) /* GA */
    {
-     /* change the underlying color of any fully transparent pixels to black */
-     
-     int i;
-  
-     if (row_info->color_type < 4)
-       return;
-  
-     i=(int) row_info->rowbytes-1;
-  
-     if (row_info->color_type == 4) /* GA */
-     {
-       if (row_info->bit_depth == 8)
+     if (row_info->bit_depth == 8)
+       {
+         for ( ; i > 0 ; )
          {
-           for ( ; i > 0 ; )
-           {
-              if (data[i--] == 0)
-                  data[i--]=0;
-  
-              else
-                  i--;
-           }
+            if (data[i--] == 0)
+                data[i--]=0;
+
+            else
+                i--;
          }
-  
-       else /* bit depth == 16 */
+       }
+
+     else /* bit depth == 16 */
+       {
+         for ( ; i > 0 ; )
          {
-           for ( ; i > 0 ; )
-           {
-              if (data[i] && data[i]== 0)
-                {
-                   i-=2;
-                   data[i--]=0;
-                   data[i--]=0;
-                }
-              else
-                   i-=4;
-           }
+            if (data[i] && data[i]== 0)
+              {
+                 i-=2;
+                 data[i--]=0;
+                 data[i--]=0;
+              }
+            else
+                 i-=4;
          }
-     }
-  
-     else /* color_type == 6, RGBA */
-     {
-       if (row_info->bit_depth == 8)
-         {
-           for ( ; i > 0 ; )
-           {
-              if (data[i] == 0)
-                {
-                   i--;
-                   data[i--]=0;
-                   data[i--]=0;
-                   data[i--]=0;
-                }
-              else
-                   i-=4;
-           }
-         }
-  
-       else /* bit depth == 16 */
-         {
-           for ( ; i > 0 ; )
-           {
-              if (data[i]==0 && data[i-1]== 0)
-                {
-                   i-=2;
-                   data[i--]=0;
-                   data[i--]=0;
-                   data[i--]=0;
-                   data[i--]=0;
-                   data[i--]=0;
-                   data[i--]=0;
-                }
-              else
-                   i-=8;
-           }
-         }
-     }
+       }
    }
 
-   /* To do: move this into a separate read_fn */
-   if (rerun_first_trial)
+   else /* color_type == 6, RGBA */
    {
-      /* To do: first trial only, check image to see if it is all opaque.
-       * If so, set it_is_opaque to 1
-       */
+     if (row_info->bit_depth == 8)
+       {
+         for ( ; i > 0 ; )
+         {
+            if (data[i] == 0)
+              {
+                 i--;
+                 data[i--]=0;
+                 data[i--]=0;
+                 data[i--]=0;
+              }
+            else
+                 i-=4;
+         }
+       }
 
-      /* To do: first trial only, check image to see if it is all gray.
-       * If so, set reduce_to_gray to 1
-       */
-
-      /* To do: if image has an alpha channel but is all opaque, remove
-       * the alpha samples from the pixels in this row.
-       */
-
-      /* To do: if image is truecolor but is all gray, reduce the pixels in
-       * this row to grayscale.
-       */
+     else /* bit depth == 16 */
+       {
+         for ( ; i > 0 ; )
+         {
+            if (data[i]==0 && data[i-1]== 0)
+              {
+                 i-=2;
+                 data[i--]=0;
+                 data[i--]=0;
+                 data[i--]=0;
+                 data[i--]=0;
+                 data[i--]=0;
+                 data[i--]=0;
+              }
+            else
+                 i-=8;
+         }
+       }
    }
 }
 
@@ -2423,8 +2380,13 @@ int main(int argc, char *argv[])
     int i;
     row_buf = (png_bytep) NULL;
     number_of_open_files = 0;
+#ifdef PNGCRUSH_COUNT_COLORS
     reduce_to_gray = 0;
     it_is_opaque = 0;
+#else
+    do_color_count = 0;
+    do_color_count = do_color_count;    /* silence compiler warning */
+#endif
 
     if (strcmp(png_libpng_ver, PNG_LIBPNG_VER_STRING))
     {
@@ -2609,14 +2571,20 @@ int main(int argc, char *argv[])
                 for (strat = 0; strat < NUM_STRATEGIES; strat++)
                     brute_force_strategies[strat] = 0;
         }
-
         else if (!strncmp(argv[i], "-bit_depth", 10))
         {
             names++;
             BUMP_I;
             force_output_bit_depth = atoi(argv[i]);
         }
-
+        else if (!strncmp(argv[i], "-cc", 3))
+        {
+            do_color_count = 1;
+        }
+        else if (!strncmp(argv[i], "-no_cc", 6))
+        {
+            do_color_count = 0;
+        }
         else if (!strncmp(argv[i], "-c", 2))
         {
             names++;
@@ -2925,6 +2893,7 @@ int main(int argc, char *argv[])
         else if (!strncmp(argv[i], "-reduce", 7))
         {
             reduction_ok++;
+            do_color_count = 1;
         }
 #ifdef PNG_gAMA_SUPPORTED
         else if (!strncmp(argv[i], "-replace_gamma", 4))
@@ -3532,6 +3501,87 @@ int main(int argc, char *argv[])
         }
         if (!already_crushed && !image_is_immutable)
         {
+#ifdef PNGCRUSH_COUNT_COLORS
+        reduce_to_gray = 0;
+        it_is_opaque = 0;
+        output_color_type = input_color_type;
+        if (do_color_count)
+        {
+            if (force_output_color_type == 8 && (input_color_type == 2 ||
+                                                 (input_color_type == 3) ||
+                                                 input_color_type == 4
+                                                 || input_color_type == 6))
+            /* check for unused alpha channel or single transparent color */
+            {
+                int alpha_status;
+                P1( "Opening file %s for alpha check\n", inname);
+
+                if ((fpin = FOPEN(inname, "rb")) == NULL)
+                {
+                    fprintf(STDERR, "Could not find file: %s\n", inname);
+                    continue;
+                }
+                number_of_open_files++;
+
+                alpha_status = count_colors(fpin);
+                if (num_rgba < 257) {
+                    P1("Finished counting colors. num_rgba=%d\n",
+                       num_rgba);
+                }
+                else
+                {
+                    P1("Finished counting colors. num_rgba is more than 256\n");
+                }
+                alpha_status = alpha_status;    /* silence compiler warning. */
+
+                FCLOSE(fpin);
+
+                if (it_is_opaque)
+                {
+                    if (output_color_type == 4)
+                        output_color_type = 0;
+                    else if (output_color_type == 6)
+                        output_color_type = 2;
+                }
+                if (reduce_to_gray)
+                {
+                    if (output_color_type == 2)
+                        output_color_type = 0;
+                    else if (output_color_type == 6)
+                        output_color_type = 4;
+                }
+            }
+#if 0 /* TO DO */
+            if (output_color_type == 0)
+                /* see if bit depth can be reduced */
+            {
+                /* TO DO */
+            }
+
+            if (input_color_type == 2)
+                /* check for 256 or fewer colors */
+            {
+                /* TO DO */
+            }
+
+            if (input_color_type == 3)
+                /* check for unused palette entries */
+            {
+                /* TO DO */
+            }
+#endif /* 0, TODO */
+            if (force_output_color_type == 8
+                && input_color_type != output_color_type)
+            {
+                P1("setting output color type to %d\n", output_color_type);
+                force_output_color_type = output_color_type;
+            }
+        }
+#else
+        if (do_color_count)
+            printf("   color counting (-cc option) is not supported.\n");
+#endif /* PNGCRUSH_COUNT_COLORS */
+
         if (plte_len > 0 && force_output_bit_depth == 0)
           {
             if (plte_len <= 2)
@@ -3586,13 +3636,6 @@ int main(int argc, char *argv[])
 
         /* MAX_METHODS is 200 */
         P1("\n\nENTERING MAIN LOOP OVER %d METHODS\n", MAX_METHODS);
-
-        /* To do: arrange to to an extra trial here to examine the
-         * pixels for possible reducion to grayscale or removal of alpha
-         */
-        if (reduction_ok)
-          rerun_first_trial=1;
-
         for (trial = 1; trial <= MAX_METHODS; trial++)
         {
             if (nosave || trial == MAX_METHODS)
@@ -3689,21 +3732,8 @@ int main(int argc, char *argv[])
                 else /* if (zs[best] == 0) */
                     z_strategy = Z_DEFAULT_STRATEGY;
             }
-
             else
             {
-                if (rerun_first_trial == 1)
-                {
-                  /* To do: run an extra trial here to find out if the
-                   * image is opaque or all-gray
-                   */
-
-                  trial--;
-                  rerun_first_trial = 0;
-                }
-                else
-                {
-
                 if (trial > 2 && trial < 5 && idat_length[trial - 1]
                     < idat_length[best_of_three])
                     best_of_three = trial - 1;
@@ -3845,11 +3875,9 @@ int main(int argc, char *argv[])
                     (png_size_t)256);
 #endif /* 0 */
 
-    /* Change the underlying color of any fully transparent pixel to black
-     * and do other permitted reductions
-     */
-    if (blacken || reduction_ok)
-      png_set_read_user_transform_fn(read_ptr, pngcrush_transform_pixels);
+    /* Change the underlying color of any fully transparent pixel to black */
+    if (blacken)
+      png_set_read_user_transform_fn(read_ptr, blacken_fn);
 
 #ifdef PNG_READ_UNKNOWN_CHUNKS_SUPPORTED
                 if (last_trial == 0)
@@ -3901,8 +3929,12 @@ int main(int argc, char *argv[])
                 pngcrush_pause();
 
                 P1( "Initializing input and output streams\n");
+#ifdef PNG_STDIO_SUPPORTED
+                png_init_io(read_ptr, fpin);
+#else
                 png_set_read_fn(read_ptr, (png_voidp) fpin,
-                                (png_rw_ptr) pngcrush_default_read_data);
+                                (png_rw_ptr) NULL);
+#endif /* PNG_STDIO_SUPPORTED */
 
                 if (nosave == 0)
                     png_set_write_fn(write_ptr, (png_voidp) fpout,
@@ -4117,7 +4149,7 @@ int main(int argc, char *argv[])
                         png_error(read_ptr,
                             "PNG file corrupted by ASCII conversion");
                     }
-                    if (fix && found_CgBI)
+                    if(fix && found_CgBI)
                     {
                         /* Skip the CgBI chunk */
 
@@ -4227,10 +4259,12 @@ int main(int argc, char *argv[])
                         {
                             if (verbose > 0 && last_trial)
                             {
+#ifdef PNGCRUSH_COUNT_COLORS
                                 if (reduce_to_gray)
                                     fprintf(STDERR, "   Reducing all-gray "
                                       "truecolor image to grayscale.\n");
                                 else
+#endif
                                     fprintf(STDERR, "   Reducing truecolor "
                                       "image to grayscale.\n");
                             }
@@ -4268,10 +4302,12 @@ int main(int argc, char *argv[])
                         {
                             if (verbose > 0 && last_trial)
                             {
+#ifdef PNGCRUSH_COUNT_COLORS
                                 if (it_is_opaque)
                                     fprintf(STDERR,
                                       "   Stripping opaque alpha channel.\n");
                                 else
+#endif
                                     fprintf(STDERR,
                                       "   Stripping existing alpha channel.\n");
                             }
@@ -5339,7 +5375,9 @@ int main(int argc, char *argv[])
                     if (found_CgBI)
                     {
                         png_warning(read_ptr,
-                            "Cannot read Xcode CgBI PNG");
+                            "Cannot read Xcode CgBI PNG. Even if we could,");
+                        png_error(read_ptr,
+                            "the original PNG could not be recovered.");
                     }
                     P1( "\nWriting info struct\n");
 
@@ -5948,7 +5986,7 @@ int main(int argc, char *argv[])
                      (unsigned long)idat_length[trial]);
                 fflush(STDERR);
             }
-          }
+            
         } /* end of trial-loop */
        
         P1("\n\nFINISHED MAIN LOOP OVER %d METHODS\n\n\n", MAX_METHODS);
@@ -6089,8 +6127,11 @@ png_uint_32 measure_idats(FILE * fp_in)
         read_info_ptr = png_create_info_struct(read_ptr);
         end_info_ptr = png_create_info_struct(read_ptr);
 
-        png_set_read_fn(read_ptr, (png_voidp) fp_in,
-            (png_rw_ptr) pngcrush_default_read_data);
+#ifdef PNG_STDIO_SUPPORTED
+        png_init_io(read_ptr, fp_in);
+#else
+        png_set_read_fn(read_ptr, (png_voidp) fp_in, (png_rw_ptr) NULL);
+#endif
 
         png_set_sig_bytes(read_ptr, 0);
         measured_idat_length = png_measure_idat(read_ptr);
@@ -6115,9 +6156,8 @@ png_uint_32 measure_idats(FILE * fp_in)
 
 png_uint_32 png_measure_idat(png_structp png_ptr)
 {
-    /* Copyright (C) 1999-2002,2006-2012 Glenn Randers-Pehrson
-       (glennrp@users.sf.net) See notice in pngcrush.c for conditions of
-       use and distribution */
+    /* Copyright (C) 1999-2002,2006 Glenn Randers-Pehrson (glennrp@users.sf.net)
+       See notice in pngcrush.c for conditions of use and distribution */
 
     /* Signature + IHDR + IEND; we'll add PLTE + IDAT lengths */
     png_uint_32 sum_idat_length = 45;
@@ -6367,7 +6407,7 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
 
             if (png_get_uint_32(chunk_name) == PNG_UINT_CgBI)
             {
-                printf(" This is an Xcode CgBI file, not a PNG file.\n");
+                printf(" This is an Xcode CGBI file, not a PNG file.\n");
                 if (fix)
                 {
                     printf (" Removing the CgBI chunk.\n");
@@ -6444,7 +6484,7 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
                 if (!strncmp((png_const_charp) buff, "Photoshop ICC profile",
                      21))
                 {
-                    printf("   Replacing bad Photoshop iCCP chunk with an "
+                    printf("   Replacing bad Photoshop ICCP chunk with an "
                       "sRGB chunk\n");
 #ifdef PNG_gAMA_SUPPORTED
 #  ifdef PNG_FIXED_POINT_SUPPORTED
@@ -6499,6 +6539,574 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
         }
     }
 }
+
+
+
+
+
+#ifdef PNGCRUSH_COUNT_COLORS
+#define USE_HASHCODE
+int count_colors(FILE * fp_in)
+{
+    /* Copyright (C) 2000-2002,2006 Glenn Randers-Pehrson (glennrp@users.sf.net)
+       See notice in pngcrush.c for conditions of use and distribution */
+    int bit_depth, color_type, interlace_method, filter_method,
+        compression_method;
+    png_uint_32 rowbytes;
+    volatile png_uint_32 channels;
+
+    int i;
+    int pass, num_pass;
+    int ret;
+    volatile int result, hashmiss, hashinserts;
+
+    png_uint_32 rgba_frequency[257];
+
+    png_uint_32 rgba_hi[257];   /* Actually contains ARGB not RGBA */
+#if 0
+    png_uint_32 rgba_lo[257];   /* Low bytes of ARGB in 16-bit PNGs */
+#endif
+
+    /* arrays to facilitate easy interlacing - use pass (0 - 6) as index */
+
+    /* start of interlace block */
+    int png_pass_start[] = { 0, 4, 0, 2, 0, 1, 0 };
+
+    /* offset to next interlace block */
+    int png_pass_inc[] = { 8, 8, 4, 4, 2, 2, 1 };
+
+    /* start of interlace block in the y direction */
+    int png_pass_ystart[] = { 0, 0, 4, 0, 2, 0, 1 };
+
+    /* offset to next interlace block in the y direction */
+    int png_pass_yinc[] = { 8, 8, 8, 4, 4, 2, 2 };
+
+    result = 0;
+    reduce_to_gray = 1;
+    it_is_opaque = 1;
+    hashmiss = 0;
+    hashinserts = 0;
+    row_buf = (png_bytep) NULL;
+
+    num_rgba = 0;
+    for (i = 0; i < 257; i++)
+    {
+        rgba_frequency[i] = 0;
+    }
+
+    P2("Checking alphas:\n");
+    P1( "Allocating read structure\n");
+    Try {
+        read_ptr =
+            png_create_read_struct(PNG_LIBPNG_VER_STRING, (png_voidp) NULL,
+                                   (png_error_ptr) png_cexcept_error,
+                                   (png_error_ptr) NULL);
+        if (read_ptr)
+        {
+            P1( "Allocating read_info structure\n");
+            read_info_ptr = png_create_info_struct(read_ptr);
+            if (read_info_ptr == NULL)
+                png_destroy_read_struct(&read_ptr, (png_infopp) NULL,
+                                        (png_infopp) NULL);
+        }
+        else
+            read_info_ptr = NULL;
+        if (read_info_ptr)
+        {
+
+#ifdef USE_HASHCODE
+            int hash[16385];
+#endif
+
+#ifdef USE_HASHCODE
+            for (i = 0; i < 16385; i++)
+                hash[i] = -1;
+#endif
+            end_info_ptr = NULL;
+
+#ifdef PNG_STDIO_SUPPORTED
+            png_init_io(read_ptr, fp_in);
+#else
+            png_set_read_fn(read_ptr, (png_voidp) fp_in, (png_rw_ptr) NULL);
+#endif
+
+            {
+#ifdef PNGCRUSH_LOCO
+                png_byte mng_signature[8] =
+                    { 138, 77, 78, 71, 13, 10, 26, 10 };
+#endif
+                png_byte png_signature[8] =
+                    { 137, 80, 78, 71, 13, 10, 26, 10 };
+
+                pngcrush_default_read_data(read_ptr, png_signature, 8);
+                png_set_sig_bytes(read_ptr, 8);
+
+#ifdef PNGCRUSH_LOCO
+                if (!(int) (png_memcmp(mng_signature, png_signature, 8))) {
+                    png_byte buffer[40];
+                    unsigned long length;
+                    /* Skip the MHDR chunk. */
+                    png_skip_chunk(read_ptr);
+                    png_permit_mng_features(read_ptr,
+                                            PNG_FLAG_MNG_FILTER_64);
+                    input_format = 1;
+                }
+                else
+#endif
+                if (png_sig_cmp(png_signature, 0, 8))
+                {
+                    if (png_sig_cmp(png_signature, 0, 4))
+                        png_error(read_ptr, "Not a PNG file.");
+                    else
+                        png_error(read_ptr,
+                           "PNG file corrupted by ASCII conversion");
+                }
+            }
+
+            if (fix && found_CgBI)
+            {
+                /* Skip the CgBI chunk. */
+                png_skip_chunk(read_ptr);
+                /* iCCP is probably badly compressed */
+                png_set_keep_unknown_chunks(read_ptr,
+                    PNG_HANDLE_CHUNK_NEVER,
+                    (png_bytep)"iCCP", 1);
+#ifdef PNG_iTXt_SUPPORTED
+                /* and iTXt */
+                png_set_keep_unknown_chunks(read_ptr,
+                    PNG_HANDLE_CHUNK_NEVER,
+                    (png_bytep)"iTXt", 1);
+#endif
+                /* zTXt too */
+                png_set_keep_unknown_chunks(read_ptr,
+                    PNG_HANDLE_CHUNK_NEVER,
+                    (png_bytep)"zTXt", 1);
+            }
+
+            png_read_info(read_ptr, read_info_ptr);
+
+#ifdef PNG_CRC_QUIET_USE
+            png_set_crc_action(read_ptr, PNG_CRC_QUIET_USE,
+                               PNG_CRC_QUIET_USE);
+#endif
+
+            png_get_IHDR(read_ptr, read_info_ptr, &width, &height,
+                         &bit_depth, &color_type, &interlace_method,
+                         &compression_method, &filter_method);
+
+            if (color_type == 2)
+                channels = 3;
+            else if (color_type == 4)
+                channels = 2;
+            else if (color_type == 6)
+                channels = 4;
+            else
+                channels = 1;
+
+            if (color_type == 0 || color_type == 3 || color_type == 4)
+                reduce_to_gray = 1;
+
+            if (bit_depth == 8)
+            {
+                if (interlace_method)
+                    num_pass = 7;
+                else
+                    num_pass = 1;
+
+                rowbytes = png_get_rowbytes(read_ptr, read_info_ptr);
+
+                row_buf = png_malloc(read_ptr, rowbytes + 64);
+
+                for (pass = 0; pass < num_pass; pass++)
+                {
+                    png_byte *rp;
+                    png_uint_32 pass_height, pass_width, y;
+                    P2( "\nBegin count_colors() interlace pass %d\n", pass);
+
+                    if (interlace_method)
+                    {
+                        pass_height = (height - png_pass_ystart[pass]
+                                       + png_pass_yinc[pass] -
+                                       1) / png_pass_yinc[pass];
+                        pass_width = (width - png_pass_start[pass]
+                                      + png_pass_inc[pass] -
+                                      1) / png_pass_inc[pass];
+                    }
+                    else
+                    {
+                        pass_height = height;
+                        pass_width = width;
+                    }
+
+                    for (y = 0; y < pass_height; y++)
+                    {
+                        png_uint_32 x;
+                        png_read_row(read_ptr, row_buf, (png_bytep) NULL);
+                        if (result < 2 || it_is_opaque || reduce_to_gray)
+                        {
+                            if (color_type == 2)
+                            {
+                                for (rp = row_buf, x = 0; x < pass_width;
+                                     x++, rp += channels)
+                                {
+#ifdef USE_HASHCODE
+                                    int hashcode;
+#endif
+                                    png_uint_32 rgba_high =
+                                        (255 << 24) | (*(rp) << 16) |
+                                        (*(rp + 1) << 8) | *(rp + 2);
+                                    assert(num_rgba < 258);
+                                    rgba_hi[num_rgba] = rgba_high;
+
+                                    if (reduce_to_gray &&
+                                        ((*(rp)) != (*(rp + 1))
+                                         || (*(rp)) != (*(rp + 2))))
+                                        reduce_to_gray = 0;
+
+                                    if (result > 1 || !it_is_opaque)
+                                        continue;
+
+
+#ifdef USE_HASHCODE
+                                    /*
+                                     *      R      G      B     mask
+                                     *  11,111  0,0000, 0000   0x3e00
+                                     *  00,000  1,1111, 0000   0x01f0
+                                     *  00,000  0,0000, 1111   0x000f
+                                     *
+                                     */
+
+                                    hashcode =
+                                        (int) (((rgba_high >> 10) & 0x3e00)
+                                               | ((rgba_high >> 7) &
+                                                  0x01f0) | ((rgba_high >>
+                                                              4) &
+                                                             0x000f));
+                                    assert(hashcode < 16385);
+                                    if (hash[hashcode] < 0)
+                                    {
+                                        hash[hashcode] = i = num_rgba;
+                                        if (i > 256)
+                                            result = 2;
+                                        else
+                                            num_rgba++;
+                                    }
+                                    else
+                                    {
+                                        int start = hash[hashcode];
+                                        for (i = start; i <= num_rgba; i++)
+                                            if (rgba_high == rgba_hi[i])
+                                                break;
+                                        hashmiss += (i - start);
+                                        if (i == num_rgba)
+                                        {
+                                            int j;
+                                            if (i > 256)
+                                                result = 2;
+                                            else {
+                                                for (j = num_rgba;
+                                                     j > start + 1; j--)
+                                                {
+                                                    rgba_hi[j] =
+                                                        rgba_hi[j - 1];
+                                                    rgba_frequency[j] =
+                                                        rgba_frequency[j -
+                                                                       1];
+                                                }
+                                                assert(start + 1 < 258);
+                                                rgba_hi[start + 1] =
+                                                    rgba_high;
+                                                rgba_frequency[start + 1] =
+                                                    0;
+                                                for (j = 0; j < 16384; j++)
+                                                    if (hash[j] > start)
+                                                        hash[j]++;
+                                                i = start + 1;
+                                                hashinserts++;
+                                                num_rgba++;
+                                            }
+                                        }
+                                    }
+#else
+                                    for (i = 0; i <= num_rgba; i++)
+                                        if (rgba_high == rgba_hi[i])
+                                            break;
+                                    hashmiss += i;
+                                    if (i > 256)
+                                        result = 2;
+                                    else if (i == num_rgba)
+                                        num_rgba++;
+#endif
+                                    assert(i < 258);
+                                    ++rgba_frequency[i];
+                                }
+                            }
+                            else if (color_type == 6)
+                            {
+                                for (rp = row_buf, x = 0; x < pass_width;
+                                     x++, rp += channels)
+                                {
+#ifdef USE_HASHCODE
+                                    int hashcode;
+#endif
+                                    png_uint_32 rgba_high =
+                                        (*(rp + 3) << 24) | (*(rp) << 16) |
+                                        (*(rp + 1) << 8) | *(rp + 2);
+                                    assert(rp - row_buf + 3 < rowbytes);
+                                    rgba_hi[num_rgba] = rgba_high;
+                                    if (reduce_to_gray &&
+                                        ((*(rp)) != (*(rp + 1))
+                                         || (*(rp)) != (*(rp + 2))))
+                                        reduce_to_gray = 0;
+                                    if (it_is_opaque && (*(rp + 3)) != 255)
+                                        it_is_opaque = 0;
+                                    if (result > 1)
+                                        continue;
+#ifdef USE_HASHCODE
+                                    /*
+                                     *  A     R     G    B    mask
+                                     * 11,1 000,0 000,0 000   0x3800
+                                     * 00,0 111,1 000,0 000   0x0780
+                                     * 00,0 000,0 111,1 000   0x0078
+                                     * 00,0 000,0 000,0 111   0x0007
+                                     *
+                                     */
+
+                                    hashcode =
+                                        (int) (((rgba_high >> 18) & 0x3800)
+                                               | ((rgba_high >> 12) &
+                                                  0x0780) | ((rgba_high >>
+                                                              8) & 0x0078)
+                                               | ((rgba_high >> 4) &
+                                                  0x0007));
+                                    assert(hashcode < 16385);
+                                    if (hash[hashcode] < 0)
+                                    {
+                                        hash[hashcode] = i = num_rgba;
+                                        if (i > 256)
+                                            result = 2;
+                                        else
+                                            num_rgba++;
+                                    }
+                                    else
+                                    {
+                                        int start = hash[hashcode];
+                                        for (i = start; i <= num_rgba; i++)
+                                            if (rgba_high == rgba_hi[i])
+                                                break;
+                                        hashmiss += (i - start);
+                                        if (i == num_rgba)
+                                        {
+                                            if (i > 256)
+                                                result = 2;
+                                            else
+                                            {
+                                                int j;
+                                                for (j = num_rgba;
+                                                     j > start + 1; j--)
+                                                {
+                                                    rgba_hi[j] =
+                                                        rgba_hi[j - 1];
+                                                    rgba_frequency[j] =
+                                                        rgba_frequency[j -
+                                                                       1];
+                                                }
+                                                rgba_hi[start + 1] =
+                                                    rgba_high;
+                                                rgba_frequency[start + 1] =
+                                                    0;
+                                                for (j = 0; j < 16384; j++)
+                                                    if (hash[j] > start)
+                                                        hash[j]++;
+                                                i = start + 1;
+                                                hashinserts++;
+                                                num_rgba++;
+                                            }
+                                        }
+                                    }
+#else
+                                    for (i = 0; i <= num_rgba; i++)
+                                        if (rgba_high == rgba_hi[i])
+                                            break;
+                                    hashmiss += i;
+                                    if (i > 256)
+                                        result = 2;
+                                    else if (i == num_rgba)
+                                        num_rgba++;
+#endif
+                                    ++rgba_frequency[i];
+                                }
+                            }
+                            else if (color_type == 4)
+                            {
+                                for (rp = row_buf, x = 0; x < pass_width;
+                                     x++, rp += channels)
+                                {
+#ifdef USE_HASHCODE
+                                    int hashcode;
+#endif
+                                    png_uint_32 rgba_high =
+                                        (*(rp + 1) << 24) | (*(rp) << 16) |
+                                        (*(rp) << 8) | (*rp);
+                                    assert(rp - row_buf + 1 < rowbytes);
+                                    rgba_hi[num_rgba] = rgba_high;
+                                    if (it_is_opaque && (*(rp + 1)) != 255)
+                                        it_is_opaque = 0;
+#ifdef USE_HASHCODE
+                                    /*
+                                     *    A          G          mask
+                                     * 11,1111,  0000,0000    0x3f00
+                                     * 00,0000,  1111,1111    0x00ff
+                                     *
+                                     */
+
+                                    hashcode =
+                                        (int) (((rgba_high >> 18) & 0x3f00)
+                                               | ((rgba_high >> 4) &
+                                                  0x00ff));
+                                    if (hash[hashcode] < 0)
+                                    {
+                                        hash[hashcode] = i = num_rgba;
+                                        if (i > 256)
+                                            result = 2;
+                                        else
+                                            num_rgba++;
+                                    }
+                                    else
+                                    {
+                                        int start = hash[hashcode];
+                                        for (i = start; i <= num_rgba; i++)
+                                            if (rgba_high == rgba_hi[i])
+                                                break;
+                                        hashmiss += (i - start);
+                                        if (i == num_rgba)
+                                        {
+                                            if (i > 256)
+                                                result = 2;
+                                            else
+                                            {
+                                                int j;
+                                                for (j = num_rgba;
+                                                     j > start + 1; j--)
+                                                {
+                                                    rgba_hi[j] =
+                                                        rgba_hi[j - 1];
+                                                    rgba_frequency[j] =
+                                                        rgba_frequency[j -
+                                                                       1];
+                                                }
+                                                rgba_hi[start + 1] =
+                                                    rgba_high;
+                                                rgba_frequency[start + 1] =
+                                                    0;
+                                                for (j = 0; j < 16384; j++)
+                                                    if (hash[j] > start)
+                                                        hash[j]++;
+                                                i = start + 1;
+                                                hashinserts++;
+                                                num_rgba++;
+                                            }
+                                        }
+                                    }
+#else
+                                    for (i = 0; i <= num_rgba; i++)
+                                        if (rgba_high == rgba_hi[i])
+                                            break;
+                                    hashmiss += i;
+                                    if (i > 256)
+                                        result = 2;
+                                    else if (i == num_rgba)
+                                        num_rgba++;
+#endif
+                                    ++rgba_frequency[i];
+                                }
+                            } else {    /* other color type */
+
+                                result = 2;
+                            }
+                        }
+                    }
+                    P2( "End count_colors() interlace pass %d\n\n", pass);
+                }
+
+            }
+            else /* (bit_depth != 8) */
+            {
+
+                /* TO DO: 16-bit support */
+                reduce_to_gray = 0;
+                it_is_opaque = 0;
+                result = 0;
+            }
+
+            png_free(read_ptr, row_buf);
+            row_buf = (png_bytep) NULL;
+            P1( "Destroying data structs\n");
+            png_destroy_read_struct(&read_ptr, &read_info_ptr,
+                                    (png_infopp) NULL);
+        }
+        else
+           result = 2;
+    }
+    Catch(msg) {
+        fprintf(STDERR, "\nWhile checking alphas in %s ", inname);
+        fprintf(STDERR, "pngcrush caught libpng error:\n   %s\n\n", msg);
+        png_free(read_ptr, row_buf);
+        row_buf = (png_bytep) NULL;
+        png_destroy_read_struct(&read_ptr, &read_info_ptr,
+                                (png_infopp) NULL);
+        P1( "Destroyed data structs\n");
+        result = 2;
+    }
+    if (verbose > 1)
+    {
+        int total = 0;
+        if (num_rgba && num_rgba < 257)
+        {
+            for (i = 0; i < num_rgba; i++)
+            {
+                printf("RGBA=(%3.3d,%3.3d,%3.3d,%3.3d), frequency=%d\n",
+                       (int) (rgba_hi[i] >> 16) & 0xff,
+                       (int) (rgba_hi[i] >> 8) & 0xff,
+                       (int) (rgba_hi[i]) & 0xff,
+                       (int) (rgba_hi[i] >> 24) & 0xff,
+                       (int) rgba_frequency[i]);
+                total += rgba_frequency[i];
+            }
+            P2("num_rgba=%d, total pixels=%d\n", num_rgba, total);
+            P2("hashcode misses=%d, inserts=%d\n", hashmiss, hashinserts);
+        }
+        if (color_type == 0 || color_type == 2)
+            it_is_opaque = 0;
+        if (reduction_ok)
+        {
+            if (reduce_to_gray)
+                P1("The truecolor image is all gray and will be reduced.\n");
+            if (it_is_opaque)
+                P1("The image is opaque and the alpha channel will be "
+                  "removed.\n");
+        }
+        else
+        {
+            if (reduce_to_gray)
+                P1("The truecolor image is all gray and could be reduced.\n");
+            if (it_is_opaque)
+                P1("The image is opaque and the alpha channel could be "
+                  "removed.\n");
+            if (reduce_to_gray || it_is_opaque)
+                P1("Rerun pngcrush with the \"-reduce\" option to do so.\n");
+            reduce_to_gray = 0;
+            it_is_opaque = 0;
+        }
+        P2("Finished checking alphas, result=%d\n", result);
+    }
+    ret = result;
+    return (ret);
+}
+#endif /* PNGCRUSH_COUNT_COLORS */
+
+
+
 
 
 void print_version_info(void)
@@ -6669,6 +7277,11 @@ struct options_help pngcrush_options[] = {
     {2, "               Default is to use same color type as the input file."},
     {2, ""},
 
+#ifdef PNGCRUSH_COUNT_COLORS
+    {0, "           -cc (do color counting)"},
+    {2, ""},
+#endif
+
     {0, "            -d directory_name/ (where output files will go)"},
     {2, ""},
     {2, "               If a directory name is given, then the output"},
@@ -6794,11 +7407,18 @@ struct options_help pngcrush_options[] = {
     {2, ""},
 #endif
 
-    {0, " -newtimestamp (Reset file modification time [default])"},
+    {0, " -newtimestamp"},
+    {2, ""},
+    {2, "               Reset file modification time [default]."},
     {2, ""},
 
     {0, "       -nobail (do not bail out early from trial -- see -bail)"},
     {2, ""},
+
+#ifdef PNGCRUSH_COUNT_COLORS
+    {0, "        -no_cc (no color counting)"},
+    {2, ""},
+#endif
 
     {0, "  -nofilecheck (do not check for infile.png == outfile.png)"},
     {2, ""},
@@ -6813,7 +7433,9 @@ struct options_help pngcrush_options[] = {
     {2, ""},
 
 
-    {0, " -oldtimestamp (Do not reset file modification time)"},
+    {0, " -oldtimestamp"},
+    {2, ""},
+    {2, "               Don't reset file modification time."},
     {2, ""},
     
     {0, "           -ow (Overwrite)"},
