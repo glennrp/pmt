@@ -1,6 +1,6 @@
 /*
  * pngcrush.c - recompresses png files
- * Copyright (C) 1998-2002,2006-2012 Glenn Randers-Pehrson
+ * Copyright (C) 1998-2002, 2006-2012 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
  * Portions copyright (C) 2005       Greg Roelofs
  *
@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.41"
+#define PNGCRUSH_VERSION "1.7.42"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -96,7 +96,7 @@
  *
  * COPYRIGHT:
  *
- * Copyright (C) 1998-2002,2006-2012 Glenn Randers-Pehrson
+ * Copyright (C) 1998-2002, 2006-2012 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
  * Portions copyright (C) 2005       Greg Roelofs
  *
@@ -141,7 +141,7 @@
  *   do even better.
  *
  *   This has no effect on the "crushed" filesize.  The reason for setting
- *   CINFO properly is to proved the *decoder* with information that will
+ *   CINFO properly is to provide the *decoder* with information that will
  *   allow it to request only the minimum amount of memory required to decode
  *   the image.
  *
@@ -179,16 +179,25 @@
  *
  *   2. Check for unused alpha channel in color-type 4 and 6.
  *
- *   If the image is entirely opaque, reduce the color-type to 0 or 2.
+ *     a. If the image is entirely opaque, reduce the color-type to 0 or 2.
+ *
+ *     b. Check for the possiblity of using the tRNS chunk instead of
+ *     the full alpha channel.  If all of the transparent pixels are
+ *     fully transparent, and they all have the same underlying color,
+ *     and no opaque pixel has that same color, then write a tRNS
+ *     chunk and reduce the color-type to 0 or 2. This is a lossless
+ *     operation.  If the lossy "-blacken" option is present, do that
+ *     operation first.
  *
  *   3. Check for equal R-G-B channels in color-type 2 or 6.
  *
  *   If this is true for all pixels, reduce the color-type to 0 or 4.
+ *   This operation is lossless.
  *
  *   4. Check for ok-to-reduce-depth (i.e., every pixel has color samples
  *   that can be expressed exactly using a smaller depth).
  *
- *   If so, reduce the bit depth accordingly.
+ *   If so, reduce the bit depth accordingly.  This operation is lossless.
  *
  *   Note for 2, 3, 4: Take care that sBIT and bKGD data are not lost or
  *   become invalid when reducing images from truecolor to grayscale or
@@ -217,7 +226,7 @@
  *   package which counts RGB pixels in an image; this and its supporting
  *   lib/libppmcmap.c would need to be revised to count RGBA pixels instead.
  *
- *   8. Finish pplt (partial palette) feature.
+ *   8. Finish pplt (MNG partial palette) feature.
  *
  *   9. Remove text-handling and color-handling features and put
  *   those in a separate program or programs, to avoid unnecessary
@@ -233,7 +242,7 @@
  *   12. Move the Photoshop-fixing stuff into a separate program.
  *
  *   13. GRR: More generally (superset of previous 3 items):  split into
- *   separate *   "edit" and "crush" programs (or functions).  Former is fully
+ *   separate "edit" and "crush" programs (or functions).  Former is fully
  *   libpng-aware, much like current pngcrush; latter makes little or no use of
  *   libpng (maybe IDAT-compression parts only?), instead handling virtually
  *   all chunks as opaque binary blocks that are copied to output file _once_,
@@ -252,9 +261,14 @@
 
 Change log:
 
+Version 1.7.42 (built with libpng-1.5.13 and zlib-1.2.7)
+  Use malloc() and free() instead of png_malloc_default() and
+    png_free_default().  This will be required to run with libpng-1.7.x.
+  Revised zutil.h to avoid redefining ptrdiff_t on MinGW/CYGWIN platforms.
+
 Version 1.7.41 (built with libpng-1.5.13 and zlib-1.2.7)
-  Reverted to version 1.7.38.  Versions 1.7.39 and 40 failed to open an
-    output file.
+  Reverted to version 1.7.38.  Versions 1.7.39 and 1.7.40 failed to
+    open an output file.
 
 Version 1.7.40 (built with libpng-1.5.13 and zlib-1.2.7)
   Revised the "To do" list.
@@ -270,12 +284,17 @@ Version 1.7.39 (built with libpng-1.5.13 and zlib-1.2.7)
     function, instead of depending on STDIO_SUPPORTED.
 
 Version 1.7.38 (built with libpng-1.5.13 and zlib-1.2.7)
-  Bail out of a trial if byte count exceeds best byte count so far.
+  Bail out of a trial if byte count exceeds best byte count so far.  This
+    avoids wasting CPU time on trial compressions of trials that exceed the
+    best compression found so far.
   Added -bail and -nobail options.  Use -nobail to get a complete report
-    of filesizes.
+    of filesizes; otherwise the report just says ">N" for any trial
+    that exceeds size N where N is the best size achieved so far.
   Added -blacken option, to enable changing the color samples of any
     fully-transparent pixels to zero in PNG files with color-type 4 or 6,
-    potentially improving their compressibility.
+    potentially improving their compressibility. Note that this is an
+    irreversible lossy change: the underlying colors of all fully transparent
+    pixels are lost, if they were not already black.
 
 Version 1.7.37 (built with libpng-1.5.12 and zlib-1.2.7)
   Reverted pngcrush.c back to 1.7.35 and fixed the bug with PLTE handling.
@@ -1885,13 +1904,12 @@ png_voidp png_debug_malloc(png_structp png_ptr, png_uint_32 size)
      * buffer and once to get a new free list entry.
      */
     {
-        memory_infop pinfo = (memory_infop)png_malloc_default(png_ptr,
-           sizeof *pinfo);
+        memory_infop pinfo = (memory_infop)malloc(sizeof *pinfo);
         pinfo->size = size;
         current_allocation += size;
         if (current_allocation > maximum_allocation)
             maximum_allocation = current_allocation;
-        pinfo->pointer = png_malloc_default(png_ptr, size);
+        pinfo->pointer = malloc(size);
         pinfo->next = pinformation;
         pinformation = pinfo;
         /* Make sure the caller isn't assuming zeroed memory. */
@@ -1934,7 +1952,7 @@ void png_debug_free(png_structp png_ptr, png_voidp ptr)
                 if (verbose > 2)
                     fprintf(STDERR, "Pointer %lux freed %lu bytes\n",
                             (unsigned long) ptr, (unsigned long)pinfo->size);
-                png_free_default(png_ptr, pinfo);
+                free(pinfo);
                 break;
             }
             if (pinfo->next == NULL) {
@@ -1947,7 +1965,7 @@ void png_debug_free(png_structp png_ptr, png_voidp ptr)
     }
 
     /* Finally free the data. */
-    png_free_default(png_ptr, ptr);
+    free(ptr);
 }
 
 #endif /* PNG_USER_MEM_SUPPORTED */
@@ -4149,7 +4167,7 @@ int main(int argc, char *argv[])
                         png_error(read_ptr,
                             "PNG file corrupted by ASCII conversion");
                     }
-                    if(fix && found_CgBI)
+                    if (fix && found_CgBI)
                     {
                         /* Skip the CgBI chunk */
 
@@ -5375,9 +5393,7 @@ int main(int argc, char *argv[])
                     if (found_CgBI)
                     {
                         png_warning(read_ptr,
-                            "Cannot read Xcode CgBI PNG. Even if we could,");
-                        png_error(read_ptr,
-                            "the original PNG could not be recovered.");
+                            "Cannot read Xcode CgBI PNG");
                     }
                     P1( "\nWriting info struct\n");
 
@@ -6113,8 +6129,9 @@ int main(int argc, char *argv[])
 
 png_uint_32 measure_idats(FILE * fp_in)
 {
-    /* Copyright (C) 1999-2002,2006 Glenn Randers-Pehrson (glennrp@users.sf.net)
-       See notice in pngcrush.c for conditions of use and distribution */
+    /* Copyright (C) 1999-2002, 2006-2012 Glenn Randers-Pehrson
+       (glennrp@users.sf.net).  See notice in pngcrush.c for conditions of
+       use and distribution */
     P2("\nmeasure_idats:\n");
     P1( "Allocating read structure\n");
 /* OK to ignore any warning about the address of exception__prev in "Try" */
@@ -6156,7 +6173,8 @@ png_uint_32 measure_idats(FILE * fp_in)
 
 png_uint_32 png_measure_idat(png_structp png_ptr)
 {
-    /* Copyright (C) 1999-2002,2006 Glenn Randers-Pehrson (glennrp@users.sf.net)
+    /* Copyright (C) 1999-2002, 2006-2012 Glenn Randers-Pehrson
+       (glennrp@users.sf.net)
        See notice in pngcrush.c for conditions of use and distribution */
 
     /* Signature + IHDR + IEND; we'll add PLTE + IDAT lengths */
@@ -6407,7 +6425,7 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
 
             if (png_get_uint_32(chunk_name) == PNG_UINT_CgBI)
             {
-                printf(" This is an Xcode CGBI file, not a PNG file.\n");
+                printf(" This is an Xcode CgBI file, not a PNG file.\n");
                 if (fix)
                 {
                     printf (" Removing the CgBI chunk.\n");
@@ -6484,7 +6502,7 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
                 if (!strncmp((png_const_charp) buff, "Photoshop ICC profile",
                      21))
                 {
-                    printf("   Replacing bad Photoshop ICCP chunk with an "
+                    printf("   Replacing bad Photoshop iCCP chunk with an "
                       "sRGB chunk\n");
 #ifdef PNG_gAMA_SUPPORTED
 #  ifdef PNG_FIXED_POINT_SUPPORTED
@@ -6548,7 +6566,8 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
 #define USE_HASHCODE
 int count_colors(FILE * fp_in)
 {
-    /* Copyright (C) 2000-2002,2006 Glenn Randers-Pehrson (glennrp@users.sf.net)
+    /* Copyright (C) 2000-2002, 2006-2012 Glenn Randers-Pehrson
+       (glennrp@users.sf.net)
        See notice in pngcrush.c for conditions of use and distribution */
     int bit_depth, color_type, interlace_method, filter_method,
         compression_method;
@@ -7143,7 +7162,7 @@ void print_version_info(void)
       " | pngcrush %s\n"
       /* If you have modified this source, you may insert additional notices
        * immediately after this sentence: */
-      " |    Copyright (C) 1998-2002,2006-2012 Glenn Randers-Pehrson\n"
+      " |    Copyright (C) 1998-2002, 2006-2012 Glenn Randers-Pehrson\n"
       " |    Portions copyright (C) 2005       Greg Roelofs\n"
       " | This is a free, open-source program.  Permission is irrevocably\n"
       " | granted to everyone to use this version of pngcrush without\n"
@@ -7189,7 +7208,7 @@ static const char *pngcrush_legal[] = {
     "",
     "If you have modified this source, you may insert additional notices",
     "immediately after this sentence.",
-    "Copyright (C) 1998-2002,2006-2012 Glenn Randers-Pehrson",
+    "Copyright (C) 1998-2002, 2006-2012 Glenn Randers-Pehrson",
     "Portions copyright (C) 2005       Greg Roelofs",
     "",
     "DISCLAIMER: The pngcrush computer program is supplied \"AS IS\".",
@@ -7407,9 +7426,7 @@ struct options_help pngcrush_options[] = {
     {2, ""},
 #endif
 
-    {0, " -newtimestamp"},
-    {2, ""},
-    {2, "               Reset file modification time [default]."},
+    {0, " -newtimestamp (Reset file modification time [default])"},
     {2, ""},
 
     {0, "       -nobail (do not bail out early from trial -- see -bail)"},
@@ -7432,10 +7449,7 @@ struct options_help pngcrush_options[] = {
     {2, "               Instead, the user limits are inherited from libpng."},
     {2, ""},
 
-
-    {0, " -oldtimestamp"},
-    {2, ""},
-    {2, "               Don't reset file modification time."},
+    {0, " -oldtimestamp (Do not reset file modification time)"},
     {2, ""},
     
     {0, "           -ow (Overwrite)"},

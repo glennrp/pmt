@@ -14,7 +14,11 @@
    own exception handling, which only returns after "Too many IDAT's",
    or anything else that we might want to handle as a warning instead of
    an error. */
-#define PNG_ABORT()
+#if PNGCRUSH_LIBPNG_VER >= 10700
+#  define PNG_ABORT exit(1)
+#else
+#  define PNG_ABORT() exit(1)
+#endif
 
 /* Suppress libpng pedantic warnings */
 #define PNG_NORETURN    /* This function does not return */

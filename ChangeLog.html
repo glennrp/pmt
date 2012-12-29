@@ -3,6 +3,18 @@
 
 Change log:
 
+Version 1.7.42 (built with libpng-1.5.13 and zlib-1.2.7)
+  Use malloc() and free() instead of png_malloc_default() and
+    png_free_default().  This will be required to run with libpng-1.7.x.
+  Revised zutil.h to avoid redefining ptrdiff_t on MinGW/CYGWIN platforms.
+
+Version 1.7.41 (built with libpng-1.5.13 and zlib-1.2.7)
+  Reverted to version 1.7.38.  Versions 1.7.39 and 1.7.40 failed to
+    open an output file.
+
+Version 1.7.40 (built with libpng-1.5.13 and zlib-1.2.7)
+  Revised the "To do" list.
+
 Version 1.7.39 (built with libpng-1.5.13 and zlib-1.2.7)
   Removed "PNGCRUSH_COUNT_COLORS" blocks which I no longer intend to
     implement because that feature is already available in ImageMagick.  Kept
@@ -22,7 +34,7 @@ Version 1.7.38 (built with libpng-1.5.13 and zlib-1.2.7)
     that exceeds size N where N is the best size achieved so far.
   Added -blacken option, to enable changing the color samples of any
     fully-transparent pixels to zero in PNG files with color-type 4 or 6,
-    potentially improving their compressibility.  Note that this is an
+    potentially improving their compressibility. Note that this is an
     irreversible lossy change: the underlying colors of all fully transparent
     pixels are lost, if they were not already black.
 
@@ -162,8 +174,6 @@ Version 1.7.14  (built with libpng-1.5.1beta08 and zlib-1.2.5)
     with bundled libpng-1.5.x.  Pngcrush cannot be built yet with
     a system libpng-1.5.x.
   Dropped most of pngcrush.h, that eliminates various parts of libpng.
-  Renamed png_default_read_data() to pngcrush_default_read_data() and
-    png_crush_pause() to pngcrush_pause()
 
 Version 1.7.13  (built with libpng-1.4.5 and zlib-1.2.5)
 
