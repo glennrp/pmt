@@ -29,8 +29,15 @@
 #  include <stdlib.h>
 #endif
 
+/* Added 12/29/12 glennrp */
+#ifdef CYGWIN
+#      define _PTRDIFF_T_DEFINED
+#endif
+
 #ifdef Z_SOLO
+# ifndef _PTRDIFF_T_DEFINED
    typedef long ptrdiff_t;  /* guess -- will be caught if guess is wrong */
+# endif
 #endif
 
 #ifndef local
