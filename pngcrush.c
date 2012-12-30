@@ -262,7 +262,9 @@
 Change log:
 
 Version 1.7.43 (built with libpng-1.5.13 and zlib-1.2.7)
-  Disabled "-ow" option on CYGWIN/MinGW because "rename()" does not work.
+  Added "remove(inname)" before "rename(outname, inname)" when using the "-ow"
+    option on CYGWIN/MinGW because "rename()" does not work if the target file
+    exists.
 
 Version 1.7.42 (built with libpng-1.5.13 and zlib-1.2.7)
   Use malloc() and free() instead of png_malloc_default() and
@@ -2881,12 +2883,7 @@ int main(int argc, char *argv[])
         }
         else if(!strncmp(argv[i], "-ow",3))
         {
-#ifdef CYGWIN
-            fprintf(STDERR,
-             "\n \"-ow\" option not available on this platform\n");
-#else
             overwrite = 1;
-#endif
         }
         else if (!strncmp(argv[i], "-premultiply", 5))
         {
@@ -6032,11 +6029,14 @@ int main(int argc, char *argv[])
             setfiletype(outname);
         }
         
-#ifndef CYGWIN
         if (last_trial && nosave == 0 && overwrite != 0)
         {
             /* rename the new file , outname = inname */
-            if (rename(outname, inname) != 0 )
+            if (
+#ifdef CYGWIN
+              remove(inname) != 0 ||
+#endif
+              rename(outname, inname) != 0 )
             {
                 fprintf(STDERR,
                     "error while renaming \"%s\" to \"%s\" \n",outname,inname);
@@ -6045,7 +6045,6 @@ int main(int argc, char *argv[])
             else
                 P2("rename %s to %s complete.\n",outname,inname);
         }
-#endif
 
         if (last_trial && nosave == 0)
         {
