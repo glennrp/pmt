@@ -3,9 +3,19 @@
 
 Change log:
 
+Version 1.7.44 (built with libpng-1.5.14 and zlib-1.2.7)
+
+Version 1.7.43 (built with libpng-1.5.13 and zlib-1.2.7)
+  Added "remove(inname)" before "rename(outname, inname)" when using the "-ow"
+    option on CYGWIN/MinGW because "rename()" does not work if the target file
+    exists.
+  Use the bundled "zlib.h" when PNGCRUSH_H is defined, otherwise use the
+    system <zlib.h>.
+
 Version 1.7.42 (built with libpng-1.5.13 and zlib-1.2.7)
   Use malloc() and free() instead of png_malloc_default() and
     png_free_default().  This will be required to run with libpng-1.7.x.
+  Revised the PNG_ABORT definition in pngcrush.h to work with libpng-1.7.x.
   Revised zutil.h to avoid redefining ptrdiff_t on MinGW/CYGWIN platforms.
 
 Version 1.7.41 (built with libpng-1.5.13 and zlib-1.2.7)

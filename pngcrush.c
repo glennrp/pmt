@@ -1,6 +1,6 @@
 /*
  * pngcrush.c - recompresses png files
- * Copyright (C) 1998-2002, 2006-2012 Glenn Randers-Pehrson
+ * Copyright (C) 1998-2002, 2006-2013 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
  * Portions copyright (C) 2005       Greg Roelofs
  *
@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.43"
+#define PNGCRUSH_VERSION "1.7.44"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -96,7 +96,7 @@
  *
  * COPYRIGHT:
  *
- * Copyright (C) 1998-2002, 2006-2012 Glenn Randers-Pehrson
+ * Copyright (C) 1998-2002, 2006-2013 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
  * Portions copyright (C) 2005       Greg Roelofs
  *
@@ -133,6 +133,12 @@
 
 /* To do:
  *
+ *   (As noted below, some of the features that aren't yet implemented
+ *   in pngcrush are already available in ImageMagick; you can try a
+ *   workflow that makes a first pass over the image with ImageMagick
+ *   to select the bit depth, color type, interlacing, etc., and then makes
+ *   another pass with pngcrush to optimize the compression.)
+ *
  *   1. Reset CINFO to reflect decoder's required window size (instead of
  *   libz-1.1.3 encoder's required window size, which is 262 bytes larger).
  *   See discussion about zlib in png-list archives for April 2001.
@@ -143,7 +149,8 @@
  *   This has no effect on the "crushed" filesize.  The reason for setting
  *   CINFO properly is to provide the *decoder* with information that will
  *   allow it to request only the minimum amount of memory required to decode
- *   the image.
+ *   the image (note that libpng-based decoders don't make use of this
+ *   hint until libpng-1.6.0).
  *
  *   In the meantime, one can just do the following and select the smallest
  *   window that does not increase the filesize, after running pngcrush once
@@ -175,7 +182,8 @@
  *      settings, then attempt to decode the zlib datastream, and choose
  *      the smallest setting whose datastream can still be decoded
  *      successfully.  This is likely to be the simplest and fastest
- *      solution.
+ *      solution; however, it will only work with libpng-1.6.0 and later,
+ *      where the decoder actually uses the CINFO hint.
  *
  *   2. Check for unused alpha channel in color-type 4 and 6.
  *
@@ -186,24 +194,30 @@
  *     fully transparent, and they all have the same underlying color,
  *     and no opaque pixel has that same color, then write a tRNS
  *     chunk and reduce the color-type to 0 or 2. This is a lossless
- *     operation.  If the lossy "-blacken" option is present, do that
- *     operation first.
+ *     operation.  ImageMagick already does this, as of version 6.7.0.
+ *     If the lossy "-blacken" option is present, do that operation first.
  *
  *   3. Check for equal R-G-B channels in color-type 2 or 6.
  *
- *   If this is true for all pixels, reduce the color-type to 0 or 4.
- *   This operation is lossless.
+ *   If this is true for all pixels, reduce the color-type to 0 or 4
+ *   (i.e., grayscale). This operation is lossless.  ImageMagick already
+ *   does this.
  *
  *   4. Check for ok-to-reduce-depth (i.e., every pixel has color samples
  *   that can be expressed exactly using a smaller depth).
  *
  *   If so, reduce the bit depth accordingly.  This operation is lossless.
+ *   ImageMagick does this.
  *
  *   Note for 2, 3, 4: Take care that sBIT and bKGD data are not lost or
  *   become invalid when reducing images from truecolor to grayscale or
  *   when reducing the bit depth.
  *
- *   5. Use a better compression algorithm for "deflating" (result must
+ *   5. Add choice of interlaced or non-interlaced output. Currently you
+ *   can change interlaced to non-interlaced and vice versa by using
+ *   ImageMagick before running pngcrush.
+ *
+ *   6. Use a better compression algorithm for "deflating" (result must
  *   still be readable with zlib!)  e.g., http://en.wikipedia.org/wiki/7-Zip
  *   says that the 7-zip deflate compressor achieves better compression
  *   (smaller files) than zlib.  If tests show that this would be worth
@@ -212,8 +226,6 @@
  *   at http://en.wikipedia.org/wiki/AdvanceCOMP and note that if this
  *   is incorporated in pngcrush, then pngcrush would have to be re-licensed,
  *   or released in two versions, one libpng-licensed and one GPL-licensed!
- *
- *   6. Improve the -help output and/or write a good man page.
  *
  *   7. Implement palette-building (from ImageMagick-6.7.0 or later, minus
  *   the "PNG8" part) -- actually ImageMagick puts the transparent colors
@@ -226,22 +238,30 @@
  *   package which counts RGB pixels in an image; this and its supporting
  *   lib/libppmcmap.c would need to be revised to count RGBA pixels instead.
  *
- *   8. Finish pplt (MNG partial palette) feature.
+ *   8. Check the "-plte_len n" option to be sure that no pixel contains
+ *   an index value that is out of range due to truncation of the PLTE chunk.
+ *   Implementing item "7" will take care of this, since that will always
+ *   build a palette of the right length, and the -plte_len option can be
+ *   eliminated.
  *
- *   9. Remove text-handling and color-handling features and put
+ *   9. Improve the -help output and/or write a good man page.
+ *
+ *   10. Finish pplt (MNG partial palette) feature.
+ *
+ *   11. Remove text-handling and color-handling features and put
  *   those in a separate program or programs, to avoid unnecessary
  *   recompressing.  Note that in pngcrush-1.7.34, pngcrush began doing
  *   this extra work only once instead of for every trial, so the potential
  *   benefit in CPU savings is much smaller now.
  *
- *   10. Add a "pcRu" ancillary chunk that keeps track of the best method,
+ *   12. Add a "pcRu" ancillary chunk that keeps track of the best method,
  *   methods already tried, and whether "loco crushing" was effective.
  *
- *   11. Try both transformed and untransformed colors when "-loco" is used.
+ *   13. Try both transformed and untransformed colors when "-loco" is used.
  *
- *   12. Move the Photoshop-fixing stuff into a separate program.
+ *   14. Move the Photoshop-fixing stuff into a separate program.
  *
- *   13. GRR: More generally (superset of previous 3 items):  split into
+ *   15. GRR: More generally (superset of previous 3 items):  split into
  *   separate "edit" and "crush" programs (or functions).  Former is fully
  *   libpng-aware, much like current pngcrush; latter makes little or no use of
  *   libpng (maybe IDAT-compression parts only?), instead handling virtually
@@ -261,14 +281,19 @@
 
 Change log:
 
+Version 1.7.44 (built with libpng-1.5.14 and zlib-1.2.7)
+
 Version 1.7.43 (built with libpng-1.5.13 and zlib-1.2.7)
   Added "remove(inname)" before "rename(outname, inname)" when using the "-ow"
     option on CYGWIN/MinGW because "rename()" does not work if the target file
     exists.
+  Use the bundled "zlib.h" when PNGCRUSH_H is defined, otherwise use the
+    system <zlib.h>.
 
 Version 1.7.42 (built with libpng-1.5.13 and zlib-1.2.7)
   Use malloc() and free() instead of png_malloc_default() and
     png_free_default().  This will be required to run with libpng-1.7.x.
+  Revised the PNG_ABORT definition in pngcrush.h to work with libpng-1.7.x.
   Revised zutil.h to avoid redefining ptrdiff_t on MinGW/CYGWIN platforms.
 
 Version 1.7.41 (built with libpng-1.5.13 and zlib-1.2.7)
@@ -951,8 +976,14 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 #endif
 
 #if PNGCRUSH_LIBPNG_VER >= 10500
-   /* Not provided by libpng15 */
+   /* "#include <zlib.h>" is not provided by libpng15 */
+#ifdef PNGCRUSH_H
+   /* Use the bundled zlib */
+#  include "zlib.h"
+#else
+   /* Use the system zlib */
 #  include <zlib.h>
+#endif
 
 #  ifndef PNG_UNUSED
 #    define PNG_UNUSED(param) (void)param;
@@ -6138,7 +6169,7 @@ int main(int argc, char *argv[])
 
 png_uint_32 measure_idats(FILE * fp_in)
 {
-    /* Copyright (C) 1999-2002, 2006-2012 Glenn Randers-Pehrson
+    /* Copyright (C) 1999-2002, 2006-2013 Glenn Randers-Pehrson
        (glennrp@users.sf.net).  See notice in pngcrush.c for conditions of
        use and distribution */
     P2("\nmeasure_idats:\n");
@@ -6182,7 +6213,7 @@ png_uint_32 measure_idats(FILE * fp_in)
 
 png_uint_32 png_measure_idat(png_structp png_ptr)
 {
-    /* Copyright (C) 1999-2002, 2006-2012 Glenn Randers-Pehrson
+    /* Copyright (C) 1999-2002, 2006-2013 Glenn Randers-Pehrson
        (glennrp@users.sf.net)
        See notice in pngcrush.c for conditions of use and distribution */
 
@@ -6575,7 +6606,7 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
 #define USE_HASHCODE
 int count_colors(FILE * fp_in)
 {
-    /* Copyright (C) 2000-2002, 2006-2012 Glenn Randers-Pehrson
+    /* Copyright (C) 2000-2002, 2006-2013 Glenn Randers-Pehrson
        (glennrp@users.sf.net)
        See notice in pngcrush.c for conditions of use and distribution */
     int bit_depth, color_type, interlace_method, filter_method,
@@ -7171,7 +7202,7 @@ void print_version_info(void)
       " | pngcrush %s\n"
       /* If you have modified this source, you may insert additional notices
        * immediately after this sentence: */
-      " |    Copyright (C) 1998-2002, 2006-2012 Glenn Randers-Pehrson\n"
+      " |    Copyright (C) 1998-2002, 2006-2013 Glenn Randers-Pehrson\n"
       " |    Portions copyright (C) 2005       Greg Roelofs\n"
       " | This is a free, open-source program.  Permission is irrevocably\n"
       " | granted to everyone to use this version of pngcrush without\n"
@@ -7179,7 +7210,7 @@ void print_version_info(void)
       " | Executable name is %s\n"
       " | It was built with libpng version %s, and is\n"
       " | running with %s"
-      " |    Copyright (C) 1998-2004, 2006-2012 Glenn Randers-Pehrson,\n"
+      " |    Copyright (C) 1998-2004, 2006-2013 Glenn Randers-Pehrson,\n"
       " |    Copyright (C) 1996, 1997 Andreas Dilger,\n"
       " |    Copyright (C) 1995, Guy Eric Schalnat, Group 42 Inc.,\n"
       " | and zlib version %s, Copyright (C) 1995%s,\n"
@@ -7217,7 +7248,7 @@ static const char *pngcrush_legal[] = {
     "",
     "If you have modified this source, you may insert additional notices",
     "immediately after this sentence.",
-    "Copyright (C) 1998-2002, 2006-2012 Glenn Randers-Pehrson",
+    "Copyright (C) 1998-2002, 2006-2013 Glenn Randers-Pehrson",
     "Portions copyright (C) 2005       Greg Roelofs",
     "",
     "DISCLAIMER: The pngcrush computer program is supplied \"AS IS\".",
