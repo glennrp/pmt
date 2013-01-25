@@ -3,6 +3,15 @@
 
 Change log:
 
+Version 1.7.45 (built with libpng-1.5.13 and zlib-1.2.7)
+  Added method 0 (uncompressed). "-m 0" now simply turns on method 0.
+  Added "-try10" option that has the same effect that "-m 0" previously did,
+    namely to try only the first ten methods.
+  Do the heuristic trials of the first 10 methods when -brute is specified,
+    to get quickly to a small solution, so we can bail out of most of the
+    remaining trials early. Previously these 10 methods were skipped during
+    a -brute run.
+
 Version 1.7.44 (built with libpng-1.5.14 and zlib-1.2.7)
 
 Version 1.7.43 (built with libpng-1.5.13 and zlib-1.2.7)
