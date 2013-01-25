@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.44"
+#define PNGCRUSH_VERSION "1.7.45"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -280,6 +280,15 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.45 (built with libpng-1.5.13 and zlib-1.2.7)
+  Added method 0 (uncompressed). "-m 0" now simply turns on method 0.
+  Added "-try10" option that has the same effect that "-m 0" previously did,
+    namely to try only the first ten methods.
+  Do the heuristic trials of the first 10 methods when -brute is specified,
+    to get quickly to a small solution, so we can bail out of most of the
+    remaining trials early. Previously these 10 methods were skipped during
+    a -brute run.
 
 Version 1.7.44 (built with libpng-1.5.14 and zlib-1.2.7)
 
@@ -2418,7 +2427,15 @@ int main(int argc, char *argv[])
     int bit_depth, color_type;
     int num_pass, pass;
     int num_methods;
+
+    int try10 = 0;
+
+    /* try_method[n]: 0 means try this method;
+     *
+     *              : 1 means do not try this method.
+     */
     int try_method[MAX_METHODSP1];
+
     int fm[MAX_METHODSP1];
     int lv[MAX_METHODSP1];
     int zs[MAX_METHODSP1];
@@ -2473,10 +2490,11 @@ int main(int argc, char *argv[])
      */
     for (i = 0; i < MAX_METHODS; i++)
     {
-        try_method[i] = 1;
+        try_method[i] = 1;  /* 1 means do not try this method */
         fm[i] = 5; lv[i] = 9; zs[i] = 1;  /* default:  method 124 */
     }
 
+    fm[0] = 0; lv[0] = 0; zs[0] = 0;   /* method  0 == uncompressed */
     fm[1] = 0; lv[1] = 4; zs[1] = 0;   /* method  1 == method  53 */
     fm[2] = 1; lv[2] = 4; zs[2] = 0;   /* method  2 == method  54 */
                lv[3] = 4;              /* method  3 == method  64 */
@@ -2502,9 +2520,9 @@ int main(int argc, char *argv[])
     }
 
     /*
-     * methods 17 through 124 (9*2*6 = 108)
+     * methods 17 through 136 (10*2*6 = 120)
      */
-    for (lev = 1; lev <= 9; lev++)
+    for (lev = 0; lev <= 9; lev++)
     {
         for (strat = 0; strat <= 1; strat++)
         {
@@ -2519,7 +2537,7 @@ int main(int argc, char *argv[])
     }
 
 #ifdef Z_RLE
-    /* methods 125 through 136
+    /* methods 137 through 148
      *
      * [strategy 3 (Z_RLE) is mostly independent of level; 1-3 and 4-9 are
      * same]
@@ -2613,7 +2631,8 @@ int main(int argc, char *argv[])
         {
             methods_specified = 1;
             brute_force++;
-            for (method = 11; method < num_methods; method++)
+            try_method[0] = 0; /* uncompressed */
+            for (method = 0; method < num_methods; method++)
                 try_method[method] = 0;
             if (brute_force_filter == 0)
                 for (filt = 0; filt < 6; filt++)
@@ -2703,7 +2722,7 @@ int main(int argc, char *argv[])
                         brute_force_strategies[2];
                     method++;
                 }
-                for (lev = 1; lev < 10; lev++)
+                for (lev = 0; lev < 10; lev++)
                 {
                     for (strat = 0; strat < 2; strat++)
                     {
@@ -2749,7 +2768,7 @@ int main(int argc, char *argv[])
                     lv[method] = specified_level;
                     method++;
                 }
-                for (lev = 1; lev < 10; lev++)
+                for (lev = 0; lev < 10; lev++)
                 {
                     for (strat = 0; strat < 2; strat++)
                     {
@@ -3057,6 +3076,10 @@ int main(int argc, char *argv[])
         {
             verbose = 0;
         }
+        else if(!strncmp(argv[i], "-try10",6))
+        {
+            try10 = 1;
+        }
         else if (!strncmp(argv[i], "-text", 5)
                  || !strncmp(argv[i], "-tEXt", 5) ||
 #ifdef PNG_iTXt_SUPPORTED
@@ -3221,7 +3244,7 @@ int main(int argc, char *argv[])
                         try_method[method] = 1;
                     method++;
                 }
-                for (lev = 1; lev < 10; lev++)
+                for (lev = 0; lev < 10; lev++)
                 {
                     for (strat = 0; strat < 2; strat++)
                     {
@@ -3673,11 +3696,11 @@ int main(int argc, char *argv[])
         output_color_type = force_output_color_type;
         output_bit_depth = force_output_bit_depth;
 
-        if (!methods_specified || try_method[0] == 0)
+        if (!methods_specified || try10 != 0)
         {
             for (i = 1; i <= DEFAULT_METHODS; i++)
                 try_method[i] = 0;
-            try_method[6] = try_method[0];
+            try_method[6] = try10;
         }
 
         best_of_three = 1;
@@ -3690,10 +3713,10 @@ int main(int argc, char *argv[])
 
         /* MAX_METHODS is 200 */
         P1("\n\nENTERING MAIN LOOP OVER %d METHODS\n", MAX_METHODS);
-        for (trial = 1; trial <= MAX_METHODS; trial++)
+        for (trial = 0; trial <= MAX_METHODS; trial++)
         {
             if (nosave || trial == MAX_METHODS)
-               last_trial = 1;
+               last_trial = 0;
 
             pngcrush_write_byte_count=0;
 
@@ -3796,7 +3819,12 @@ int main(int argc, char *argv[])
                     P2("skipping \"late\" trial %d\n", trial);
                     continue;
                 }
-                if (!methods_specified && try_method[0])
+
+                /* default behavior is to do the heuristics (6 of the first
+                 * 10 methods). try10 means try all of 1-10.
+                 */
+                if ((!methods_specified && try10 == 0) ||
+                   (brute_force != 0 && bail != 0)) 
                 {
                     if ((trial == 4 || trial == 7) && best_of_three != 1)
                     {
@@ -7313,9 +7341,9 @@ struct options_help pngcrush_options[] = {
     {2, ""},
 
 #ifdef Z_RLE
-    {0, "        -brute (use brute-force: try 126 different methods [11-136])"},
+    {0, "        -brute (use brute-force: try 138 different methods [11-148])"},
 #else
-    {0, "        -brute (use brute-force: try 114 different methods [11-124])"},
+    {0, "        -brute (use brute-force: try 126 different methods [11-136])"},
 #endif
     {2, ""},
     {2, "               Very time-consuming and generally not worthwhile."},
@@ -7448,13 +7476,13 @@ struct options_help pngcrush_options[] = {
 
     {0, "            -m method [0 through " STRNGIFY(MAX_METHODS) "]"},
     {2, ""},
-    {2, "               pngcrush method to try (0 means try all of 1-10)."},
-    {2, "               Can be repeated as in '-m 1 -m 4 -m 7'."},
-    {2, "               This can be useful if pngcrush runs out of memory"},
-    {2, "               when it tries methods 2, 3, 5, 6, 8, 9, or 10 which"},
-    {2, "               use filtering and are memory-intensive.  Methods"},
-    {2, "               1, 4, and 7 use no filtering; methods 11 and up use"},
-    {2, "               specified filter, compression level, and strategy."},
+    {2, "               pngcrush method to try.  Can be repeated as in"},
+    {2, "               '-m 1 -m 4 -m 7'. This can be useful if pngcrush"},
+    {2, "               runs out of memory when it tries methods 2, 3, 5,"},
+    {2, "               6, 8, 9, or 10 which use filtering and are memory-"},
+    {2, "               intensive.  Methods 1, 4, and 7 use no filtering;"},
+    {2, "               methods 11 and up use the specified filter,"},
+    {2, "               compression level, and strategy."},
     {2, ""},
     {2, FAKE_PAUSE_STRING},
 
