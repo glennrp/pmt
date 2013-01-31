@@ -285,6 +285,7 @@ Version 1.7.45 (built with libpng-1.5.13 and zlib-1.2.7)
   Added method 0 (uncompressed). "-m 0" now simply turns on method 0.
   Added "-try10" option that has the same effect that "-m 0" previously did,
     namely to try only the first ten methods.
+  Inserted new methods 17 through 21 with zlib level 0.
   Do the heuristic trials of the first 10 methods when -brute is specified,
     to get quickly to a small solution, so we can bail out of most of the
     remaining trials early. Previously these 10 methods were skipped during
@@ -2493,20 +2494,20 @@ int main(int argc, char *argv[])
     for (i = 0; i < MAX_METHODS; i++)
     {
         try_method[i] = 1;  /* 1 means do not try this method */
-        fm[i] = 5; lv[i] = 9; zs[i] = 1;  /* default:  method 124 */
+        fm[i] = 5; lv[i] = 9; zs[i] = 1;  /* default:  method 136 */
     }
 
     fm[0] = 0; lv[0] = 0; zs[0] = 0;   /* method  0 == uncompressed */
-    fm[1] = 0; lv[1] = 4; zs[1] = 0;   /* method  1 == method  53 */
-    fm[2] = 1; lv[2] = 4; zs[2] = 0;   /* method  2 == method  54 */
-               lv[3] = 4;              /* method  3 == method  64 */
-    fm[4] = 0;                         /* method  4 == method 119 */
-    fm[5] = 1;            zs[5] = 0;   /* method  5 == method 114 */
-                          zs[6] = 0;   /* method  6 == method 118 */
-    fm[7] = 0;            zs[7] = 0;   /* method  7 == method 113 */
-    fm[8] = 1;                         /* method  8 == method 120 */
+    fm[1] = 0; lv[1] = 4; zs[1] = 0;   /* method  1 == method  65 */
+    fm[2] = 1; lv[2] = 4; zs[2] = 0;   /* method  2 == method  66 */
+               lv[3] = 4;              /* method  3 == method  76 */
+    fm[4] = 0;                         /* method  4 == method 131 */
+    fm[5] = 1;            zs[5] = 0;   /* method  5 == method 126 */
+                          zs[6] = 0;   /* method  6 == method 130 */
+    fm[7] = 0;            zs[7] = 0;   /* method  7 == method 125 */
+    fm[8] = 1;                         /* method  8 == method 132 */
                lv[9] = 2; zs[9] = 2;   /* method  9 == method  16 */
-                                       /* method 10 == method 124 */
+                                       /* method 10 == method 136 */
 
     /* methods 11 through 16
      *
