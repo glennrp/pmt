@@ -282,6 +282,7 @@
 Change log:
 
 Version 1.7.46 (built with libpng-1.5.13 and zlib-1.2.7)
+  Moved the new level 0 methods to the end of the trial list (methods 137-148)
 
 Version 1.7.45 (built with libpng-1.5.13 and zlib-1.2.7)
   Added method 0 (uncompressed). "-m 0" now simply turns on method 0.
@@ -2499,17 +2500,18 @@ int main(int argc, char *argv[])
         fm[i] = 5; lv[i] = 9; zs[i] = 1;  /* default:  method 136 */
     }
 
+
     fm[0] = 0; lv[0] = 0; zs[0] = 0;   /* method  0 == uncompressed */
-    fm[1] = 0; lv[1] = 4; zs[1] = 0;   /* method  1 == method  65 */
-    fm[2] = 1; lv[2] = 4; zs[2] = 0;   /* method  2 == method  66 */
-               lv[3] = 4;              /* method  3 == method  76 */
-    fm[4] = 0;                         /* method  4 == method 131 */
-    fm[5] = 1;            zs[5] = 0;   /* method  5 == method 126 */
-                          zs[6] = 0;   /* method  6 == method 130 */
-    fm[7] = 0;            zs[7] = 0;   /* method  7 == method 125 */
-    fm[8] = 1;                         /* method  8 == method 132 */
+    fm[1] = 0; lv[1] = 4; zs[1] = 0;   /* method  1 == method  53 */
+    fm[2] = 1; lv[2] = 4; zs[2] = 0;   /* method  2 == method  54 */
+               lv[3] = 4;              /* method  3 == method  64 */
+    fm[4] = 0;                         /* method  4 == method 119 */
+    fm[5] = 1;            zs[5] = 0;   /* method  5 == method 114 */
+                          zs[6] = 0;   /* method  6 == method 118 */
+    fm[7] = 0;            zs[7] = 0;   /* method  7 == method 113 */
+    fm[8] = 1;                         /* method  8 == method 120 */
                lv[9] = 2; zs[9] = 2;   /* method  9 == method  16 */
-                                       /* method 10 == method 136 */
+                                       /* method 10 == method 124 */
 
     /* methods 11 through 16
      *
@@ -2527,7 +2529,7 @@ int main(int argc, char *argv[])
     /*
      * methods 17 through 136 (10*2*6 = 120)
      */
-    for (lev = 0; lev <= 9; lev++)
+    for (lev = 1; lev <= 9; lev++)
     {
         for (strat = 0; strat <= 1; strat++)
         {
@@ -2562,6 +2564,17 @@ int main(int argc, char *argv[])
         method++;
     }
 #endif /* Z_RLE */
+
+    for (strat = 0; strat <= 1; strat++)
+    {
+        for (filt = 0; filt <= 5; filt++)
+        {
+            fm[method] = filt;
+            lv[method] = 0;
+            zs[method] = strat;
+            method++;
+        }
+    }
 
     num_methods = method;   /* GRR */
 
