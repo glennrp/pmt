@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.45"
+#define PNGCRUSH_VERSION "1.7.46"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -280,6 +280,8 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.46 (built with libpng-1.5.13 and zlib-1.2.7)
 
 Version 1.7.45 (built with libpng-1.5.13 and zlib-1.2.7)
   Added method 0 (uncompressed). "-m 0" now simply turns on method 0.
