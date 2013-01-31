@@ -289,6 +289,8 @@ Version 1.7.45 (built with libpng-1.5.13 and zlib-1.2.7)
     to get quickly to a small solution, so we can bail out of most of the
     remaining trials early. Previously these 10 methods were skipped during
     a -brute run.
+  Removed the "-reduce" line from the help screen when PNGCRUSH_COUNT_COLORS
+    is disabled.
 
 Version 1.7.44 (built with libpng-1.5.14 and zlib-1.2.7)
 
@@ -1498,8 +1500,8 @@ static int input_format = 0;    /* 0: PNG  1: MNG */
 static int output_format = 0;
 #endif
 static int do_color_count;
-static int reduction_ok = 0;
 #ifdef PNGCRUSH_COUNT_COLORS
+static int reduction_ok = 0;
 int count_colors(FILE * fpin);
 static int num_rgba, reduce_to_gray, it_is_opaque;
 #endif
@@ -2965,8 +2967,10 @@ int main(int argc, char *argv[])
         }
         else if (!strncmp(argv[i], "-reduce", 7))
         {
+#ifdef PNGCRUSH_COUNT_COLORS
             reduction_ok++;
             do_color_count = 1;
+#endif
         }
 #ifdef PNG_gAMA_SUPPORTED
         else if (!strncmp(argv[i], "-replace_gamma", 4))
@@ -7542,10 +7546,12 @@ struct options_help pngcrush_options[] = {
     {0, "            -q (quiet)"},
     {2, ""},
 
+#ifdef PNGCRUSH_COUNT_COLORS
     {0, "       -reduce (do lossless color-type or bit-depth reduction)"},
     {2, ""},
     {2, "               (if possible)"},
     {2, ""},
+#endif
 
     {0, "          -rem chunkname (or \"alla\" or \"allb\")"},
     {2, ""},
