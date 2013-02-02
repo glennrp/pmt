@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.46"
+#define PNGCRUSH_VERSION "1.7.47"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -217,7 +217,10 @@
  *   can change interlaced to non-interlaced and vice versa by using
  *   ImageMagick before running pngcrush.
  *
- *   6. Use a better compression algorithm for "deflating" (result must
+ *   6. Find out why the "-nobail" option is faster than "-bail". For now,
+ *   make "-nobail" the default.
+ *
+ *   7. Use a better compression algorithm for "deflating" (result must
  *   still be readable with zlib!)  e.g., http://en.wikipedia.org/wiki/7-Zip
  *   says that the 7-zip deflate compressor achieves better compression
  *   (smaller files) than zlib.  If tests show that this would be worth
@@ -227,7 +230,7 @@
  *   is incorporated in pngcrush, then pngcrush would have to be re-licensed,
  *   or released in two versions, one libpng-licensed and one GPL-licensed!
  *
- *   7. Implement palette-building (from ImageMagick-6.7.0 or later, minus
+ *   8. Implement palette-building (from ImageMagick-6.7.0 or later, minus
  *   the "PNG8" part) -- actually ImageMagick puts the transparent colors
  *   first, then the semitransparent colors, and finally the opaque colors,
  *   and does not sort colors by frequency of use but just adds them
@@ -238,30 +241,30 @@
  *   package which counts RGB pixels in an image; this and its supporting
  *   lib/libppmcmap.c would need to be revised to count RGBA pixels instead.
  *
- *   8. Check the "-plte_len n" option to be sure that no pixel contains
+ *   9. Check the "-plte_len n" option to be sure that no pixel contains
  *   an index value that is out of range due to truncation of the PLTE chunk.
  *   Implementing item "7" will take care of this, since that will always
  *   build a palette of the right length, and the -plte_len option can be
  *   eliminated.
  *
- *   9. Improve the -help output and/or write a good man page.
+ *   10. Improve the -help output and/or write a good man page.
  *
- *   10. Finish pplt (MNG partial palette) feature.
+ *   11. Finish pplt (MNG partial palette) feature.
  *
- *   11. Remove text-handling and color-handling features and put
+ *   12. Remove text-handling and color-handling features and put
  *   those in a separate program or programs, to avoid unnecessary
  *   recompressing.  Note that in pngcrush-1.7.34, pngcrush began doing
  *   this extra work only once instead of for every trial, so the potential
  *   benefit in CPU savings is much smaller now.
  *
- *   12. Add a "pcRu" ancillary chunk that keeps track of the best method,
+ *   13. Add a "pcRu" ancillary chunk that keeps track of the best method,
  *   methods already tried, and whether "loco crushing" was effective.
  *
- *   13. Try both transformed and untransformed colors when "-loco" is used.
+ *   14. Try both transformed and untransformed colors when "-loco" is used.
  *
- *   14. Move the Photoshop-fixing stuff into a separate program.
+ *   15. Move the Photoshop-fixing stuff into a separate program.
  *
- *   15. GRR: More generally (superset of previous 3 items):  split into
+ *   16. GRR: More generally (superset of previous 3 items):  split into
  *   separate "edit" and "crush" programs (or functions).  Former is fully
  *   libpng-aware, much like current pngcrush; latter makes little or no use of
  *   libpng (maybe IDAT-compression parts only?), instead handling virtually
@@ -280,6 +283,12 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.47 (built with libpng-1.5.13 and zlib-1.2.7)
+  Do not do the heuristic trials of the first 10 methods when -brute is
+    specified, because it did not save time as I hoped.
+  Fixed a mistake in 1.7.45 and 1.7.46 that caused the output file to
+    not be written.
 
 Version 1.7.46 (built with libpng-1.5.13 and zlib-1.2.7)
   Moved the new level 0 methods to the end of the trial list (methods 137-148)
@@ -1416,8 +1425,9 @@ static png_uint_32 pngcrush_best_byte_count=0xffffffff;
             
 static int verbose = 1;
 static int fix = 0;
-static int bail = 0; /* if 0, bail out of trial early */
-static int blacken = 0; /* if 0, do not blacken color samples */
+static int bail = 0; /* if 0, bail out of trials early */
+static int blacken = 0; /* if 0, or 1 after the first trial,
+                           do not blacken color samples */
 static int things_have_changed = 0;
 static int global_things_have_changed = 0;
 static int default_compression_window = 15;
@@ -2363,11 +2373,12 @@ void blacken_fn(png_structp png_ptr, png_row_infop row_info, png_bytep data)
        {
          for ( ; i > 0 ; )
          {
-            if (data[i--] == 0)
-                data[i--]=0;
-
-            else
-                i--;
+            if (data[i] == 0 &&  data[i-1] != 0)
+               {
+                  data[i-1]=0;
+                  blacken = 2;
+               }
+            i-=2;
          }
        }
 
@@ -2375,14 +2386,14 @@ void blacken_fn(png_structp png_ptr, png_row_infop row_info, png_bytep data)
        {
          for ( ; i > 0 ; )
          {
-            if (data[i] && data[i]== 0)
-              {
-                 i-=2;
-                 data[i--]=0;
-                 data[i--]=0;
-              }
-            else
-                 i-=4;
+            if ((data[i] == 0 && data[i-1] == 0) && (data[i-2] != 0 ||
+                 data[i-3] != 0))
+               {
+                 data[i-2]=0;
+                 data[i-3]=0;
+                 blacken = 2;
+               }
+            i-=4;
          }
        }
    }
@@ -2393,15 +2404,15 @@ void blacken_fn(png_structp png_ptr, png_row_infop row_info, png_bytep data)
        {
          for ( ; i > 0 ; )
          {
-            if (data[i] == 0)
+            if (data[i] == 0 && (data[i-1] != 0 || data[i-2] != 0 ||
+                data[i-3] != 0))
               {
-                 i--;
-                 data[i--]=0;
-                 data[i--]=0;
-                 data[i--]=0;
+                data[i-1]=0;
+                data[i-2]=0;
+                data[i-3]=0;
+                blacken = 2;
               }
-            else
-                 i-=4;
+            i-=4;
          }
        }
 
@@ -2409,18 +2420,19 @@ void blacken_fn(png_structp png_ptr, png_row_infop row_info, png_bytep data)
        {
          for ( ; i > 0 ; )
          {
-            if (data[i]==0 && data[i-1]== 0)
+            if ((data[i]==0 && data[i-1]== 0) &&
+                (data[i-2] != 0 || data[i-3] != 0 || data[i-4] != 0 ||
+                data[i-5] != 0 || data[i-6] != 0 || data[i-7] != 0))
               {
-                 i-=2;
-                 data[i--]=0;
-                 data[i--]=0;
-                 data[i--]=0;
-                 data[i--]=0;
-                 data[i--]=0;
-                 data[i--]=0;
+                data[i-2]=0;
+                data[i-3]=0;
+                data[i-4]=0;
+                data[i-5]=0;
+                data[i-6]=0;
+                data[i-7]=0;
+                blacken = 2;
               }
-            else
-                 i-=8;
+            i-=8;
          }
        }
    }
@@ -2914,7 +2926,7 @@ int main(int argc, char *argv[])
             names++;
             BUMP_I;
             method = atoi(argv[i]);
-            if (method >= 0 && method <= MAX_METHODS)
+            if (method > 0 && method <= MAX_METHODS)
             {
               methods_specified = 1;
               brute_force = 0;
@@ -3339,7 +3351,7 @@ int main(int argc, char *argv[])
 
     for (;;)  /* loop on input files */
     {
-        last_trial = 0;
+        last_trial = 1;
 
         things_have_changed = global_things_have_changed;
 
@@ -3725,6 +3737,9 @@ int main(int argc, char *argv[])
 
         best_of_three = 1;
 
+        if (blacken > 1)
+           blacken = 1;
+
         /* ////////////////////////////////////////////////////////////////////
         ////////////////                                   ////////////////////
         ////////////////  START OF MAIN LOOP OVER METHODS  ////////////////////
@@ -3736,7 +3751,7 @@ int main(int argc, char *argv[])
         for (trial = 0; trial <= MAX_METHODS; trial++)
         {
             if (nosave || trial == MAX_METHODS)
-               last_trial = 0;
+               last_trial = 1;
 
             pngcrush_write_byte_count=0;
 
@@ -3843,8 +3858,7 @@ int main(int argc, char *argv[])
                 /* default behavior is to do the heuristics (6 of the first
                  * 10 methods). try10 means try all of 1-10.
                  */
-                if ((!methods_specified && try10 == 0) ||
-                   (brute_force != 0 && bail != 0)) 
+                if (!methods_specified && try10 == 0)
                 {
                     if ((trial == 4 || trial == 7) && best_of_three != 1)
                     {
@@ -3961,7 +3975,6 @@ int main(int argc, char *argv[])
                 if (no_limits == 0)
                 {
 # if PNG_LIBPNG_VER >= 10400
-                   png_set_chunk_cache_max(read_ptr, 500);
                    png_set_user_limits(read_ptr, 500000L, 500000L);
                    png_set_chunk_cache_max(read_ptr, 500);
 # endif
@@ -3978,7 +3991,7 @@ int main(int argc, char *argv[])
 #endif /* 0 */
 
     /* Change the underlying color of any fully transparent pixel to black */
-    if (blacken)
+    if ((trial == 0 && blacken == 1) || blacken == 2)
       png_set_read_user_transform_fn(read_ptr, blacken_fn);
 
 #ifdef PNG_READ_UNKNOWN_CHUNKS_SUPPORTED
@@ -7345,7 +7358,10 @@ struct options_help pngcrush_options[] = {
 
     {0, "         -bail (bail out of trial when size exceeds best size found"},
     {2, ""},
-    {2, "               Default is to bail out -- use -nobail to prevent that"},
+    {2, "               Default is to bail out and simply report that the"},
+    {2, "               filesize for the trial would be greater than the"},
+    {2, "               best filesize achieved so far.  Use the \"-nobail\""},
+    {2, "               option to prevent that."},
     {2, ""},
 
     {0, "    -bit_depth depth (bit_depth to use in output file)"},
@@ -7494,14 +7510,14 @@ struct options_help pngcrush_options[] = {
     {2, ""},
 #endif
 
-    {0, "            -m method [0 through " STRNGIFY(MAX_METHODS) "]"},
+    {0, "            -m method [1 through " STRNGIFY(MAX_METHODS) "]"},
     {2, ""},
     {2, "               pngcrush method to try.  Can be repeated as in"},
     {2, "               '-m 1 -m 4 -m 7'. This can be useful if pngcrush"},
     {2, "               runs out of memory when it tries methods 2, 3, 5,"},
     {2, "               6, 8, 9, or 10 which use filtering and are memory-"},
     {2, "               intensive.  Methods 1, 4, and 7 use no filtering;"},
-    {2, "               methods 11 and up use the specified filter,"},
+    {2, "               methods 11 and up use a specified filter,"},
     {2, "               compression level, and strategy."},
     {2, ""},
     {2, FAKE_PAUSE_STRING},
@@ -7517,7 +7533,10 @@ struct options_help pngcrush_options[] = {
     {0, " -newtimestamp (Reset file modification time [default])"},
     {2, ""},
 
-    {0, "       -nobail (do not bail out early from trial -- see -bail)"},
+    {0, "       -nobail (do not bail out early from trial -- see \"-bail\")"},
+    {2, ""},
+    {2, "               Use this if you want to get a report of the"},
+    {2, "               exact filesize achieved by each trial."},
     {2, ""},
 
 #ifdef PNGCRUSH_COUNT_COLORS
