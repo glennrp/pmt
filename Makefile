@@ -62,7 +62,7 @@ EXES = $(PNGCRUSH)$(E)
 
 # implicit make rules -------------------------------------------------------
 
-.c$(O): png.h pngconf.h pngcrush.h cexcept.h pngpriv.h $(ZHDR)
+.c$(O): png.h pngconf.h pngcrush.h cexcept.h pngpriv.h pnglibconf.h $(ZHDR)
 	$(CC) -c $(TOOFAR_OK) $(CPPFLAGS) $(CFLAGS) $<
 
 

@@ -13,7 +13,6 @@
  *
  * This file has been modified, by Glenn Randers-Pehrson, from the original
  * libpng distribution by adding a line reading
- *
  * #include "pngcrush.h"
  */
 
