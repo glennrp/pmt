@@ -273,14 +273,13 @@
 
 Change log:
 
-Version 1.7.49 (built with libpng-1.6.0rc07 and zlib-1.2.7)
+Version 1.7.49 (built with libpng-1.5.14 and zlib-1.2.7)
   Use png_set_benign_errors() to allow certain errors in the input file
     to be handled as warnings.
   Skip PNG_ABORT redefinition when using libpng-1.4.0 and later.
   Implemented "-reduce" option to identify and reduce all-gray images,
     all-opaque images, unused PLTE entries, and 16-bit images that can be
     reduced losslessly to 8-bit.
-  Made default method do the -reduce options by default.
 
 Version 1.7.48 (built with libpng-1.5.14 and zlib-1.2.7)
   Reserved method==0 for examining the pixels during trial 0, if necessary.
