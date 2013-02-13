@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.48"
+#define PNGCRUSH_VERSION "1.7.49"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -194,35 +194,13 @@
  *      course involves a lot more trial compressions.
  *
  *   2. Check for unused alpha channel in color-type 4 and 6.
- *
- *     a. If the image is entirely opaque, reduce the color-type to 0 or 2.
- *
- *     b. Check for the possiblity of using the tRNS chunk instead of
- *     the full alpha channel.  If all of the transparent pixels are
- *     fully transparent, and they all have the same underlying color,
- *     and no opaque pixel has that same color, then write a tRNS
- *     chunk and reduce the color-type to 0 or 2. This is a lossless
- *     operation.  ImageMagick already does this, as of version 6.7.0.
- *     If the lossy "-blacken" option is present, do that operation first.
- *
- *   3. Check for equal R-G-B channels in color-type 2 or 6.
- *
- *   If this is true for all pixels, reduce the color-type to 0 or 4
- *   (i.e., grayscale). This operation is lossless.  ImageMagick already
- *   does this.
- *
- *   4. Check for ok-to-reduce-depth (i.e., every pixel has color samples
- *   that can be expressed exactly using a smaller depth).
- *
- *   If so, reduce the bit depth accordingly.  This operation is lossless.
- *   ImageMagick does this.
- *
- *   Note for 2, 3, 4: Take care that sBIT and bKGD data are not lost or
- *   become invalid when reducing images from truecolor to grayscale or
- *   when reducing the bit depth.
- *
- *   See pngcrush_examine_pixels_fn() and pngcrush_transform_pixels_fn(),
- *   below.
+ *      Check for the possiblity of using the tRNS chunk instead of
+ *      the full alpha channel.  If all of the transparent pixels are
+ *      fully transparent, and they all have the same underlying color,
+ *      and no opaque pixel has that same color, then write a tRNS
+ *      chunk and reduce the color-type to 0 or 2. This is a lossless
+ *      operation.  ImageMagick already does this, as of version 6.7.0.
+ *      If the lossy "-blacken" option is present, do that operation first.
  *
  *   5. Add choice of interlaced or non-interlaced output. Currently you
  *   can change interlaced to non-interlaced and vice versa by using
@@ -253,7 +231,10 @@
  *   an index value that is out of range due to truncation of the PLTE chunk.
  *   Implementing item "7" will take care of this, since that will always
  *   build a palette of the right length, and the -plte_len option can be
- *   eliminated.
+ *   eliminated.  Alternatively, always (or maybe when the -reduce option
+ *   has been given) reduce the PLTE length to accommodate
+ *   the largest index present in the IDAT or bKGD chunks or plte_length,
+ *   if it is larger (changes the meaning of the -plte_len option).
  *
  *   9. Improve the -help output and/or write a good man page.
  *
@@ -292,6 +273,15 @@
 
 Change log:
 
+Version 1.7.49 (built with libpng-1.6.0rc07 and zlib-1.2.7)
+  Use png_set_benign_errors() to allow certain errors in the input file
+    to be handled as warnings.
+  Skip PNG_ABORT redefinition when using libpng-1.4.0 and later.
+  Implemented "-reduce" option to identify and reduce all-gray images,
+    all-opaque images, unused PLTE entries, and 16-bit images that can be
+    reduced losslessly to 8-bit.
+  Made default method do the -reduce options by default.
+
 Version 1.7.48 (built with libpng-1.5.14 and zlib-1.2.7)
   Reserved method==0 for examining the pixels during trial 0, if necessary.
     Changed blacken_fn() to separate pngcrush_examine_pixels_fn() and
@@ -303,7 +293,7 @@ Version 1.7.48 (built with libpng-1.5.14 and zlib-1.2.7)
     conditions such as if the image is opaque or gray or can be losslessly
     reduced in bit depth, set flags in trial 0 and accomplish the
     transformations in the remaining trials (see the To do list starting
-    about line 188 in the pngcrush.c source).  
+    about line 200 in the pngcrush.c source).  
   Removed "PNGCRUSH_COUNT_COLORS" blocks again.
 
 Version 1.7.47 (built with libpng-1.5.13 and zlib-1.2.7)
@@ -1067,7 +1057,7 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 #  endif
 #endif
 
-#if PNGCRUSH_LIBPNG_VER < 10700 || defined(PNGCRUSH_H)
+#if PNGCRUSH_LIBPNG_VER < 10800 || defined(PNGCRUSH_H)
 
 /* Changed in version 0.99 */
 #if PNGCRUSH_LIBPNG_VER < 99
@@ -1448,8 +1438,15 @@ static png_uint_32 pngcrush_best_byte_count=0xffffffff;
 static int verbose = 1;
 static int fix = 0;
 static int bail = 0; /* if 0, bail out of trials early */
-static int blacken = 0; /* if 0, or 1 after the first trial,
+static int blacken = 0; /* if 0, or 2 after the first trial,
                            do not blacken color samples */
+static int make_gray = 0; /* if 0, 2, or 3 after the first trial,
+                           do not change color_type to gray */
+static int make_opaque = 0; /* if 0, 2, or 3 after the first trial,
+                           do not change color_type to opaque */
+static int make_8_bit = 0; /* if 0, 2, or 3 after the first trial,
+                           do not change color_type to gray */
+static int reduce_palette = 0;
 static int things_have_changed = 0;
 static int global_things_have_changed = 0;
 static int compression_window;
@@ -1921,15 +1918,21 @@ pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
 static void png_cexcept_error(png_structp png_ptr, png_const_charp err_msg)
 {
     if (png_ptr);
-#ifdef PNGCRUSH_H
+
+/* Handle "Too many IDAT's found" error.  In libpng-1.4.x this became
+ * a benign error, "Too many IDATs found".
+ */
+#if PNG_LIBPNG_VER < 10400
+#  ifdef PNGCRUSH_H 
     if (!strcmp(err_msg, "Too many IDAT's found")) {
-#ifdef PNG_CONSOLE_IO_SUPPORTED
+#    ifdef PNG_CONSOLE_IO_SUPPORTED
         fprintf(stderr, "\nIn %s, correcting ", inname);
-#else
+#    else
         png_warning(png_ptr, err_msg);
-#endif
+#    endif
     } else
-#endif /* PNGCRUSH_H */
+#  endif /* PNGCRUSH_H */
+#endif /* PNG_LIBPNG_VER */
     {
         Throw err_msg;
     }
@@ -2375,31 +2378,91 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
     row_info, png_bytep data)
 {
    
-   int i;
 
-   if (blacken == 1)
+   if (blacken == 1 || make_gray == 1 || make_opaque == 1)
    {
       /* Check if there are any fully transparent pixels.  If one is found,
-       * set blacken==2 and do not check any more pixels. If the PNG
-       * colortype does not support an alpha channel, set blacken==0
-       * and do not check any more rows.
+       * without the underlying color already black, set blacken==2. If the
+       * PNG colortype does not support an alpha channel, set blacken==3.
+       *
+       * Check if there are any transparent pixels.  If one is found,
+       * set make_opaque==2. If the PNG colortype does not support an alpha
+       * channel, set make_opaque==3.
+       *
+       * Check if there are any non-gray pixels.  If one is found,
+       * set make_gray == 2. If the PNG colortype is already gray, set
+       * make_gray = 3.
+       *
+       * To do:
+       * Check if any 16-bit pixels do not have identical high and low
+       * bytes.  If one is found, set make_8_bit == 2. If the PNG bit_depth
+       * is not 16-bits, set make_8_bit = 3.
        */
+
+      int i;
    
       if (row_info->color_type < 4)
-        blacken = 0;
+      {
+        blacken = 3;  /* It doesn't have an alpha channel */
+        make_opaque = 3;
+      }
    
+      if (row_info->color_type == 0 || row_info->color_type == 4)
+        make_gray = 3; /* It's already gray! */
+
+      if (row_info->color_type == 3)
+        make_gray = 3; /* Don't change indexed PNG */
+
+      if (row_info->bit_depth < 16)
+        make_8_bit = 3;
+
       i=(int) row_info->rowbytes-1;
+
+      if (row_info->color_type == 2 && make_gray == 1) /* RGB */
+      {
+        if (row_info->bit_depth == 8)
+          {
+            for ( ; i > 0 ; )
+            {
+               if (data[i] != data[i-1] || data[i] != data[i-2])
+                 {
+                   make_gray = 2;
+                 }
+               
+               i-=3;
+            }
+          }
    
-      if (row_info->color_type == 4) /* GA */
+        else /* bit depth == 16 */
+          {
+            for ( ; i > 0 ; )
+            {
+               if (data[i] != data[i-2] || data[i] != data[i-4] ||
+                   data[i-1] != data[i-3] || data[i-1] != data[i-5])
+               {
+                  make_gray = 2;
+               }
+               i-=6;
+            }
+          }
+      }
+
+      else if (row_info->color_type == 4 && (blacken == 1 ||
+               make_opaque == 1)) /* GA */
       {
         if (row_info->bit_depth == 8)
           {
             for ( ; i > 0 ; )
             {
                if (data[i] == 0 &&  data[i-1] != 0)
-                  {
-                     blacken = 2;
-                  }
+               {
+                   blacken = 2;
+               }
+
+               if (data[i] != 0)
+               {
+                   make_opaque = 2;
+               }
                i-=2;
             }
           }
@@ -2410,15 +2473,21 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
             {
                if ((data[i] == 0 && data[i-1] == 0) && (data[i-2] != 0 ||
                     data[i-3] != 0))
-                  {
-                    blacken = 2;
-                  }
+               {
+                  blacken = 2;
+               }
+               if (data[i] != 0 || data[i-1] != 0)
+               {
+                   make_opaque = 2;
+               }
                i-=4;
             }
           }
       }
    
-      else /* color_type == 6, RGBA */
+      /* color_type == 6, RGBA */
+      else if (row_info->color_type == 6 && (blacken == 1 || make_gray == 1 ||
+               make_opaque == 1))
       {
         if (row_info->bit_depth == 8)
           {
@@ -2429,6 +2498,17 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
                  {
                    blacken = 2;
                  }
+
+               if (data[i] != data[i-1] || data[i] != data[i-2])
+                 {
+                   make_gray = 2;
+                 }
+
+               if (data[i] != 255)
+                 {
+                   make_opaque = 2;
+                 }
+               
                i-=4;
             }
           }
@@ -2443,15 +2523,71 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
                  {
                    blacken = 2;
                  }
+
+               if (data[i] != data[i-2] || data[i] != data[i-4] ||
+                   data[i-1] != data[i-3] || data[i-1] != data[i-5])
+                 {
+                   make_gray = 2;
+                 }
+
+               if (data[i] != 255 || data[i-1] != 255)
+                 {
+                   make_opaque = 2;
+                 }
+
                i-=8;
             }
           }
       }
    }
 
-   /* Future versions will check here for other conditions such as whether
-    * the image has an all-opaque alpha channel or if all pixels are gray.
-    */
+   if (make_8_bit == 1)
+   {
+      int i;
+      i=(int) row_info->rowbytes-1;
+
+      if (row_info->color_type == 0)
+      {
+         for ( ; i > 0 ; )
+         {
+               if (data[i] != data[i-1])
+                  make_8_bit = 2;
+               i-=2;
+         }
+      }
+
+      if (row_info->color_type == 2)
+      {
+         for ( ; i > 0 ; )
+         {
+               if (data[i] != data[i-1] || data[i-2] != data[i-3] ||
+                   data[i-4] != data [i-5])
+                  make_8_bit = 2;
+               i-=6;
+         }
+      }
+
+      if (row_info->color_type == 4)
+      {
+         for ( ; i > 0 ; )
+         {
+               if (data[i] != data[i-1] || data[i-2] != data[i-3])
+                  make_8_bit = 2;
+               i-=4;
+         }
+      }
+
+      if (row_info->color_type == 6)
+      {
+         for ( ; i > 0 ; )
+         {
+               if (data[i] != data[i-1] || data[i-2] != data[i-3] ||
+                   data[i-4] != data [i-5] || data[i-6] != data[i-7])
+                  make_8_bit = 2;
+               i-=8;
+         }
+      }
+   }
 }
 
 void pngcrush_transform_pixels_fn(png_structp png_ptr, png_row_infop row_info,
@@ -3089,7 +3225,10 @@ int main(int argc, char *argv[])
         }
         else if (!strncmp(argv[i], "-reduce", 7))
         {
-            /* unused */
+            make_opaque = 1;
+            make_gray = 1;
+            make_8_bit = 1;
+            reduce_palette = 1;
         }
 #ifdef PNG_gAMA_SUPPORTED
         else if (!strncmp(argv[i], "-replace_gamma", 4))
@@ -3744,8 +3883,15 @@ int main(int argc, char *argv[])
 
         if (!methods_specified || try10 != 0)
         {
-            for (i = 1; i <= DEFAULT_METHODS; i++)
+            for (i = 0; i <= DEFAULT_METHODS; i++)
                 try_method[i] = 0;
+            /*
+            Uncomment these in pngcrush-1.8.0
+            make_gray = 1;
+            make_opaque = 1;
+            make_8_bit = 1;
+            reduce_palette = 1;
+            */
             try_method[6] = try10;
         }
 
@@ -3757,13 +3903,34 @@ int main(int argc, char *argv[])
            try_method[0] = 0;
         }
 
+        if (make_gray)
+        {
+           make_gray = 1;
+           try_method[0] = 0;
+        }
+
+        if (make_opaque)
+        {
+           make_opaque = 1;
+           try_method[0] = 0;
+        }
+
+        if (make_8_bit)
+        {
+           make_8_bit = 1;
+           try_method[0] = 0;
+        }
+
+        if (reduce_palette)
+           try_method[0] = 0;
+
         /* ////////////////////////////////////////////////////////////////////
         ////////////////                                   ////////////////////
         ////////////////  START OF MAIN LOOP OVER METHODS  ////////////////////
         ////////////////                                   ////////////////////
         //////////////////////////////////////////////////////////////////// */
 
-        /* MAX_METHODS is 200 */
+        /* MAX_METHODS is 150 */
         P1("\n\nENTERING MAIN LOOP OVER %d METHODS\n", MAX_METHODS);
         for (trial = 0; trial <= MAX_METHODS; trial++)
         {
@@ -3989,6 +4156,13 @@ int main(int argc, char *argv[])
                 if (read_ptr == NULL)
                     Throw "pngcrush could not create read_ptr";
 
+#if PNG_LIBPNG_VER >= 10400
+                /* Allow certain errors in the input file to be handled
+                 * as warnings.
+                 */
+                png_set_benign_errors(read_ptr, 1);
+#endif
+
 #ifdef PNG_SET_USER_LIMITS_SUPPORTED
                 if (no_limits == 0)
                 {
@@ -4008,19 +4182,17 @@ int main(int argc, char *argv[])
                     (png_size_t)256);
 #endif /* 0 */
 
-    /* Change the underlying color of any fully transparent pixel to black */
-    if (trial == 0 && blacken == 1)
+    /* Change the underlying color of any fully transparent pixel to black.
+     * Remove the alpha channel from any fully-opaque image.
+     * Change any all-gray image to a gray colortype.
+     * Reduce 16-bit image to 8-bit if possible without loss.
+     */
+    if (trial == 0 &&
+        (blacken == 1 || make_gray == 1 || make_opaque == 1 || make_8_bit == 1))
     {
-      P1(" Check for fully transparent pixels\n");
+      P1(" Examine image for possible lossless reductions\n");
       png_set_read_user_transform_fn(read_ptr, pngcrush_examine_pixels_fn);
     }
-
-    if (trial != 0 && blacken == 2)
-    {
-      P1(" Blacken the fully transparent pixels\n");
-      png_set_read_user_transform_fn(read_ptr, pngcrush_transform_pixels_fn);
-    }
-
 #ifdef PNG_READ_UNKNOWN_CHUNKS_SUPPORTED
                 if (last_trial == 0)
                 {
@@ -4096,13 +4268,18 @@ int main(int argc, char *argv[])
 
 #ifdef PNG_READ_CHECK_FOR_INVALID_INDEX_SUPPORTED
                 /* Only run this test (new in libpng-1.5.10) during the
-                 * final trial
+                 * 0th and last trial
                  */
-                png_set_check_for_invalid_index (read_ptr, last_trial);
+                if ((last_trial && reduce_palette == 0) ||
+                    (trial == 0 && reduce_palette == 1))
+                {
+                  P1(" Check the palette\n");
+                  png_set_check_for_invalid_index (read_ptr, 1);
+                }
 #endif
 #ifdef PNG_WRITE_CHECK_FOR_INVALID_INDEX_SUPPORTED
                 if (last_trial && nosave == 0)
-                   png_set_check_for_invalid_index (write_ptr, last_trial);
+                   png_set_check_for_invalid_index (write_ptr, 1);
 #endif
 
             if (last_trial == 1)
@@ -4316,6 +4493,55 @@ int main(int argc, char *argv[])
 
                 png_read_info(read_ptr, read_info_ptr);
 
+                if (trial != 0)
+                {
+                  if (make_opaque == 1)
+                  {
+                     P1(" Remove all-opaque alpha channel\n");
+                     if (output_color_type == 4)
+                        output_color_type = 0;
+                     if (output_color_type == 6)
+                        output_color_type = 2;
+                  }
+                  else
+                     P1(" make_opaque=%d\n",make_opaque);
+
+                  if (make_gray == 1)
+                  {
+                     /* Note: Take care that sBIT and bKGD data are not
+                      * lost or become invalid when reducing images from
+                      * truecolor to grayscale or when reducing the bit depth.
+                      * (To do: test this; it's probably OK)
+                      */
+                     /* To do: check bKGD color */
+
+                     P1(" Encode all-gray image with a gray colortype\n");
+                     if (output_color_type == 6)
+                        output_color_type = 4;
+                     if (output_color_type == 2)
+                        output_color_type = 0;
+                  }
+                     P1(" make_gray=%d\n",make_gray);
+
+                  if (make_8_bit == 1)
+                  {
+                     /* Note: Take care that sBIT and bKGD data are not
+                      * lost or become invalid when reducing images from
+                      * truecolor to grayscale or when reducing the bit depth.
+                      * (To do: test this; it's probably OK)
+                      */
+                     P1(" Reduce 16-bit image losslessly to 8-bit\n");
+                  }
+                     P1(" make_8_bit=%d\n",make_8_bit);
+
+                  if (make_opaque != 1 && blacken == 2)
+                  {
+                     P1(" Blacken the fully transparent pixels\n");
+                     png_set_read_user_transform_fn(read_ptr,
+                         pngcrush_transform_pixels_fn);
+                  }
+                }
+
                 /* { GRR added for quick %-navigation (1) */
 
                 /* Start of chunk-copying/removal code, in order:
@@ -4378,15 +4604,22 @@ int main(int argc, char *argv[])
                                     interlace_method);
                         }
 
-#ifndef PNG_WRITE_PACK_SUPPORTED
-                        if (output_bit_depth == 0)
-#else
-                        if (force_output_bit_depth == 0)
-#endif
+                        if (make_8_bit == 1)
                         {
-                            output_bit_depth = input_bit_depth;
+                           output_bit_depth = 8;
                         }
-                        if ((output_color_type != 3
+                        else
+                        {
+#ifndef PNG_WRITE_PACK_SUPPORTED
+                          if (output_bit_depth == 0)
+#else
+                          if (force_output_bit_depth == 0)
+#endif
+                          {
+                            output_bit_depth = input_bit_depth;
+                          }
+                        }
+                          if ((output_color_type != 3
                              || output_bit_depth > 8)
                             && output_bit_depth >= 8
                             && output_bit_depth != input_bit_depth)
@@ -5762,6 +5995,33 @@ int main(int argc, char *argv[])
                        break;
                 }
 
+#ifdef PNG_GET_PALETTE_MAX_SUPPORTED
+                if (color_type == 3)
+                  {
+                  if (trial == 0 && reduce_palette == 1)
+                     {
+                       int palette_length;
+
+                       palette_length = png_get_palette_max(read_ptr,
+                          read_info_ptr);
+                       P1("Measured palette length = %d\n", palette_length);
+#ifdef PNG_READ_bKGD_SUPPORTED
+                       {
+                         png_color_16p bkgd;
+                         if (png_get_bKGD(read_ptr, read_info_ptr, &bkgd))
+                         {
+                           P1("bKGD index = %d\n", bkgd->index);
+                           if (bkgd->index > palette_length)
+                              palette_length = (int) bkgd->index;
+                           P1("Total    palette length = %d\n", palette_length);
+                         }
+                       }
+#endif
+                       plte_len = palette_length;
+                     }
+                  }
+#endif
+
                 if (nosave)
                 {
                     t_stop = (TIME_T) clock();
@@ -6383,7 +6643,7 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
 #endif
 #ifdef INFLATE_ALLOW_INVALID_DISTANCE_TOOFAR_ARRR
         /* The warning here about deprecated access to png_ptr->zstream
-         * is unavoidable.  This will not work with libpng-1.5.x.
+         * is unavoidable.  This will not work with libpng-1.5.x and later.
          */
         inflateUndermine(&png_ptr->zstream, 1);
 #endif
@@ -7023,12 +7283,10 @@ struct options_help pngcrush_options[] = {
     {0, "            -q (quiet)"},
     {2, ""},
 
-#ifdef PNGCRUSH_COUNT_COLORS
     {0, "       -reduce (do lossless color-type or bit-depth reduction)"},
     {2, ""},
     {2, "               (if possible)"},
     {2, ""},
-#endif
 
     {0, "          -rem chunkname (or \"alla\" or \"allb\")"},
     {2, ""},
