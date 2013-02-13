@@ -2028,14 +2028,14 @@ void png_debug_free(png_structp png_ptr, png_voidp ptr)
                    the memory that is to be freed. */
                 memset(ptr, 0x55, pinfo->size);
                 if (verbose > 2)
-                    fprintf(STDERR, "Pointer %lux freed %lu bytes\n",
-                            (unsigned long) ptr, (unsigned long)pinfo->size);
+                    fprintf(STDERR, "Pointer %p freed %lu bytes\n",
+                        (png_voidp) ptr, (unsigned long)pinfo->size);
                 free(pinfo);
                 break;
             }
             if (pinfo->next == NULL) {
-                fprintf(STDERR, "Pointer %lux not found\n",
-                    (unsigned long) ptr);
+                fprintf(STDERR, "Pointer %p not found\n",
+                    (png_voidp) ptr);
                 break;
             }
             ppinfo = &pinfo->next;
