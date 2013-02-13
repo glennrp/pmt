@@ -1993,8 +1993,8 @@ png_voidp png_debug_malloc(png_structp png_ptr, png_uint_32 size)
         /* Make sure the caller isn't assuming zeroed memory. */
         png_memset(pinfo->pointer, 0xdd, pinfo->size);
         if (verbose > 2)
-            fprintf(STDERR, "Pointer %lux allocated %lu bytes\n",
-                    (unsigned long) pinfo->pointer, (unsigned long)size);
+            fprintf(STDERR, "Pointer %p allocated %lu bytes\n",
+                    (png_voidp) pinfo->pointer, (unsigned long)size);
         return (png_voidp) (pinfo->pointer);
     }
 }
@@ -2345,8 +2345,8 @@ void show_result(void)
         fprintf(STDERR, "MEMORY ERROR: %d bytes still allocated\n",
                 current_allocation);
         while (pinfo != NULL) {
-            fprintf(STDERR, " %8lu bytes at %lux\n", (unsigned long)pinfo->size,
-                    (unsigned long) pinfo->pointer);
+            fprintf(STDERR, " %8lu bytes at %p\n", (unsigned long)pinfo->size,
+                    (png_voidp) pinfo->pointer);
             free(pinfo->pointer);
             pinfo = pinfo->next;
         }
