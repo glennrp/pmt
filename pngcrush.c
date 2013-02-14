@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.49"
+#define PNGCRUSH_VERSION "1.7.50"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -193,8 +193,7 @@
  *      for all methods, just as the "pc" script above does.  This of
  *      course involves a lot more trial compressions.
  *
- *   2. Check for unused alpha channel in color-type 4 and 6.
- *      Check for the possiblity of using the tRNS chunk instead of
+ *   2. Check for the possiblity of using the tRNS chunk instead of
  *      the full alpha channel.  If all of the transparent pixels are
  *      fully transparent, and they all have the same underlying color,
  *      and no opaque pixel has that same color, then write a tRNS
@@ -202,11 +201,11 @@
  *      operation.  ImageMagick already does this, as of version 6.7.0.
  *      If the lossy "-blacken" option is present, do that operation first.
  *
- *   5. Add choice of interlaced or non-interlaced output. Currently you
+ *   3. Add choice of interlaced or non-interlaced output. Currently you
  *   can change interlaced to non-interlaced and vice versa by using
  *   ImageMagick before running pngcrush.
  *
- *   6. Use a better compression algorithm for "deflating" (result must
+ *   4. Use a better compression algorithm for "deflating" (result must
  *   still be readable with zlib!)  e.g., http://en.wikipedia.org/wiki/7-Zip
  *   says that the 7-zip deflate compressor achieves better compression
  *   (smaller files) than zlib.  If tests show that this would be worth
@@ -216,7 +215,7 @@
  *   is incorporated in pngcrush, then pngcrush would have to be re-licensed,
  *   or released in two versions, one libpng-licensed and one GPL-licensed!
  *
- *   7. Implement palette-building (from ImageMagick-6.7.0 or later, minus
+ *   5. Implement palette-building (from ImageMagick-6.7.0 or later, minus
  *   the "PNG8" part) -- actually ImageMagick puts the transparent colors
  *   first, then the semitransparent colors, and finally the opaque colors,
  *   and does not sort colors by frequency of use but just adds them
@@ -227,33 +226,33 @@
  *   package which counts RGB pixels in an image; this and its supporting
  *   lib/libppmcmap.c would need to be revised to count RGBA pixels instead.
  *
- *   8. Check the "-plte_len n" option to be sure that no pixel contains
+ *   6. Check the "-plte_len n" option to be sure that no pixel contains
  *   an index value that is out of range due to truncation of the PLTE chunk.
- *   Implementing item "7" will take care of this, since that will always
+ *   Implementing item "5" will take care of this, since that will always
  *   build a palette of the right length, and the -plte_len option can be
  *   eliminated.  Alternatively, always (or maybe when the -reduce option
  *   has been given) reduce the PLTE length to accommodate
  *   the largest index present in the IDAT or bKGD chunks or plte_length,
  *   if it is larger (changes the meaning of the -plte_len option).
  *
- *   9. Improve the -help output and/or write a good man page.
+ *   7. Improve the -help output and/or write a good man page.
  *
- *   10. Finish pplt (MNG partial palette) feature.
+ *   8. Finish pplt (MNG partial palette) feature.
  *
- *   11. Remove text-handling and color-handling features and put
+ *   9. Remove text-handling and color-handling features and put
  *   those in a separate program or programs, to avoid unnecessary
  *   recompressing.  Note that in pngcrush-1.7.34, pngcrush began doing
  *   this extra work only once instead of for every trial, so the potential
  *   benefit in CPU savings is much smaller now.
  *
- *   12. Add a "pcRu" ancillary chunk that keeps track of the best method,
+ *   10. Add a "pcRu" ancillary chunk that keeps track of the best method,
  *   methods already tried, and whether "loco crushing" was effective.
  *
- *   13. Try both transformed and untransformed colors when "-loco" is used.
+ *   11. Try both transformed and untransformed colors when "-loco" is used.
  *
- *   14. Move the Photoshop-fixing stuff into a separate program.
+ *   12. Move the Photoshop-fixing stuff into a separate program.
  *
- *   15. GRR: More generally (superset of previous 3 items):  split into
+ *   13. GRR: More generally (superset of previous 3 items):  split into
  *   separate "edit" and "crush" programs (or functions).  Former is fully
  *   libpng-aware, much like current pngcrush; latter makes little or no use of
  *   libpng (maybe IDAT-compression parts only?), instead handling virtually
@@ -272,6 +271,11 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.50 (built with libpng-1.6.0 and zlib-1.2.7)
+  Removed completed items from the "To do" list.
+  Ignore the argument of the "plte_len" argument and just set the
+     "reduce_palette" flag.
 
 Version 1.7.49 (built with libpng-1.5.14 and zlib-1.2.7)
   Use png_set_benign_errors() to allow certain errors in the input file
@@ -3201,10 +3205,8 @@ int main(int argc, char *argv[])
         else if (!strncmp(argv[i], "-plte_len", 9))
         {
             names++;
-            BUMP_I;
-            plte_len = atoi(argv[i]);
-            if (plte_len < 0 || plte_len > 256)
-               plte_len = -1;
+            BUMP_I; /* Ignore old plte_len argument */
+            reduce_palette = 1;
         }
         else if (!strncmp(argv[i], "-pplt", 3))
         {
@@ -7273,10 +7275,7 @@ struct options_help pngcrush_options[] = {
     {2, "               Useful in conjunction with -v option to get info."},
     {2, ""},
 
-    {0, "     -plte_len n (truncate unused entries from the top of PLTE)"},
-    {2, ""},
-    {2, "               Truncates the PLTE.  Be sure not to truncate it to"},
-    {2, "               less than the greatest index present in IDAT."},
+    {0, "     -plte_len n (obsolete, n is ignored, sets automatic reduction)"},
     {2, ""},
 
     {0, "            -q (quiet)"},

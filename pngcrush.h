@@ -5,14 +5,14 @@
  * license (see LICENSE, in pngcrush.c).
  */
 
-/* Special defines for pngcrush version 1.7.49 */
+/* Special defines for pngcrush version 1.7.50 */
 
 #ifndef PNGCRUSH_H
 #define PNGCRUSH_H
 
 #undef PNG_PROGRESSIVE_READ_SUPPORTED
 
-#if PNG_LIBPNG_VER >= 10700
+#if PNG_LIBPNG_VER >= 10600
 #  undef PNG_SIMPLIFIED_READ_AFIRST_SUPPORTED
 #  undef PNG_SIMPLIFIED_READ_BGR_SUPPORTED
 #  undef PNG_SIMPLIFIED_READ_SUPPORTED
