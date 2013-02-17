@@ -80,13 +80,18 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.50"
+#define PNGCRUSH_VERSION "1.7.51"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
 #define PNGCRUSH_MULTIPLE_ROWS
 */
 #define PNGCRUSH_LARGE
+
+#define PNGCRUSH_ROWBYTES(pixel_bits, width) \
+    ((pixel_bits) >= 8 ? \
+    ((png_size_t)(width) * (((png_size_t)(pixel_bits)) >> 3)) : \
+    (( ((png_size_t)(width) * ((png_size_t)(pixel_bits))) + 7) >> 3) )
 
 /*
  * NOTICES
@@ -162,7 +167,7 @@
  *      cp $1 temp-$$.png
  *      for w in 512 1 2 4 8 16 32
  *      do
- *      pngcrush -ow -w $w -brute temp-$$.png 
+ *      pngcrush -ow -w $w -brute temp-$$.png
  *      done
  *      mv temp-$$.png $2
  *
@@ -191,7 +196,8 @@
  *
  *      d. The simplest way might be to simply try all window sizes
  *      for all methods, just as the "pc" script above does.  This of
- *      course involves a lot more trial compressions.
+ *      course involves a lot more trial compressions, but it will catch
+ *      those instances where a smaller file will result.
  *
  *   2. Check for the possiblity of using the tRNS chunk instead of
  *      the full alpha channel.  If all of the transparent pixels are
@@ -272,10 +278,23 @@
 
 Change log:
 
+Version 1.7.51 (built with libpng-1.6.0 and zlib-1.2.7)
+  Added "-noreduce" option, in preparation for "-reduce" becoming the
+    default behaviour in version 1.8.0.  This turns off lossless bit depth,
+    color type and palette reduction, and opaque alpha channel removal.
+  Zero out the high byte of transparent color for color-type 0 and 2,
+    when reducing from 16 bits to 8.
+  Undefined a bunch of stuff in pngcrush.h that we do not use, saves about
+    100 kbytes of executable file size in addition to about 50k saved by
+    undefining the simplified API.
+  Fixed double-underscore typo in an #ifdef in png.c
+  If "-reduce" is on and the background index is larger than the reduced
+    palette_length+1, reduce it to the palette_length+1.
+
 Version 1.7.50 (built with libpng-1.6.0 and zlib-1.2.7)
   Removed completed items from the "To do" list.
   Ignore the argument of the "plte_len" argument and just set the
-     "reduce_palette" flag.
+    "reduce_palette" flag.
 
 Version 1.7.49 (built with libpng-1.5.14 and zlib-1.2.7)
   Use png_set_benign_errors() to allow certain errors in the input file
@@ -296,7 +315,7 @@ Version 1.7.48 (built with libpng-1.5.14 and zlib-1.2.7)
     conditions such as if the image is opaque or gray or can be losslessly
     reduced in bit depth, set flags in trial 0 and accomplish the
     transformations in the remaining trials (see the To do list starting
-    about line 200 in the pngcrush.c source).  
+    about line 200 in the pngcrush.c source).
   Removed "PNGCRUSH_COUNT_COLORS" blocks again.
 
 Version 1.7.47 (built with libpng-1.5.13 and zlib-1.2.7)
@@ -531,7 +550,7 @@ Version 1.7.7  (built with libpng-1.4.0 and zlib-1.2.3.4)
 Version 1.7.6  (built with libpng-1.4.0rc02 and zlib-1.2.3.2)
   Change some "#if defined(X)" to "#ifdef X" according to libpng coding style.
   Added some defines to suppress pedantic warnings from libpng-1.2.41beta15
-    and later.  A warning about deprecated access to png_ptr->zstream is 
+    and later.  A warning about deprecated access to png_ptr->zstream is
     otherwise unavoidable.  When building the embedded libpng, a warning
     about png_default_error() returning is also otherwise unavoidable.
   Write premultiplied alpha if output extension is .ppng and
@@ -833,7 +852,7 @@ Version 1.4.5 (built with libpng-1.0.7rc2 and cexcept-1.0.0)
   or grayscale when fewer than 257 RGBA combinations are present,
   and no color is present that requires 16-bit precision.  For now,
   it only reports the frequencies.
-  
+
   Added "-fix" option, for fixing bad CRCs and other correctable
   conditions.
 
@@ -924,7 +943,7 @@ Version 1.3.3 (built with libpng-1.0.5m)
   arithmetic is not enabled.
 
 Version 1.3.2 (built with libpng-1.0.5k)
-  
+
   Renamed "dirname" to "directory_name" to avoid conflict with "dirname"
   that appears in string.h on some platforms.
 
@@ -1007,7 +1026,7 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 #ifdef PNG_LIBPNG_VER
 #define PNGCRUSH_LIBPNG_VER PNG_LIBPNG_VER
 #else
-/* 
+/*
  * This must agree with PNG_LIBPNG_VER; you have to define it manually
  * here if you are using libpng-1.0.6h or earlier
  */
@@ -1249,7 +1268,7 @@ png_uint_32 pngcrush_crc;
 
 #if defined(__DJGPP__) && ((__DJGPP__ == 2) && (__DJGPP_MINOR__ == 0))
 #  include <libc/dosio.h>     /* for _USE_LFN, djgpp 2.0 only */
-#endif 
+#endif
 
 #if ( defined(_Windows) || defined(_WINDOWS) || defined(WIN32) ||  \
    defined(_WIN32) || defined(__WIN32__) || defined(__CYGWIN__) || \
@@ -1360,6 +1379,8 @@ static int found_cHRM = 0;
 #endif
 
 static int premultiply = 0;
+static int interlace_method = 0;
+png_alloc_size_t max_bytes;
 
        /* 0: not premultipled
         * 1: premultiplied input (input has .ppng suffix)
@@ -1437,7 +1458,7 @@ static int trial;
 static int last_trial = 0;
 static png_uint_32 pngcrush_write_byte_count;
 static png_uint_32 pngcrush_best_byte_count=0xffffffff;
-            
+
 static int verbose = 1;
 static int fix = 0;
 static int bail = 0; /* if 0, bail out of trials early */
@@ -1517,6 +1538,7 @@ static int have_bkgd = 0;
 static png_uint_16 bkgd_red = 0;
 static png_uint_16 bkgd_green = 0;
 static png_uint_16 bkgd_blue = 0;
+static png_byte bkgd_index = 0;
 
 static png_colorp palette;
 static int num_palette;
@@ -1926,7 +1948,7 @@ static void png_cexcept_error(png_structp png_ptr, png_const_charp err_msg)
  * a benign error, "Too many IDATs found".
  */
 #if PNG_LIBPNG_VER < 10400
-#  ifdef PNGCRUSH_H 
+#  ifdef PNGCRUSH_H
     if (!strcmp(err_msg, "Too many IDAT's found")) {
 #    ifdef PNG_CONSOLE_IO_SUPPORTED
         fprintf(stderr, "\nIn %s, correcting ", inname);
@@ -2380,7 +2402,7 @@ static void pngcrush_flush(png_structp png_ptr)
 void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
     row_info, png_bytep data)
 {
-   
+
 
    if (blacken == 1 || make_gray == 1 || make_opaque == 1)
    {
@@ -2403,13 +2425,13 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
        */
 
       int i;
-   
+
       if (row_info->color_type < 4)
       {
         blacken = 3;  /* It doesn't have an alpha channel */
         make_opaque = 3;
       }
-   
+
       if (row_info->color_type == 0 || row_info->color_type == 4)
         make_gray = 3; /* It's already gray! */
 
@@ -2431,11 +2453,11 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
                  {
                    make_gray = 2;
                  }
-               
+
                i-=3;
             }
           }
-   
+
         else /* bit depth == 16 */
           {
             for ( ; i > 0 ; )
@@ -2469,7 +2491,7 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
                i-=2;
             }
           }
-   
+
         else /* bit depth == 16 */
           {
             for ( ; i > 0 ; )
@@ -2487,7 +2509,7 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
             }
           }
       }
-   
+
       /* color_type == 6, RGBA */
       else if (row_info->color_type == 6 && (blacken == 1 || make_gray == 1 ||
                make_opaque == 1))
@@ -2511,11 +2533,11 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
                  {
                    make_opaque = 2;
                  }
-               
+
                i-=4;
             }
           }
-   
+
         else /* bit depth == 16 */
           {
             for ( ; i > 0 ; )
@@ -2596,14 +2618,14 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
 void pngcrush_transform_pixels_fn(png_structp png_ptr, png_row_infop row_info,
      png_bytep data)
 {
-   
+
    int i;
 
    if (blacken == 2)
    {
    /* change the underlying color of any fully transparent pixels to black */
       i=(int) row_info->rowbytes-1;
-   
+
       if (row_info->color_type == 4) /* GA */
       {
         if (row_info->bit_depth == 8)
@@ -2617,7 +2639,7 @@ void pngcrush_transform_pixels_fn(png_structp png_ptr, png_row_infop row_info,
                i-=2;
             }
           }
-   
+
         else /* bit depth == 16 */
           {
             for ( ; i > 0 ; )
@@ -2632,7 +2654,7 @@ void pngcrush_transform_pixels_fn(png_structp png_ptr, png_row_infop row_info,
             }
           }
       }
-   
+
       else /* color_type == 6, RGBA */
       {
         if (row_info->bit_depth == 8)
@@ -2649,7 +2671,7 @@ void pngcrush_transform_pixels_fn(png_structp png_ptr, png_row_infop row_info,
                i-=4;
             }
           }
-   
+
         else /* bit depth == 16 */
           {
             for ( ; i > 0 ; )
@@ -2873,7 +2895,7 @@ int main(int argc, char *argv[])
 
         else if (!strncmp(argv[i], "-bail", 5))
             bail=0;
- 
+
         else if (!strncmp(argv[i], "-nobail", 7))
             bail=1;
 
@@ -2885,6 +2907,7 @@ int main(int argc, char *argv[])
             bkgd_red = (png_uint_16) atoi(argv[++i]);
             bkgd_green = (png_uint_16) atoi(argv[++i]);
             bkgd_blue = (png_uint_16) atoi(argv[++i]);
+            bkgd_index = 0;
         }
 
         else if (!strncmp(argv[i], "-blacken", 8))
@@ -3181,6 +3204,14 @@ int main(int argc, char *argv[])
         else if (!strncmp(argv[i], "-nolimits", 5))
         {
             no_limits++;
+        }
+
+        else if (!strncmp(argv[i], "-noreduce", 9))
+        {
+            make_opaque = 0;
+            make_gray = 0;
+            make_8_bit = 0;
+            reduce_palette = 0;
         }
 
         else if (!strncmp(argv[i], "-nosave", 2))
@@ -3769,7 +3800,7 @@ int main(int argc, char *argv[])
 #ifdef PNGCRUSH_LOCO
             if (new_mng)
             {
-           
+
 #  ifdef PNG_USER_MEM_SUPPORTED
                mng_ptr = png_create_write_struct_2(PNG_LIBPNG_VER_STRING,
                  (png_voidp) NULL, (png_error_ptr) png_cexcept_error,
@@ -3783,7 +3814,7 @@ int main(int argc, char *argv[])
 #  endif
                if (mng_ptr == NULL)
                   fprintf(STDERR, "pngcrush could not create mng_ptr");
-                  
+
                if ((mng_out = FOPEN(mngname, "wb")) == NULL)
                {
                   fprintf(STDERR, "Could not open output file %s\n",
@@ -3815,7 +3846,7 @@ int main(int argc, char *argv[])
 
             if (verbose > 0)
             {
-                
+
                 fprintf(STDERR, "   Recompressing %s\n", inname);
                 fprintf(STDERR,
                   "   Total length of data found in critical chunks = %8lu\n",
@@ -4567,7 +4598,7 @@ int main(int argc, char *argv[])
                  *  - unknown chunks
                  */
                 {
-                    int interlace_method, compression_method,
+                    int compression_method,
                         filter_method;
 
                     P1( "Transferring info struct\n");
@@ -4772,7 +4803,7 @@ int main(int argc, char *argv[])
                                 if (nosave == 0 && last_trial == 1)
                                    png_permit_mng_features(write_ptr,
                                        PNG_FLAG_MNG_FILTER_64);
-                       
+
                             }
                         } else
                             filter_method = 0;
@@ -4843,6 +4874,7 @@ int main(int argc, char *argv[])
                         backgrnd->green = bkgd_green;
                         backgrnd->blue = bkgd_blue;
                         backgrnd->gray = backgrnd->green;
+                        backgrnd->index = bkgd_index;
                         png_set_bKGD(write_ptr, write_info_ptr,
                                      backgrnd);
                     }
@@ -5013,11 +5045,13 @@ int main(int argc, char *argv[])
                                 fprintf(STDERR, "   Ignoring sRGB request; "
 #  ifdef PNG_FIXED_POINT_SUPPORTED
                                   "gamma=(%lu/100000)"
-#  else
-                                  "gamma=%f"
-#  endif
                                   " is not approx. 0.455\n",
                                   (unsigned long)file_gamma);
+#  else
+                                  "gamma=%f"
+                                  " is not approx. 0.455\n",
+                                  file_gamma);
+#  endif
                             }
                         }
 #endif /* PNG_gAMA_SUPPORTED */
@@ -5149,7 +5183,7 @@ int main(int argc, char *argv[])
                                      res_y, unit_type);
                         if (verbose > 0 && last_trial)
                             fprintf(STDERR, "   Added pHYs %lu %lu 1 chunk\n",
-                            (unsigned long)res_x, 
+                            (unsigned long)res_x,
                             (unsigned long)res_y);
                     }
                 }
@@ -5214,11 +5248,25 @@ int main(int argc, char *argv[])
                                 }
                                 num_trans = last_nonmax + 1;
                             }
+                            else
+                            {
+                               /* color type is 0 or 2 */
+                               if (input_bit_depth == 16 &&
+                                   output_bit_depth == 8)
+                               {
+                                 /* zero out the high byte */
+                                 trans_values->red &= 0x00ff;
+                                 trans_values->green &= 0x00ff;
+                                 trans_values->blue &= 0x00ff;
+                                 trans_values->gray &= 0x00ff;
+                               }
+
+                            }
                             if (verbose > 1)
                                 fprintf(STDERR,
                                   "   png_set_tRNS, num_trans=%d\n",
                                   num_trans);
-                            if (output_color_type != 3 || num_trans)
+                            if (output_color_type < 3 || num_trans)
                                 png_set_tRNS(write_ptr, write_info_ptr,
                                              trans, num_trans,
                                              trans_values);
@@ -5770,10 +5818,54 @@ int main(int argc, char *argv[])
                         if (output_color_type == 6)
                             channels = 4;
 
-                        required_window =
-                            (png_uint_32) (height *
-                                           ((width * channels * bit_depth +
-                                             15) >> 3) + 262);
+                        /* This method was copied from libpng to find maximum
+                         * data size.  Only return sizes up to the maximum of
+                         * a png_uint_32, by limiting the width and height used
+                         * to 15 bits.
+                         */
+                        png_uint_32 rowbytes;
+                        png_uint_32 h = height;
+
+                        rowbytes = png_get_rowbytes(read_ptr, read_info_ptr);
+                        if (rowbytes < 16384 && h < 16384)
+                        {
+                          if (rowbytes * h < 16384)
+                          {
+                             if (interlace_method)
+                             {
+                                /* Interlacing makes the image larger because of
+                                 * the replication of both the filter byte and the
+                                 * padding to a byte boundary.
+                                 */
+                                png_uint_32 w = width;
+                                unsigned int pd = channels * output_bit_depth;
+                                png_alloc_size_t cb_base;
+                                int interlace_pass;
+
+                                for (cb_base=0, interlace_pass=0;
+                                     interlace_pass<=6; ++interlace_pass)
+                                {
+                                   png_uint_32 pw = PNG_PASS_COLS(w, interlace_pass);
+
+                                   if (pw > 0)
+                                      cb_base += (PNGCRUSH_ROWBYTES(pd, pw)+1) *
+                                          PNG_PASS_ROWS(h, interlace_pass);
+                                }
+
+                                max_bytes = cb_base;
+                             }
+
+                             else
+                                max_bytes = (rowbytes+1) * h;
+                          }
+                          else
+                             max_bytes = 0x3fffffffU;
+                        }
+
+                        else
+                           max_bytes = 0x3fffffffU;
+
+                        required_window = (png_uint_32) (max_bytes + 262);
 
                         zbuf_size =
                             png_get_compression_buffer_size(write_ptr);
@@ -6011,9 +6103,19 @@ int main(int argc, char *argv[])
                          png_color_16p bkgd;
                          if (png_get_bKGD(read_ptr, read_info_ptr, &bkgd))
                          {
-                           P1("bKGD index = %d\n", bkgd->index);
+                           bkgd_index = bkgd->index;
+                           P1("bKGD index = %d\n", bkgd_index);
+#if 1
+                           if (bkgd_index > palette_length+1)
+                           {
+                              bkgd_index = palette_length+1;
+                              have_bkgd = 1;
+                              fprintf(STDERR,
+                                  "   New bKGD index = %d\n", bkgd_index);
+                           }
+#endif
                            if (bkgd->index > palette_length)
-                              palette_length = (int) bkgd->index;
+                              palette_length = (int) bkgd_index+1;
                            P1("Total    palette length = %d\n", palette_length);
                          }
                        }
@@ -6193,7 +6295,7 @@ int main(int argc, char *argv[])
                                     text_compression[ntext];
                                 png_set_text(write_ptr, write_end_info_ptr,
                                              added_text, 1);
-  
+
                                 if (verbose > 0 && last_trial)
                                 {
                                   if (added_text[0].compression < 0)
@@ -6379,9 +6481,9 @@ int main(int argc, char *argv[])
                      (unsigned long)idat_length[trial]);
                 fflush(STDERR);
             }
-            
+
         } /* end of trial-loop */
-       
+
         P1("\n\nFINISHED MAIN LOOP OVER %d METHODS\n\n\n", MAX_METHODS);
 
         /* ////////////////////////////////////////////////////////////////////
@@ -6400,7 +6502,7 @@ int main(int argc, char *argv[])
             FCLOSE(fpout);
             setfiletype(outname);
         }
-        
+
         if (last_trial && nosave == 0 && overwrite != 0)
         {
             /* rename the new file , outname = inname */
@@ -6455,7 +6557,7 @@ int main(int argc, char *argv[])
                 {
                 fprintf(STDERR,
                   "   Best pngcrush method        =   %d "
-                  "(ws %d fm %d zl %d zs %d) = %8lu\n      for %s\n", best, 
+                  "(ws %d fm %d zl %d zs %d) = %8lu\n      for %s\n", best,
                   compression_window, fm[best], lv[best], zs[best],
                   (unsigned long)idat_length[best], outname);
                 }
@@ -7238,6 +7340,11 @@ struct options_help pngcrush_options[] = {
     {2, ""},
 #endif
 
+    {0, "            -n (no save; doesn't do compression or write output PNG)"},
+    {2, ""},
+    {2, "               Useful in conjunction with -v option to get info."},
+    {2, ""},
+
     {0, " -newtimestamp (Reset file modification time [default])"},
     {2, ""},
 
@@ -7259,20 +7366,18 @@ struct options_help pngcrush_options[] = {
     {2, "               Instead, the user limits are inherited from libpng."},
     {2, ""},
 
+    {0, "     -noreduce (turns off \"-reduce\" operations)"},
+    {2, ""},
+
     {0, " -oldtimestamp (Do not reset file modification time)"},
     {2, ""},
-    
+
     {0, "           -ow (Overwrite)"},
     {2, ""},
     {2, "               Overwrite the input file.  The input file is "},
     {2, "               removed and the output file (default \"pngout.png\")"},
     {2, "               is renamed to the input file after recompression"},
     {2, "               and therefore they must reside on the same filesystem"},
-    {2, ""},
-    
-    {0, "            -n (no save; doesn't do compression or write output PNG)"},
-    {2, ""},
-    {2, "               Useful in conjunction with -v option to get info."},
     {2, ""},
 
     {0, "     -plte_len n (obsolete, n is ignored, sets automatic reduction)"},
@@ -7283,7 +7388,9 @@ struct options_help pngcrush_options[] = {
 
     {0, "       -reduce (do lossless color-type or bit-depth reduction)"},
     {2, ""},
-    {2, "               (if possible)"},
+    {2, "               (if possible).  Also reduces palette length if"},
+    {2, "               if possible.  Currently only attempts to reduce the"},
+    {2, "               bit depth from 16 to 8"},
     {2, ""},
 
     {0, "          -rem chunkname (or \"alla\" or \"allb\")"},
