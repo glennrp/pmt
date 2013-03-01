@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.51"
+#define PNGCRUSH_VERSION "1.7.52"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -134,6 +134,23 @@
  *
  * 3. This Copyright notice, disclaimer, and license may not be removed
  *    or altered from any source or altered source distribution.
+ *
+ * CEXCEPT COPYRIGHT, DISCLAIMER, and LICENSE:
+ *
+ * The cexcept.h header file which is bundled with this software
+ * is released under the license and disclaimer described in lines 10
+ * through 18 of cexcept.h.
+ *
+ * LIBPNG COPYRIGHT, DISCLAIMER, and LICENSE:
+ *
+ * If libpng is bundled with this software, it is released under the
+ * libpng license (see COPYRIGHT NOTICE, DISCLAIMER, and LICENSE, in png.h)
+ *
+ * ZLIB COPYRIGHT, DISCLAIMER, and LICENSE:
+ *
+ * If zlib is bundled with this software, it is released under the
+ * zlib license (see the copyright notice, disclaimer, and license
+ * appearing in lines 4 through 24 of zlib.h)
  */
 
 /* To do:
@@ -221,6 +238,10 @@
  *   is incorporated in pngcrush, then pngcrush would have to be re-licensed,
  *   or released in two versions, one libpng-licensed and one GPL-licensed!
  *
+ *   Also consider Google's "zopfli" compressor, which is said to slow but
+ *   achieves better compression.  It is Apache-2.0 licensed and available from
+ *   a GIT repository at SourceForge (see https://code.google.com/p/zopfli/).
+ *
  *   5. Implement palette-building (from ImageMagick-6.7.0 or later, minus
  *   the "PNG8" part) -- actually ImageMagick puts the transparent colors
  *   first, then the semitransparent colors, and finally the opaque colors,
@@ -278,6 +299,10 @@
 
 Change log:
 
+Version 1.7.52 (built with libpng-1.6.1beta2 and zlib-1.2.7)
+  Added license info for cexcept.h, libpng, and zlib.
+  Added consideration of "zopfli" compression to the "To do" list.
+ 
 Version 1.7.51 (built with libpng-1.6.0 and zlib-1.2.7)
   Added "-noreduce" option, in preparation for "-reduce" becoming the
     default behaviour in version 1.8.0.  This turns off lossless bit depth,
