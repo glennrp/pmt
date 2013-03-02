@@ -299,9 +299,11 @@
 
 Change log:
 
-Version 1.7.52 (built with libpng-1.6.1beta2 and zlib-1.2.7)
+Version 1.7.52 (built with libpng-1.6.1beta05 and zlib-1.2.7)
   Added license info for cexcept.h, libpng, and zlib.
   Added consideration of "zopfli" compression to the "To do" list.
+  Fixed a typo that caused a cHRM chunk to be "found" if an iCCP chunk
+    were present.
  
 Version 1.7.51 (built with libpng-1.6.0 and zlib-1.2.7)
   Added "-noreduce" option, in preparation for "-reduce" becoming the
@@ -4931,7 +4933,7 @@ int main(int argc, char *argv[])
                     double white_x, white_y, red_x, red_y, green_x,
                         green_y, blue_x, blue_y;
 
-                    if (png_get_cHRM
+                    if (found_cHRM && png_get_cHRM
                         (read_ptr, read_info_ptr, &white_x, &white_y,
                          &red_x, &red_y, &green_x, &green_y, &blue_x,
                          &blue_y)) {
@@ -6985,7 +6987,7 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
 #ifdef PNG_UINT_cHRM
         if (png_get_uint_32(chunk_name) == PNG_UINT_cHRM)
 #else
-        if (!png_memcmp(chunk_name, png_iCCP, 4))
+        if (!png_memcmp(chunk_name, png_cHRM, 4))
 #endif
           found_cHRM=1;
 #endif /* PNG_cHRM_SUPPORTED */
