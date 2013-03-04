@@ -299,11 +299,18 @@
 
 Change log:
 
-Version 1.7.52 (built with libpng-1.6.1beta05 and zlib-1.2.7)
+Version 1.7.52 (built with libpng-1.6.1beta06 and zlib-1.2.7)
   Added license info for cexcept.h, libpng, and zlib.
   Added consideration of "zopfli" compression to the "To do" list.
   Fixed a typo that caused a cHRM chunk to be "found" if an iCCP chunk
     were present.
+  Reset best_byte_count before trial loop.
+  Revise global png_set_keep_unknown_chunks() calls to avoid a libpng16
+    warning.
+  Reset "intent" to "specified_intent" before trial loop.
+  Reset "plte_len" to "specified_plte_len" before trial loop.
+  Initialize length of each trial to 0x7fffffff so any untried method
+    is not the "best method".
  
 Version 1.7.51 (built with libpng-1.6.0 and zlib-1.2.7)
   Added "-noreduce" option, in preparation for "-reduce" becoming the
@@ -1533,9 +1540,11 @@ static png_bytepp row_pointers;
 static int z_strategy;
 static int best_of_three;
 static int methods_specified = 0;
+static int specified_intent = -1;
 static int intent = -1;
 static int ster_mode = -1;
 static int new_time_stamp = 1;
+static int specified_plte_len = -1;
 static int plte_len = -1;
 #ifdef PNG_FIXED_POINT_SUPPORTED
 static int specified_gamma = 0;
@@ -3104,7 +3113,7 @@ int main(int argc, char *argv[])
             names++;
             BUMP_I;
             found_gAMA=1;
-            if (intent < 0)
+            if (specified_intent < 0)
             {
 #ifdef PNG_FIXED_POINT_SUPPORTED
                 int c;
@@ -3366,14 +3375,14 @@ int main(int argc, char *argv[])
             specified_gamma = 0.45455;
 #  endif
 #endif
-            intent = 0;
+            specified_intent = 0;
             BUMP_I;
             if (!strncmp(argv[i], "0", 1) ||
                 !strncmp(argv[i], "1", 1) ||
                 !strncmp(argv[i], "2", 1) || !strncmp(argv[i], "3", 1))
             {
                 names++;
-                intent = (int) atoi(argv[i]);
+                specified_intent = (int) atoi(argv[i]);
                 global_things_have_changed = 1;
             } else
                 i--;
@@ -3651,6 +3660,8 @@ int main(int argc, char *argv[])
         }
 
         image_specified_gamma = 0;
+        intent=specified_intent;
+        plte_len=specified_plte_len;
 
         inname = argv[names++];
 
@@ -3955,6 +3966,7 @@ int main(int argc, char *argv[])
         }
 
         best_of_three = 1;
+        pngcrush_best_byte_count=0xffffffff;
 
         if (blacken)
         {
@@ -3998,8 +4010,7 @@ int main(int argc, char *argv[])
 
             pngcrush_write_byte_count=0;
 
-            if (trial > 1)
-              idat_length[trial] = (png_uint_32) 0xffffffff;
+            idat_length[trial] = (png_uint_32) 0xffffffff;
 
             /* this part of if-block is for final write-the-best-file
                iteration */
@@ -4256,7 +4267,11 @@ int main(int argc, char *argv[])
                 if (last_trial == 0)
                 {
                    png_set_keep_unknown_chunks(read_ptr,
+#if PNG_LIBPNG_VER < 10700
+                        PNG_HANDLE_CHUNK_IF_SAFE, (png_bytep) NULL, 0);
+#else
                         PNG_HANDLE_CHUNK_NEVER, (png_bytep) NULL, 0);
+#endif
                    png_set_keep_unknown_chunks(read_ptr,
                         PNG_HANDLE_CHUNK_NEVER, chunks_to_ignore,
                         sizeof (chunks_to_ignore)/5);
@@ -4406,7 +4421,11 @@ int main(int argc, char *argv[])
                                                     0);
                         else
                             png_set_keep_unknown_chunks(write_ptr,
+#if PNG_LIBPNG_VER < 10700
+                                                    PNG_HANDLE_CHUNK_IF_SAFE,
+#else
                                                     PNG_HANDLE_CHUNK_NEVER,
+#endif
                                                     (png_bytep) NULL,
                                                     0);
 
