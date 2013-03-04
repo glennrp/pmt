@@ -24,13 +24,13 @@ CPPFLAGS = -I.
 # Work around zlib compiler bug in 1.2.6
 CPPFLAGS += -DZ_SOLO
 
-# Cannot use this with libpng15
+# Cannot use this with libpng15 and later.
 # TOOFAR_OK=-DINFLATE_ALLOW_INVALID_DISTANCE_TOOFAR_ARRR
 TOOFAR_OK=
 
 #CFLAGS = -O -Wall
 #CFLAGS = -O2
-#CFLAGS = -O3 -fomit-frame-pointer -Wall
+#CFLAGS = -O2 -fomit-frame-pointer -Wall
 #CFLAGS = -Os -fomit-frame-pointer -Wall
 CFLAGS = -O3 -funroll-loops -fomit-frame-pointer -Wall -Wshadow
 # [note that -Wall is a gcc-specific compilation flag ("all warnings on")]
@@ -79,7 +79,8 @@ inflate$(O): inflate.c
 deflate$(O): deflate.c
 	$(CC) -c -DTOO_FAR=32767 $(CPPFLAGS) $(CFLAGS) $<
 
-pngcrush$(O): pngcrush.c png.h pngconf.h pngcrush.h cexcept.h $(ZHDR)
+pngcrush$(O): pngcrush.c png.h pngconf.h pngcrush.h pnglibconf.h cexcept.h \
+	$(ZHDR)
 	$(CC) -c $(CPPFLAGS) $(CFLAGS) $(TOOFAR_OK) $<
 
 $(PNGCRUSH)$(E): $(OBJS)
