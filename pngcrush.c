@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.52"
+#define PNGCRUSH_VERSION "1.7.53"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -210,6 +210,8 @@
  *      successfully.  This is likely to be the simplest and fastest
  *      solution; however, it will only work with libpng-1.6.0 and later,
  *      where the decoder actually uses the CINFO hint.
+ *      This seems to be the only method that would work with zopfli
+ *      compression which always writes "7" (i.e., a 32k window) in CINFO.
  *
  *      d. The simplest way might be to simply try all window sizes
  *      for all methods, just as the "pc" script above does.  This of
@@ -241,6 +243,8 @@
  *   Also consider Google's "zopfli" compressor, which is said to slow but
  *   achieves better compression.  It is Apache-2.0 licensed and available from
  *   a GIT repository at SourceForge (see https://code.google.com/p/zopfli/).
+ *   See also the "pngzop" directory under the pmt.sourceforge.net project.
+ *   Note paragraph 1.c above; zopfli always writes "7" in CINFO.
  *
  *   5. Implement palette-building (from ImageMagick-6.7.0 or later, minus
  *   the "PNG8" part) -- actually ImageMagick puts the transparent colors
@@ -253,33 +257,24 @@
  *   package which counts RGB pixels in an image; this and its supporting
  *   lib/libppmcmap.c would need to be revised to count RGBA pixels instead.
  *
- *   6. Check the "-plte_len n" option to be sure that no pixel contains
- *   an index value that is out of range due to truncation of the PLTE chunk.
- *   Implementing item "5" will take care of this, since that will always
- *   build a palette of the right length, and the -plte_len option can be
- *   eliminated.  Alternatively, always (or maybe when the -reduce option
- *   has been given) reduce the PLTE length to accommodate
- *   the largest index present in the IDAT or bKGD chunks or plte_length,
- *   if it is larger (changes the meaning of the -plte_len option).
+ *   6. Improve the -help output and/or write a good man page.
  *
- *   7. Improve the -help output and/or write a good man page.
+ *   7. Finish pplt (MNG partial palette) feature.
  *
- *   8. Finish pplt (MNG partial palette) feature.
- *
- *   9. Remove text-handling and color-handling features and put
+ *   8. Remove text-handling and color-handling features and put
  *   those in a separate program or programs, to avoid unnecessary
  *   recompressing.  Note that in pngcrush-1.7.34, pngcrush began doing
  *   this extra work only once instead of for every trial, so the potential
  *   benefit in CPU savings is much smaller now.
  *
- *   10. Add a "pcRu" ancillary chunk that keeps track of the best method,
+ *   9. Add a "pcRu" ancillary chunk that keeps track of the best method,
  *   methods already tried, and whether "loco crushing" was effective.
  *
- *   11. Try both transformed and untransformed colors when "-loco" is used.
+ *   10. Try both transformed and untransformed colors when "-loco" is used.
  *
- *   12. Move the Photoshop-fixing stuff into a separate program.
+ *   11. Move the Photoshop-fixing stuff into a separate program.
  *
- *   13. GRR: More generally (superset of previous 3 items):  split into
+ *   12. GRR: More generally (superset of previous 3 items):  split into
  *   separate "edit" and "crush" programs (or functions).  Former is fully
  *   libpng-aware, much like current pngcrush; latter makes little or no use of
  *   libpng (maybe IDAT-compression parts only?), instead handling virtually
@@ -298,6 +293,10 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.53 (built with libpng-1.6.1beta06 and zlib-1.2.7)
+  Removed plte_len stuff from the "To do" list because it is done.
+  Shorten the indexed-PNG tRNS chunk length if it has more entries than the PLTE chunk.
 
 Version 1.7.52 (built with libpng-1.6.1beta06 and zlib-1.2.7)
   Added license info for cexcept.h, libpng, and zlib.
@@ -1570,6 +1569,12 @@ static png_byte trns_array[256];
 static png_byte trans_in[256];
 static png_uint_16 num_trans_in;
 
+#if defined(PNG_READ_tRNS_SUPPORTED) && defined(PNG_WRITE_tRNS_SUPPORTED)
+       png_bytep trans;
+       int num_trans;
+       png_color_16p trans_values;
+#endif
+
 static int have_bkgd = 0;
 static png_uint_16 bkgd_red = 0;
 static png_uint_16 bkgd_green = 0;
@@ -2755,6 +2760,8 @@ int main(int argc, char *argv[])
     int lv[MAX_METHODSP1];
     int zs[MAX_METHODSP1];
     int lev, strat, filt;
+
+
 #ifdef PNG_gAMA_SUPPORTED
 #  ifdef PNG_FIXED_POINT_SUPPORTED
     png_fixed_point file_gamma = 0;
@@ -2764,10 +2771,27 @@ int main(int argc, char *argv[])
 #endif
     char *cp;
     int i;
-    row_buf = (png_bytep) NULL;
-    number_of_open_files = 0;
-    do_color_count = 0;
-    do_color_count = do_color_count;    /* silence compiler warning */
+
+    unsigned char z_cmf[8];
+    unsigned char z_flg[8];
+
+    t_start = (TIME_T) clock();
+
+    /* Precompute z_cmf and z_flg bytes */
+    for (i=0; i<8; i++)
+    {
+       int cmf=(i+8)*16 + 8;
+
+       /* 3 means max compression */
+       int cmf_flg=256*cmf+(3*64);
+
+       /* cmf+flg must be a multiple of 31 */
+       int fcheck=31-cmf_flg%31;
+       cmf_flg+=fcheck; /* cmf+flg must be a multiple of 31 */
+
+       z_cmf[i]=(cmf_flg>>8 & 0xFF);
+       z_flg[i]=(cmf_flg & 0xFF);
+    }
 
     if (strcmp(png_libpng_ver, PNG_LIBPNG_VER_STRING))
     {
@@ -2777,7 +2801,10 @@ int main(int argc, char *argv[])
         fprintf(STDERR, "  png.c version: %s\n\n", png_libpng_ver);
     }
 
-    t_start = (TIME_T) clock();
+    row_buf = (png_bytep) NULL;
+    number_of_open_files = 0;
+    do_color_count = 0;
+    do_color_count = do_color_count;    /* silence compiler warning */
 
     strncpy(prog_string, argv[0], STR_BUF_SIZE);
     prog_string[STR_BUF_SIZE-1] = '\0';
@@ -3644,6 +3671,12 @@ int main(int argc, char *argv[])
         }
     }
 
+    if (verbose == 3)
+        for (i=0; i<8; i++)
+        {
+            printf("  CMF[%d]= 0x%x,0x%x\n",i+8,z_cmf[i],z_flg[i]);
+        }
+
     for (ia = 0; ia < 256; ia++)
         trns_array[ia]=255;
 
@@ -4010,7 +4043,8 @@ int main(int argc, char *argv[])
 
             pngcrush_write_byte_count=0;
 
-            idat_length[trial] = (png_uint_32) 0xffffffff;
+            if (trial != 0)
+               idat_length[trial] = (png_uint_32) 0xffffffff;
 
             /* this part of if-block is for final write-the-best-file
                iteration */
@@ -4036,11 +4070,9 @@ int main(int argc, char *argv[])
                     }
                 }
 
-                if (image_is_immutable
-                    || (idat_length[best] == idat_length[0]
-                    && things_have_changed == 0
-                    && idat_length[best] != idat_length[final_method]
-                    && nosave == 0))
+                if (image_is_immutable ||
+                     (idat_length[best] == idat_length[0] &&
+                     things_have_changed == 0 && nosave == 0))
                 {
                     /* just copy input to output */
 
@@ -4099,7 +4131,8 @@ int main(int argc, char *argv[])
                 else /* if (zs[best] == 0) */
                     z_strategy = Z_DEFAULT_STRATEGY;
             }
-            else
+
+            else /* Trial < MAX_METHODS */
             {
                 if (trial > 2 && trial < 5 && idat_length[trial - 1]
                     < idat_length[best_of_three])
@@ -5249,10 +5282,6 @@ int main(int argc, char *argv[])
 
 #if defined(PNG_READ_tRNS_SUPPORTED) && defined(PNG_WRITE_tRNS_SUPPORTED)
                 {
-                    png_bytep trans;
-                    int num_trans;
-                    png_color_16p trans_values;
-
                     if (png_get_tRNS
                         (read_ptr, read_info_ptr, &trans, &num_trans,
                          &trans_values))
@@ -6142,7 +6171,7 @@ int main(int argc, char *argv[])
                        int palette_length;
 
                        palette_length = png_get_palette_max(read_ptr,
-                          read_info_ptr);
+                          read_info_ptr)+1;
                        P1("Measured palette length = %d\n", palette_length);
 #ifdef PNG_READ_bKGD_SUPPORTED
                        {
@@ -6152,21 +6181,27 @@ int main(int argc, char *argv[])
                            bkgd_index = bkgd->index;
                            P1("bKGD index = %d\n", bkgd_index);
 #if 1
-                           if (bkgd_index > palette_length+1)
+                           if (bkgd_index > palette_length)
                            {
-                              bkgd_index = palette_length+1;
+                              bkgd_index = palette_length;
                               have_bkgd = 1;
                               fprintf(STDERR,
                                   "   New bKGD index = %d\n", bkgd_index);
                            }
 #endif
-                           if (bkgd->index > palette_length)
+                           if (bkgd->index >= palette_length)
                               palette_length = (int) bkgd_index+1;
                            P1("Total    palette length = %d\n", palette_length);
                          }
                        }
 #endif
                        plte_len = palette_length;
+                       if (num_trans > plte_len)
+                       {
+                          num_trans = plte_len;
+                          png_set_tRNS(write_ptr, write_info_ptr, trns_array,
+                                     num_trans, trans_values);
+                        }
                      }
                   }
 #endif
@@ -7426,7 +7461,7 @@ struct options_help pngcrush_options[] = {
     {2, "               and therefore they must reside on the same filesystem"},
     {2, ""},
 
-    {0, "     -plte_len n (obsolete, n is ignored, sets automatic reduction)"},
+    {0, "   -plte_len n (obsolete; positive \"n\" enables palette reduction)"},
     {2, ""},
 
     {0, "            -q (quiet)"},
@@ -7465,9 +7500,10 @@ struct options_help pngcrush_options[] = {
 #endif
     {2, ""},
 
-    {0, "          -res dpi"},
+    {0, "          -res resolution in dpi"},
     {2, ""},
-    {2, "               Write a pHYs chunk with the given resolution."},
+    {2, "               Write a pHYs chunk with the given resolution in dpi"},
+    {2, "               written as pixels per meter in x and y directions."},
     {2, ""},
 
 #ifdef Z_RLE
