@@ -14,7 +14,7 @@
 #include "pngpriv.h"
 
 /* Generate a compiler error if there is an old png.h in the search path. */
-typedef png_libpng_version_1_6_1beta06 Your_png_h_is_not_version_1_6_1beta06;
+typedef png_libpng_version_1_6_1rc01 Your_png_h_is_not_version_1_6_1rc01;
 
 /* Tells libpng that we have already handled the first "num_bytes" bytes
  * of the PNG file signature.  If the PNG data is embedded into another
@@ -768,13 +768,13 @@ png_get_copyright(png_const_structrp png_ptr)
 #else
 #  ifdef __STDC__
    return PNG_STRING_NEWLINE \
-     "libpng version 1.6.1beta06 - March 4, 2013" PNG_STRING_NEWLINE \
+     "libpng version 1.6.1rc01 - March 21, 2013" PNG_STRING_NEWLINE \
      "Copyright (c) 1998-2013 Glenn Randers-Pehrson" PNG_STRING_NEWLINE \
      "Copyright (c) 1996-1997 Andreas Dilger" PNG_STRING_NEWLINE \
      "Copyright (c) 1995-1996 Guy Eric Schalnat, Group 42, Inc." \
      PNG_STRING_NEWLINE;
 #  else
-      return "libpng version 1.6.1beta06 - March 4, 2013\
+      return "libpng version 1.6.1rc01 - March 21, 2013\
       Copyright (c) 1998-2013 Glenn Randers-Pehrson\
       Copyright (c) 1996-1997 Andreas Dilger\
       Copyright (c) 1995-1996 Guy Eric Schalnat, Group 42, Inc.";
@@ -2179,7 +2179,7 @@ png_compare_ICC_profile_with_sRGB(png_const_structrp png_ptr,
          if (length == png_sRGB_checks[i].length &&
             intent == png_sRGB_checks[i].intent)
          {
-            /* Now calculate the alder32 if not done already. */
+            /* Now calculate the adler32 if not done already. */
             if (adler == 0)
             {
                adler = adler32(0, NULL, 0);

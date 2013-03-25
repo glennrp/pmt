@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.53"
+#define PNGCRUSH_VERSION "1.7.54"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -294,7 +294,9 @@
 
 Change log:
 
-Version 1.7.53 (built with libpng-1.6.1beta06 and zlib-1.2.7)
+Version 1.7.54 (built with libpng-1.6.1rc01 and zlib-1.2.7-1)
+
+Version 1.7.53 (built with libpng-1.6.1rc01 and zlib-1.2.7)
   Removed plte_len stuff from the "To do" list because it is done.
   Shorten the indexed-PNG tRNS chunk length if it has more entries than the PLTE chunk.
 
