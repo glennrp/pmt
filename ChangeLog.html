@@ -3,7 +3,16 @@
 
 Change log:
 
-Version 1.7.55 (built with libpng-1.6.1rc01 and zlib-1.2.7-1)
+Version 1.7.56 (built with libpng-1.6.1 and zlib-1.2.7-1)
+  Only use pngcrush_debug_malloc() and pngcrush_debug_free() if the result
+    is going to be shown.
+  Added PNG_PASS_ROWS, PNG_UNUSED, and other macro definitions, when building
+    with libpng-1.4.x and older libpng versions.
+  Multiplied rowbytes by 8/bit_depth when using the system library because
+    we do not call png_read_transform_info(). This prevents a crash when
+    reading sub-8-bit input files.
+
+Version 1.7.55 (built with libpng-1.6.1 and zlib-1.2.7-1)
 
 Version 1.7.54 (built with libpng-1.6.1rc01 and zlib-1.2.7-1)
 

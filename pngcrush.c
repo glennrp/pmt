@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.55"
+#define PNGCRUSH_VERSION "1.7.56"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -246,7 +246,12 @@
  *   See also the "pngzop" directory under the pmt.sourceforge.net project.
  *   Note paragraph 1.c above; zopfli always writes "7" in CINFO.
  *
- *   5. Implement palette-building (from ImageMagick-6.7.0 or later, minus
+ *   5. Optionally recognize any sRGB iCCP profile and replace it with the
+ *   sRGB chunk.  Turn this option on if the "-reduce" option is on.  Also,
+ *   if "-reduce" is on, delete any gAMA and cHRM chunks if the sRGB chunk
+ *   is being written.
+ *
+ *   6. Implement palette-building (from ImageMagick-6.7.0 or later, minus
  *   the "PNG8" part) -- actually ImageMagick puts the transparent colors
  *   first, then the semitransparent colors, and finally the opaque colors,
  *   and does not sort colors by frequency of use but just adds them
@@ -257,24 +262,24 @@
  *   package which counts RGB pixels in an image; this and its supporting
  *   lib/libppmcmap.c would need to be revised to count RGBA pixels instead.
  *
- *   6. Improve the -help output and/or write a good man page.
+ *   7. Improve the -help output and/or write a good man page.
  *
- *   7. Finish pplt (MNG partial palette) feature.
+ *   8. Finish pplt (MNG partial palette) feature.
  *
- *   8. Remove text-handling and color-handling features and put
+ *   9. Remove text-handling and color-handling features and put
  *   those in a separate program or programs, to avoid unnecessary
  *   recompressing.  Note that in pngcrush-1.7.34, pngcrush began doing
  *   this extra work only once instead of for every trial, so the potential
  *   benefit in CPU savings is much smaller now.
  *
- *   9. Add a "pcRu" ancillary chunk that keeps track of the best method,
+ *   10. Add a "pcRu" ancillary chunk that keeps track of the best method,
  *   methods already tried, and whether "loco crushing" was effective.
  *
- *   10. Try both transformed and untransformed colors when "-loco" is used.
+ *   11. Try both transformed and untransformed colors when "-loco" is used.
  *
- *   11. Move the Photoshop-fixing stuff into a separate program.
+ *   12. Move the Photoshop-fixing stuff into a separate program.
  *
- *   12. GRR: More generally (superset of previous 3 items):  split into
+ *   13. GRR: More generally (superset of previous 3 items):  split into
  *   separate "edit" and "crush" programs (or functions).  Former is fully
  *   libpng-aware, much like current pngcrush; latter makes little or no use of
  *   libpng (maybe IDAT-compression parts only?), instead handling virtually
@@ -293,6 +298,15 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.56 (built with libpng-1.6.1 and zlib-1.2.7-1)
+  Only use pngcrush_debug_malloc() and pngcrush_debug_free() if the result
+    is going to be shown.
+  Added PNG_PASS_ROWS, PNG_UNUSED, and other macro definitions, when building
+    with libpng-1.4.x and older libpng versions.
+  Multiplied rowbytes by 8/bit_depth when using the system library because
+    we do not call png_read_transform_info(). This prevents a crash when
+    reading sub-8-bit input files.
 
 Version 1.7.55 (built with libpng-1.6.1 and zlib-1.2.7-1)
 
@@ -1070,6 +1084,44 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 #define PNGCRUSH_LIBPNG_VER 10007
 #endif
 
+#  ifndef PNG_UNUSED
+#    define PNG_UNUSED(param) (void)param;
+#  endif
+
+#if (PNG_LIBPNG_VER < 10500)
+/* Two macros to return the first row and first column of the original,
+ * full, image which appears in a given pass.  'pass' is in the range 0
+ * to 6 and the result is in the range 0 to 7.
+ */
+#define PNG_PASS_START_ROW(pass) (((1&~(pass))<<(3-((pass)>>1)))&7)
+#define PNG_PASS_START_COL(pass) (((1& (pass))<<(3-(((pass)+1)>>1)))&7)
+
+/* A macro to return the offset between pixels in the output row for a pair of
+ * pixels in the input - effectively the inverse of the 'COL_SHIFT' macro that
+ * follows.  Note that ROW_OFFSET is the offset from one row to the next whereas
+ * COL_OFFSET is from one column to the next, within a row.
+ */
+#define PNG_PASS_ROW_OFFSET(pass) ((pass)>2?(8>>(((pass)-1)>>1)):8)
+#define PNG_PASS_COL_OFFSET(pass) (1<<((7-(pass))>>1))
+
+/* Two macros to help evaluate the number of rows or columns in each
+ * pass.  This is expressed as a shift - effectively log2 of the number or
+ * rows or columns in each 8x8 tile of the original image.
+ */
+#define PNG_PASS_ROW_SHIFT(pass) ((pass)>2?(8-(pass))>>1:3)
+#define PNG_PASS_COL_SHIFT(pass) ((pass)>1?(7-(pass))>>1:3)
+
+/* Hence two macros to determine the number of rows or columns in a given
+ * pass of an image given its height or width.  In fact these macros may
+ * return non-zero even though the sub-image is empty, because the other
+ * dimension may be empty for a small image.
+ */
+#define PNG_PASS_ROWS(height, pass) (((height)+(((1<<PNG_PASS_ROW_SHIFT(pass))\
+   -1)-PNG_PASS_START_ROW(pass)))>>PNG_PASS_ROW_SHIFT(pass))
+#define PNG_PASS_COLS(width, pass) (((width)+(((1<<PNG_PASS_COL_SHIFT(pass))\
+   -1)-PNG_PASS_START_COL(pass)))>>PNG_PASS_COL_SHIFT(pass))
+#endif /* PNG_LIBPNG_VER < 10500 */
+
 #if PNGCRUSH_LIBPNG_VER >= 10500
    /* "#include <zlib.h>" is not provided by libpng15 */
 #ifdef PNGCRUSH_H
@@ -1079,10 +1131,6 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
    /* Use the system zlib */
 #  include <zlib.h>
 #endif
-
-#  ifndef PNG_UNUSED
-#    define PNG_UNUSED(param) (void)param;
-#  endif
 
    /* Not provided by libpng16 */
 #  include <string.h>
@@ -1114,7 +1162,7 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 #      define png_memset  memset
 #    endif
 #  endif
-#endif
+#endif /* PNGCRUSH_LIBPNG_VER >= 10500 */
 
 #if PNGCRUSH_LIBPNG_VER < 10800 || defined(PNGCRUSH_H)
 
@@ -1365,7 +1413,7 @@ png_uint_32 pngcrush_crc;
 
 #define STR_BUF_SIZE      256
 #define MAX_IDAT_SIZE     524288L
-#define MAX_METHODS       150
+#define MAX_METHODS       200
 #define MAX_METHODSP1     (MAX_METHODS+1)
 #define DEFAULT_METHODS   10
 #define FAKE_PAUSE_STRING "P"
@@ -1417,7 +1465,11 @@ static int found_cHRM = 0;
 
 static int premultiply = 0;
 static int interlace_method = 0;
+#if (PNG_LIBPNG_VER < 10400)
+png_size_t max_bytes;
+#else
 png_alloc_size_t max_bytes;
+#endif
 
        /* 0: not premultipled
         * 1: premultiplied input (input has .ppng suffix)
@@ -1683,8 +1735,8 @@ int pngcrush_crc_finish(png_structp png_ptr, png_uint_32 skip);
 void png_save_uint_32(png_bytep buf, png_uint_32 i);
 
 #ifdef PNG_USER_MEM_SUPPORTED
-png_voidp png_debug_malloc(png_structp png_ptr, png_uint_32 size);
-void png_debug_free(png_structp png_ptr, png_voidp ptr);
+png_voidp pngcrush_debug_malloc(png_structp png_ptr, png_uint_32 size);
+void pngcrush_debug_free(png_structp png_ptr, png_voidp ptr);
 #endif
 
 void pngcrush_pause(void);
@@ -2036,13 +2088,13 @@ static int maximum_allocation = 0;
 
 
 
-png_voidp png_debug_malloc(png_structp png_ptr, png_uint_32 size)
+png_voidp pngcrush_debug_malloc(png_structp png_ptr, png_uint_32 size)
 {
 
     /*
      * png_malloc has already tested for NULL; png_create_struct calls
-     * png_debug_malloc directly (with png_ptr == NULL prior to libpng-1.2.0
-     * which is OK since we are not using a user mem_ptr)
+     * pngcrush_debug_malloc directly (with png_ptr == NULL prior to
+     * libpng-1.2.0 which is OK since we are not using a user mem_ptr)
      */
 
     if (size == 0)
@@ -2074,10 +2126,10 @@ png_voidp png_debug_malloc(png_structp png_ptr, png_uint_32 size)
 
 
 /* Free a pointer.  It is removed from the list at the same time. */
-void png_debug_free(png_structp png_ptr, png_voidp ptr)
+void pngcrush_debug_free(png_structp png_ptr, png_voidp ptr)
 {
     if (png_ptr == NULL)
-        fprintf(STDERR, "NULL pointer to png_debug_free.\n");
+        fprintf(STDERR, "NULL pointer to pngcrush_debug_free.\n");
     if (ptr == 0) {
 #if 0 /* This happens all the time. */
         fprintf(STDERR, "WARNING: freeing NULL pointer\n");
@@ -2424,7 +2476,6 @@ void show_result(void)
     }
 #endif /* PNG_USER_MEM_SUPPORTED */
     if (found_acTL_chunk == 2)
-      if (verbose > 0)
         fprintf(STDERR,
         "   **** Discarded APNG chunks. ****\n");
 }
@@ -2806,6 +2857,7 @@ int main(int argc, char *argv[])
     }
 
     row_buf = (png_bytep) NULL;
+    P2(" row_buf = %p\n",row_buf);
     number_of_open_files = 0;
     do_color_count = 0;
     do_color_count = do_color_count;    /* silence compiler warning */
@@ -3877,16 +3929,17 @@ int main(int argc, char *argv[])
             {
 
 #  ifdef PNG_USER_MEM_SUPPORTED
-               mng_ptr = png_create_write_struct_2(PNG_LIBPNG_VER_STRING,
-                 (png_voidp) NULL, (png_error_ptr) png_cexcept_error,
-                 (png_error_ptr) NULL, (png_voidp) NULL,
-                 (png_malloc_ptr) png_debug_malloc,
-                 (png_free_ptr) png_debug_free);
-#  else
-               mng_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING,
-                 (png_voidp) NULL, (png_error_ptr) png_cexcept_error,
-                 (png_error_ptr) NULL);
+               if (verbose > 0)
+                  mng_ptr = png_create_write_struct_2(PNG_LIBPNG_VER_STRING,
+                    (png_voidp) NULL, (png_error_ptr) png_cexcept_error,
+                    (png_error_ptr) NULL, (png_voidp) NULL,
+                    (png_malloc_ptr) pngcrush_debug_malloc,
+                    (png_free_ptr) pngcrush_debug_free);
+               else
 #  endif
+                  mng_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING,
+                    (png_voidp) NULL, (png_error_ptr) png_cexcept_error,
+                    (png_error_ptr) NULL);
                if (mng_ptr == NULL)
                   fprintf(STDERR, "pngcrush could not create mng_ptr");
 
@@ -4250,16 +4303,17 @@ int main(int argc, char *argv[])
                 png_uint_32 row_length;
                 P1( "Allocating read and write structures\n");
 #ifdef PNG_USER_MEM_SUPPORTED
-                read_ptr = png_create_read_struct_2(PNG_LIBPNG_VER_STRING,
-                  (png_voidp) NULL, (png_error_ptr) png_cexcept_error,
-                  (png_error_ptr) NULL, (png_voidp) NULL,
-                  (png_malloc_ptr) png_debug_malloc,
-                  (png_free_ptr) png_debug_free);
-#else
-                read_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING,
-                  (png_voidp) NULL, (png_error_ptr) png_cexcept_error,
-                  (png_error_ptr) NULL);
+                if (verbose > 0)
+                   read_ptr = png_create_read_struct_2(PNG_LIBPNG_VER_STRING,
+                     (png_voidp) NULL, (png_error_ptr) png_cexcept_error,
+                     (png_error_ptr) NULL, (png_voidp) NULL,
+                     (png_malloc_ptr) pngcrush_debug_malloc,
+                     (png_free_ptr) pngcrush_debug_free);
+                else
 #endif /* PNG_USER_MEM_SUPPORTED */
+                   read_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING,
+                     (png_voidp) NULL, (png_error_ptr) png_cexcept_error,
+                     (png_error_ptr) NULL);
                 if (read_ptr == NULL)
                     Throw "pngcrush could not create read_ptr";
 
@@ -4318,16 +4372,19 @@ int main(int argc, char *argv[])
                 if (nosave == 0)
                 {
 #ifdef PNG_USER_MEM_SUPPORTED
-                    write_ptr = png_create_write_struct_2(PNG_LIBPNG_VER_STRING,
-                      (png_voidp) NULL, (png_error_ptr) png_cexcept_error,
-                      (png_error_ptr) NULL, (png_voidp) NULL,
-                      (png_malloc_ptr) png_debug_malloc,
-                      (png_free_ptr) png_debug_free);
-#else
-                    write_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING,
-                      (png_voidp) NULL, (png_error_ptr) png_cexcept_error,
-                      (png_error_ptr) NULL);
+                   if (verbose > 0)
+                       write_ptr = png_create_write_struct_2(
+                         PNG_LIBPNG_VER_STRING,
+                         (png_voidp) NULL, (png_error_ptr) png_cexcept_error,
+                         (png_error_ptr) NULL, (png_voidp) NULL,
+                         (png_malloc_ptr) pngcrush_debug_malloc,
+                         (png_free_ptr) pngcrush_debug_free);
+                    else
 #endif
+                       write_ptr = png_create_write_struct(
+                         PNG_LIBPNG_VER_STRING,
+                         (png_voidp) NULL, (png_error_ptr) png_cexcept_error,
+                         (png_error_ptr) NULL);
                     if (write_ptr == NULL)
                         Throw "pngcrush could not create write_ptr";
 
@@ -4809,9 +4866,10 @@ int main(int argc, char *argv[])
                             need_expand = 1;
                         }
 
-                        if (output_color_type && output_color_type != 3 &&
+                        if (output_color_type != 0 &&
+                            output_color_type != 3 &&
                             output_bit_depth < 8)
-                            output_bit_depth = 8;
+                           output_bit_depth = 8;
 
                         if ((output_color_type == 2
                              || output_color_type == 6)
@@ -4832,6 +4890,7 @@ int main(int argc, char *argv[])
                         {
                             png_set_packing(read_ptr);
                         }
+
                         if (output_color_type == 0 && output_bit_depth < 8)
                         {
                             png_color_8 true_bits;
@@ -4934,11 +4993,12 @@ int main(int argc, char *argv[])
                     {
                         if (keep_chunk("bKGD", argv))
                         {
-                            if ((input_color_type == 2
-                                 || input_color_type == 6)
-                                && (output_color_type == 0
-                                    || output_color_type == 4))
-                                background->gray = background->green;
+                            if ((input_color_type == 2 ||
+                                input_color_type == 6) &&
+                                (output_color_type == 0 ||
+                                output_color_type == 4))
+                              background->gray = background->green;
+
                             png_set_bKGD(write_ptr, write_info_ptr,
                                          background);
                         }
@@ -4973,16 +5033,17 @@ int main(int argc, char *argv[])
                     if (found_cHRM && png_get_cHRM_fixed
                         (read_ptr, read_info_ptr, &white_x, &white_y,
                          &red_x, &red_y, &green_x, &green_y, &blue_x,
-                         &blue_y)) {
-                        if (keep_chunk("cHRM", argv))
+                         &blue_y))
                         {
+                          if (keep_chunk("cHRM", argv))
+                          {
                                 png_set_cHRM_fixed(write_ptr,
                                                    write_info_ptr, white_x,
                                                    white_y, red_x, red_y,
                                                    green_x, green_y,
                                                    blue_x, blue_y);
+                          }
                         }
-                    }
                 }
 #else
                 {
@@ -5789,18 +5850,25 @@ int main(int argc, char *argv[])
                  * does not check the PNG_FLAG_ROW_INIT flag and does not
                  * initialize the row or issue a warning.
                  *
-                 * However, pngcrush fails to read interlaced PNGs properly
+                 */
+#ifdef PNGCRUSH_H
+                png_read_transform_info(read_ptr, read_info_ptr);
+#else
+                /* Some pngcrush capabilities are lacking when the system
+                 * libpng is used instead of the one bundled with pngcrush
+                 *
+                 * To do: list those capabilities here
+                 */
+
+                /* pngcrush fails to read interlaced PNGs properly
                  * when png_read_update_info() is called here.
                  */
 
                 /* png_read_update_info(read_ptr, read_info_ptr); */
-#ifdef PNGCRUSH_H
-                png_read_transform_info(read_ptr, read_info_ptr);
-#else
-                /* Some pngcrush capabilities are lacking with the system
-                 * libpng is used instead of the one bundled with pngcrush
-                 *
-                 * To do: list those capabilities here
+
+                /* Workaround is to multiply rowbytes by 8/bit_depth
+                 * to allow for unpacking, wherever we allocate a
+                 * row buffer.
                  */
 #endif
 
@@ -5906,6 +5974,13 @@ int main(int argc, char *argv[])
                         png_uint_32 h = height;
 
                         rowbytes = png_get_rowbytes(read_ptr, read_info_ptr);
+#ifndef PNGCRUSH_H
+                        /* We must do this because we could not call
+                         * png_read_update_info().
+                         */
+                        if (input_bit_depth < 8)
+                          rowbytes *= 8/input_bit_depth;
+#endif
                         if (rowbytes < 16384 && h < 16384)
                         {
                           if (rowbytes * h < 16384)
@@ -5918,7 +5993,11 @@ int main(int argc, char *argv[])
                                  */
                                 png_uint_32 w = width;
                                 unsigned int pd = channels * output_bit_depth;
+#if (PNG_LIBPNG_VER < 10400)
+                                png_size_t cb_base;
+#else
                                 png_alloc_size_t cb_base;
+#endif
                                 int interlace_pass;
 
                                 for (cb_base=0, interlace_pass=0;
@@ -6028,6 +6107,12 @@ int main(int argc, char *argv[])
                     png_uint_32 rowbytes;
 
                     rowbytes = png_get_rowbytes(read_ptr, read_info_ptr);
+#ifndef PNGCRUSH_H
+                    if (input_bit_depth < 8)
+                      rowbytes *= 8/input_bit_depth;
+#endif
+
+                    P2("rowbytes = %lud\n",rowbytes;
 
                     rowbytes_s = (png_size_t) rowbytes;
                     if (rowbytes == (png_uint_32) rowbytes_s)
@@ -6054,6 +6139,13 @@ int main(int argc, char *argv[])
                         read_row_length >
                         write_row_length ? read_row_length :
                         write_row_length;
+#ifndef PNGCRUSH_H
+                    /* We must do this because we could not call
+                     * png_read_update_info().
+                     */
+                    if (input_bit_depth < 8)
+                          row_length *= 8/input_bit_depth;
+#endif
 #  ifdef PNGCRUSH_MULTIPLE_ROWS
                     row_buf =
                         (png_bytep) png_malloc(read_ptr,
@@ -6065,6 +6157,8 @@ int main(int argc, char *argv[])
 #  endif
                 }
 #endif /* PNGCRUSH_LARGE */
+
+                P2(" row_buf = %p\n",row_buf);
 
                 if (row_buf == NULL)
                     png_error(read_ptr,
@@ -6080,15 +6174,18 @@ int main(int argc, char *argv[])
                      */
                 }
 
+                P2("allocated rowbuf.\n");
+
 #ifdef PNGCRUSH_MULTIPLE_ROWS
                 row_pointers = (png_bytepp) png_malloc(read_ptr,
                                                        rows_at_a_time *
                                                        sizeof(png_bytepp));
+                P2("allocated row_pointers.\n");
+
                 for (i = 0; i < rows_at_a_time; i++)
                     row_pointers[i] = row_buf + i * row_length;
 #endif
 
-                P2("allocated rowbuf.\n");
                 pngcrush_pause();
 
                 num_pass = png_set_interlace_handling(read_ptr);
@@ -6461,21 +6558,33 @@ int main(int argc, char *argv[])
                 }
                 /* } GRR:  added for %-navigation (2) */
 
-                P1( "Destroying data structs\n");
+                P1( "Destroying read data structs\n");
                 if (row_buf != (png_bytep) NULL)
                 {
+                    P2(" row_buf = %p\n",row_buf);
+                    P2( "Destroying row_buf\n");
+                    /* Crash has been observed here when using the
+                     * system libpng instead of the bundled one.
+                     * It seems to have to do with the workaround for
+                     * png_read_transform_info() not being exported
+                     * in libpng-1.5.6 and later.
+                     */
                     png_free(read_ptr, row_buf);
                     row_buf = (png_bytep) NULL;
                 }
+                P2( "Destroyed data row_buf\n");
 #ifdef PNGCRUSH_MULTIPLE_ROWS
                 if (row_pointers != (png_bytepp) NULL)
                 {
+                    P1( "Destroying row_pointers\n");
                     png_free(read_ptr, row_pointers);
                     row_pointers = (png_bytepp) NULL;
                 }
+                P2( "Destroyed data row_pointers\n");
 #endif
                 png_destroy_read_struct(&read_ptr, &read_info_ptr,
                                         &end_info_ptr);
+                P2( "Destroyed data structs\n");
                 if (nosave == 0)
                 {
 #ifdef PNGCRUSH_LOCO
@@ -6682,7 +6791,11 @@ int main(int argc, char *argv[])
                 show_result();
 #ifdef PNG_iCCP_SUPPORTED
             if (iccp_length)
+            {
                 free(iccp_text);
+                iccp_text = NULL;
+                iccp_length = 0;
+            }
 #endif
             if (pngcrush_must_exit)
                 exit(0);
@@ -7684,4 +7797,4 @@ void print_usage(int retval)
 
     exit(retval);
 }
-#endif /* PNGCRUSH_LIBPNG_VER < 10700 || defined(PNGCRUSH_H) */
+#endif /* PNGCRUSH_LIBPNG_VER < 10800 || defined(PNGCRUSH_H) */
