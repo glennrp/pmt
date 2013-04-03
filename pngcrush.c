@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.56"
+#define PNGCRUSH_VERSION "1.7.57"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -251,7 +251,13 @@
  *   if "-reduce" is on, delete any gAMA and cHRM chunks if the sRGB chunk
  *   is being written.
  *
- *   6. Implement palette-building (from ImageMagick-6.7.0 or later, minus
+ *   6. Turn "-reduce" and "-force" on by default.
+ *
+ *   7. Implement a "-copy" option that simply copies the IDAT data,
+ *   possibly repackaged in a different IDAT chunk size (not the same as
+ *   "-already").  
+ *
+ *   8. Implement palette-building (from ImageMagick-6.7.0 or later, minus
  *   the "PNG8" part) -- actually ImageMagick puts the transparent colors
  *   first, then the semitransparent colors, and finally the opaque colors,
  *   and does not sort colors by frequency of use but just adds them
@@ -262,24 +268,24 @@
  *   package which counts RGB pixels in an image; this and its supporting
  *   lib/libppmcmap.c would need to be revised to count RGBA pixels instead.
  *
- *   7. Improve the -help output and/or write a good man page.
+ *   9. Improve the -help output and/or write a good man page.
  *
- *   8. Finish pplt (MNG partial palette) feature.
+ *   10. Finish pplt (MNG partial palette) feature.
  *
- *   9. Remove text-handling and color-handling features and put
+ *   11. Remove text-handling and color-handling features and put
  *   those in a separate program or programs, to avoid unnecessary
  *   recompressing.  Note that in pngcrush-1.7.34, pngcrush began doing
  *   this extra work only once instead of for every trial, so the potential
  *   benefit in CPU savings is much smaller now.
  *
- *   10. Add a "pcRu" ancillary chunk that keeps track of the best method,
+ *   12. Add a "pcRu" ancillary chunk that keeps track of the best method,
  *   methods already tried, and whether "loco crushing" was effective.
  *
- *   11. Try both transformed and untransformed colors when "-loco" is used.
+ *   13. Try both transformed and untransformed colors when "-loco" is used.
  *
- *   12. Move the Photoshop-fixing stuff into a separate program.
+ *   14. Move the Photoshop-fixing stuff into a separate program.
  *
- *   13. GRR: More generally (superset of previous 3 items):  split into
+ *   15. GRR: More generally (superset of previous 3 items):  split into
  *   separate "edit" and "crush" programs (or functions).  Former is fully
  *   libpng-aware, much like current pngcrush; latter makes little or no use of
  *   libpng (maybe IDAT-compression parts only?), instead handling virtually
@@ -298,6 +304,8 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.57 (built with libpng-1.6.1 and zlib-1.2.7-1)
 
 Version 1.7.56 (built with libpng-1.6.1 and zlib-1.2.7-1)
   Only use pngcrush_debug_malloc() and pngcrush_debug_free() if the result
