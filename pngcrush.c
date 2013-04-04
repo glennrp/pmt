@@ -251,11 +251,12 @@
  *   if "-reduce" is on, delete any gAMA and cHRM chunks if the sRGB chunk
  *   is being written.
  *
- *   6. Turn "-reduce" and "-force" on by default.
+ *   6. Turn "-reduce" and "-force" on by default, and provide an "-old"
+ *   option to use the current default settings for these..
  *
  *   7. Implement a "-copy" option that simply copies the IDAT data,
- *   possibly repackaged in a different IDAT chunk size (not the same as
- *   "-already").  
+ *   possibly repackaged in a different IDAT chunk size (not quite the same
+ *   as the existing "-already" option).  
  *
  *   8. Implement palette-building (from ImageMagick-6.7.0 or later, minus
  *   the "PNG8" part) -- actually ImageMagick puts the transparent colors
@@ -306,6 +307,10 @@
 Change log:
 
 Version 1.7.57 (built with libpng-1.6.1 and zlib-1.2.7-1)
+  Added "-new" option that turns on "-reduce" and "-force" which will be
+    the default settings for version 1.8.0 and beyond.
+  Added "-old" option that turns off "-reduce" and "-force" which are the
+    current default settings.
 
 Version 1.7.56 (built with libpng-1.6.1 and zlib-1.2.7-1)
   Only use pngcrush_debug_malloc() and pngcrush_debug_free() if the result
@@ -3323,6 +3328,15 @@ int main(int argc, char *argv[])
             }
         }
 
+        else if (!strncmp(argv[i], "-new", 4))
+        {
+            global_things_have_changed = 1;  /* -force */
+            make_opaque = 1;                 /* -reduce */
+            make_gray = 1;                   /* -reduce */
+            make_8_bit = 1;                  /* -reduce */
+            reduce_palette = 1;              /* -reduce */
+        }
+
         else if (!strncmp(argv[i], "-nofilecheck", 5))
         {
             nofilecheck++;
@@ -3351,6 +3365,14 @@ int main(int argc, char *argv[])
         else if (!strncmp(argv[i], "-oldtimestamp", 5))
         {
             new_time_stamp=0;
+        }
+        else if (!strncmp(argv[i], "-old", 4))
+        {
+            global_things_have_changed = 0;  /* no -force */
+            make_opaque = 0;                 /* no -reduce */
+            make_gray = 0;                   /* no -reduce */
+            make_8_bit = 0;                  /* no -reduce */
+            reduce_palette = 0;              /* no -reduce */
         }
         else if(!strncmp(argv[i], "-ow",3))
         {
@@ -7551,6 +7573,9 @@ struct options_help pngcrush_options[] = {
     {2, "               Useful in conjunction with -v option to get info."},
     {2, ""},
 
+    {0, "          -new (Use new default settings (-force and -reduce))"},
+    {2, ""},
+
     {0, " -newtimestamp (Reset file modification time [default])"},
     {2, ""},
 
@@ -7575,6 +7600,9 @@ struct options_help pngcrush_options[] = {
     {0, "     -noreduce (turns off \"-reduce\" operations)"},
     {2, ""},
 
+    {0, "          -old (Use old default settings (no -force and no -reduce))"},
+    {2, ""},
+
     {0, " -oldtimestamp (Do not reset file modification time)"},
     {2, ""},
 
@@ -7595,7 +7623,7 @@ struct options_help pngcrush_options[] = {
     {0, "       -reduce (do lossless color-type or bit-depth reduction)"},
     {2, ""},
     {2, "               (if possible).  Also reduces palette length if"},
-    {2, "               if possible.  Currently only attempts to reduce the"},
+    {2, "               possible.  Currently only attempts to reduce the"},
     {2, "               bit depth from 16 to 8"},
     {2, ""},
 
