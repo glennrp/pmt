@@ -311,6 +311,7 @@ Version 1.7.57 (built with libpng-1.6.1 and zlib-1.2.7-1)
     the default settings for version 1.8.0 and beyond.
   Added "-old" option that turns off "-reduce" and "-force" which are the
     current default settings.
+  Updated copyright year for zlib-1.2.7-1.
 
 Version 1.7.56 (built with libpng-1.6.1 and zlib-1.2.7-1)
   Only use pngcrush_debug_malloc() and pngcrush_debug_free() if the result
@@ -5898,7 +5899,9 @@ int main(int argc, char *argv[])
 
                 /* Workaround is to multiply rowbytes by 8/bit_depth
                  * to allow for unpacking, wherever we allocate a
-                 * row buffer.
+                 * row buffer.  This results in too large a value for
+                 * rowbytes under some conditions, e.g., when increasing
+                 * a sub-8-bit file to RGBA, but this is rare and harmless.
                  */
 #endif
 
@@ -7294,6 +7297,9 @@ void print_version_info(void)
       case 0x1260:
       case 0x1270:
          zlib_copyright="-2012";
+         break;
+      case 0x1271:
+         zlib_copyright="-2013";
          break;
       default:
          zlib_copyright=" (or later)";
