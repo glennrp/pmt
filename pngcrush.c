@@ -306,15 +306,14 @@
 
 Change log:
 
-Version 1.7.57 (built with libpng-1.6.1 and zlib-1.2.7-1)
+Version 1.7.57 (built with libpng-1.5.15 and zlib-1.2.7-1)
   Added "-new" option that turns on "-reduce" and "-force" which will be
     the default settings for version 1.8.0 and beyond.
   Added "-old" option that turns off "-reduce" and "-force" which are the
     current default settings.
   Updated copyright year for zlib-1.2.7-1.
-  Changed windowBits from 0 to 15 in png_inflate_claim() call in pngrutil.c
-    to be able to read old PNG files with "TOO FAR" errors.  This fix will
-    of course only work with the bundled libpng.
+  Reverted to libpng-1.5.15 to be able to read old PNG files with TOO FAR
+    errors.  This will of course only work with the embedded libpng.
 
 Version 1.7.56 (built with libpng-1.6.1 and zlib-1.2.7-1)
   Only use pngcrush_debug_malloc() and pngcrush_debug_free() if the result
