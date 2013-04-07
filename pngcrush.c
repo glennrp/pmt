@@ -312,6 +312,9 @@ Version 1.7.57 (built with libpng-1.6.1 and zlib-1.2.7-1)
   Added "-old" option that turns off "-reduce" and "-force" which are the
     current default settings.
   Updated copyright year for zlib-1.2.7-1.
+  Changed windowBits from 0 to 15 in png_inflate_claim() call in pngrutil.c
+    to be able to read old PNG files with "TOO FAR" errors.  This fix will
+    of course only work with the bundled libpng.
 
 Version 1.7.56 (built with libpng-1.6.1 and zlib-1.2.7-1)
   Only use pngcrush_debug_malloc() and pngcrush_debug_free() if the result
@@ -1473,6 +1476,7 @@ static PNG_CONST char *extension = "_C" DOT "png";
 static png_uint_32 width, height;
 static png_uint_32 measured_idat_length;
 static int found_gAMA = 0;
+static int found_IDAT = 0;
 #ifdef PNG_cHRM_SUPPORTED
 static int found_cHRM = 0;
 #endif
@@ -1971,6 +1975,20 @@ pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
    }
    if ((png_uint_32)check != (png_uint_32)length)
       png_error(png_ptr, "read Error");
+#if 0
+   if (fix)
+   {
+     found_IDAT == 1)
+     {
+        /* replace first two bytes */
+        printf("  Input CMF = 0x%x,0x%x\n",buf[0],buf[1]);
+        found_IDAT++;
+     }
+     if (length==4)
+        if (buf[0] == 'I' && buf[1] == 'D' && buf[2] == 'A' && buf[3] == 'T')
+          found_IDAT++;
+   }
+#endif
 }
 #endif /* USE_FAR_KEYWORD */
 #endif /* PNG_STDIO_SUPPORTED */
@@ -4130,6 +4148,7 @@ int main(int argc, char *argv[])
                last_trial = 1;
 
             pngcrush_write_byte_count=0;
+            found_IDAT = 0;
 
             if (trial != 0)
                idat_length[trial] = (png_uint_32) 0xffffffff;
@@ -6981,6 +7000,10 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
          */
         inflateUndermine(&png_ptr->zstream, 1);
 #endif
+
+        /* To do: always use a 32k window while decompressing (replace the
+         * first two bytes of the first input IDAT with z_cmf[8], z_flg[8]?)
+         */
     }
 
     for (;;)

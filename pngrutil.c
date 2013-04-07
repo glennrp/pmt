@@ -4451,7 +4451,7 @@ defined(PNG_USER_TRANSFORM_PTR_SUPPORTED)
     * IDAT stream has a bogus deflate header window_bits value, but this should
     * not be happening any longer!)
     */
-   if (png_inflate_claim(png_ptr, png_IDAT, 0) != Z_OK)
+   if (png_inflate_claim(png_ptr, png_IDAT, 15) != Z_OK)
       png_error(png_ptr, png_ptr->zstream.msg);
 
    png_ptr->flags |= PNG_FLAG_ROW_INIT;
