@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.57"
+#define PNGCRUSH_VERSION "1.7.58"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -196,13 +196,14 @@
  *      a. Revise the bundled zlib to report the maximum window size that
  *      it actually used, then rewrite CINFO to contain the next power-of-two
  *      size equal or larger than the size.  This method would of course
- *      only work when pngcrush is built with the bundled zlib.
+ *      only work when pngcrush is built with the bundled zlib, and won't
+ *      work with zopfli compression.
  *
  *      b. Do additional trials after the best filter method, strategy,
  *      and compression level have been determined, using those settings
  *      and reducing the window size until the measured filesize increases,
  *      then choosing the smallest size which did not cause the filesize
- *      to increase.
+ *      to increase.  This is expensive.
  *
  *      c. After the trials are complete, replace CINFO with smaller
  *      settings, then attempt to decode the zlib datastream, and choose
@@ -216,7 +217,7 @@
  *      d. The simplest way might be to simply try all window sizes
  *      for all methods, just as the "pc" script above does.  This of
  *      course involves a lot more trial compressions, but it will catch
- *      those instances where a smaller file will result.
+ *      those instances where a smaller file will result.  Expensive.
  *
  *   2. Check for the possiblity of using the tRNS chunk instead of
  *      the full alpha channel.  If all of the transparent pixels are
@@ -306,6 +307,10 @@
 
 Change log:
 
+Version 1.7.58 (built with libpng-1.5.15 and zlib-1.2.7-1)
+  Do not enable reduce_palette by default for "-reduce", "-new", or "-old".
+    It still is failing for some files.
+
 Version 1.7.57 (built with libpng-1.5.15 and zlib-1.2.7-1)
   Added "-new" option that turns on "-reduce" and "-force" which will be
     the default settings for version 1.8.0 and beyond.
@@ -357,6 +362,8 @@ Version 1.7.51 (built with libpng-1.6.0 and zlib-1.2.7)
   Fixed double-underscore typo in an #ifdef in png.c
   If "-reduce" is on and the background index is larger than the reduced
     palette_length+1, reduce it to the palette_length+1.
+  Increased required_window_size if necessary to account for slightly larger
+    size of interlaced files due to additional filter bytes and padding.
 
 Version 1.7.50 (built with libpng-1.6.0 and zlib-1.2.7)
   Removed completed items from the "To do" list.
@@ -3352,7 +3359,6 @@ int main(int argc, char *argv[])
             make_opaque = 1;                 /* -reduce */
             make_gray = 1;                   /* -reduce */
             make_8_bit = 1;                  /* -reduce */
-            reduce_palette = 1;              /* -reduce */
         }
 
         else if (!strncmp(argv[i], "-nofilecheck", 5))
@@ -3390,7 +3396,6 @@ int main(int argc, char *argv[])
             make_opaque = 0;                 /* no -reduce */
             make_gray = 0;                   /* no -reduce */
             make_8_bit = 0;                  /* no -reduce */
-            reduce_palette = 0;              /* no -reduce */
         }
         else if(!strncmp(argv[i], "-ow",3))
         {
@@ -3427,7 +3432,6 @@ int main(int argc, char *argv[])
             make_opaque = 1;
             make_gray = 1;
             make_8_bit = 1;
-            reduce_palette = 1;
         }
 #ifdef PNG_gAMA_SUPPORTED
         else if (!strncmp(argv[i], "-replace_gamma", 4))
@@ -4098,7 +4102,6 @@ int main(int argc, char *argv[])
             make_gray = 1;
             make_opaque = 1;
             make_8_bit = 1;
-            reduce_palette = 1;
             */
             try_method[6] = try10;
         }
@@ -6038,9 +6041,10 @@ int main(int argc, char *argv[])
                           {
                              if (interlace_method)
                              {
-                                /* Interlacing makes the image larger because of
-                                 * the replication of both the filter byte and the
-                                 * padding to a byte boundary.
+                                /* Interlacing makes the uncompressed data
+                                 * larger because of the replication of both
+                                 * the filter byte and the padding to a byte
+                                 * boundary.
                                  */
                                 png_uint_32 w = width;
                                 unsigned int pd = channels * output_bit_depth;
@@ -6054,7 +6058,8 @@ int main(int argc, char *argv[])
                                 for (cb_base=0, interlace_pass=0;
                                      interlace_pass<=6; ++interlace_pass)
                                 {
-                                   png_uint_32 pw = PNG_PASS_COLS(w, interlace_pass);
+                                   png_uint_32 pw = PNG_PASS_COLS(w,
+                                     interlace_pass);
 
                                    if (pw > 0)
                                       cb_base += (PNGCRUSH_ROWBYTES(pd, pw)+1) *
@@ -7821,7 +7826,7 @@ void print_usage(int retval)
             fprintf(STDERR, pngcrush_usage[j], progname);  /* special case */
     }
 
-    /* this block is also handled specially due to the "else" clause... */
+    /* This block is also handled specially due to the "else" clause... */
     if (verbose > 1)
     {
         pngcrush_pause();
@@ -7835,8 +7840,9 @@ void print_usage(int retval)
     else
         fprintf(STDERR, "options:\n");
 
-    /* this is the main part of the help screen; it is more complex than the
-     * other blocks due to the mix of verbose and non-verbose lines */
+    /* This is the main part of the help screen; it is more complex than the
+     * other blocks due to the mix of verbose and non-verbose lines
+     */
     jmax = sizeof(pngcrush_options) / sizeof(struct options_help);
     for (j = 0;  j < jmax;  ++j)
     {
@@ -7850,7 +7856,8 @@ void print_usage(int retval)
     }
 
     /* due to progname, the verbose part of the -p option is handled explicitly
-     * (fortunately, it's the very last option anyway) */
+     * (fortunately, it's the very last option anyway)
+     */
     if (verbose > 1)
     {
         fprintf(STDERR, "\n"
