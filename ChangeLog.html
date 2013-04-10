@@ -3,6 +3,19 @@
 
 Change log:
 
+Version 1.7.58 (built with libpng-1.5.15 and zlib-1.2.7-1)
+  Do not enable reduce_palette by default for "-reduce", "-new", or "-old".
+    It still is failing for some files.
+
+Version 1.7.57 (built with libpng-1.5.15 and zlib-1.2.7-1)
+  Added "-new" option that turns on "-reduce" and "-force" which will be
+    the default settings for version 1.8.0 and beyond.
+  Added "-old" option that turns off "-reduce" and "-force" which are the
+    current default settings.
+  Updated copyright year for zlib-1.2.7-1.
+  Reverted to libpng-1.5.15 to be able to read old PNG files with TOO FAR
+    errors.  This will of course only work with the embedded libpng.
+
 Version 1.7.56 (built with libpng-1.6.1 and zlib-1.2.7-1)
   Only use pngcrush_debug_malloc() and pngcrush_debug_free() if the result
     is going to be shown.
@@ -45,6 +58,8 @@ Version 1.7.51 (built with libpng-1.6.0 and zlib-1.2.7)
   Fixed double-underscore typo in an #ifdef in png.c
   If "-reduce" is on and the background index is larger than the reduced
     palette_length+1, reduce it to the palette_length+1.
+  Increased required_window_size if necessary to account for slightly larger
+    size of interlaced files due to additional filter bytes and padding.
 
 Version 1.7.50 (built with libpng-1.6.0 and zlib-1.2.7)
   Removed completed items from the "To do" list.
