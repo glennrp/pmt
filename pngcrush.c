@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.58"
+#define PNGCRUSH_VERSION "1.7.59"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -306,6 +306,8 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.59 (built with libpng-1.5.15 and zlib-1.2.7-1)
 
 Version 1.7.58 (built with libpng-1.5.15 and zlib-1.2.7-1)
   Do not enable reduce_palette by default for "-reduce", "-new", or "-old".
