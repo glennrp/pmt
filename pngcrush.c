@@ -307,7 +307,8 @@
 
 Change log:
 
-Version 1.7.59 (built with libpng-1.5.15 and zlib-1.2.7-1)
+Version 1.7.59 (built with libpng-1.5.15 and zlib-1.2.7-2-motley)
+  Show the acTL chunk in the chunk list in verbose output.
 
 Version 1.7.58 (built with libpng-1.5.15 and zlib-1.2.7-1)
   Do not enable reduce_palette by default for "-reduce", "-new", or "-old".
@@ -7141,8 +7142,7 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
         {
            found_acTL_chunk = 1;
         }
-        else
-        {
+
 #ifdef PNG_UINT_IDAT
             if ((png_get_uint_32(chunk_name) == PNG_UINT_IDAT) ||
 #endif
@@ -7205,7 +7205,6 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
             }
             else
                 found_any_chunk=1;
-        }
 
 #ifdef PNG_gAMA_SUPPORTED
 #ifdef PNG_UINT_gAMA
