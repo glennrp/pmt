@@ -307,8 +307,16 @@
 
 Change log:
 
-Version 1.7.59 (built with libpng-1.5.15 and zlib-1.2.7-2-motley)
+Version 1.7.59 (built with libpng-1.6.3beta06 and zlib-1.2.8)
   Show the acTL chunk in the chunk list in verbose output.
+  Fixed several bugs reported by pornel at users.sf.net:
+    Do not call png_set_benign_errors when PNG_BENIGN_ERRORS_SUPPORTED
+      is not defined
+    Renamed PNG_UNUSED() macro PNGCRUSH_UNUSED().
+    Moved a closing bracket inside the PNGCRUSH_LOCO block.
+    Moved the declaration of "new_mng" outside a PNGCRUSH_LOCO block.
+    Put reference to "input_format" inside a PNGCRUSH_LOCO block.
+    Moved declarations of mng_out and mngname inside a PNGCRUSH_LOGO block.
 
 Version 1.7.58 (built with libpng-1.5.15 and zlib-1.2.7-1)
   Do not enable reduce_palette by default for "-reduce", "-new", or "-old".
@@ -1110,9 +1118,7 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 #define PNGCRUSH_LIBPNG_VER 10007
 #endif
 
-#  ifndef PNG_UNUSED
-#    define PNG_UNUSED(param) (void)param;
-#  endif
+#define PNGCRUSH_UNUSED(param) (void)param;
 
 #if (PNG_LIBPNG_VER < 10500)
 /* Two macros to return the first row and first column of the original,
@@ -1478,7 +1484,9 @@ struct options_help
 static PNG_CONST char *progname;
 static PNG_CONST char *inname = "pngtest" DOT "png";
 static PNG_CONST char *outname = "pngout" DOT "png";
+#ifdef PNGCRUSH_LOCO
 static PNG_CONST char *mngname = "mngout" DOT "mng";
+#endif
 static PNG_CONST char *directory_name = "pngcrush" DOT "bak";
 static PNG_CONST char *extension = "_C" DOT "png";
 
@@ -1612,9 +1620,7 @@ static int overwrite = 0; /* overwrite the input file instead of creating
                            a new output file */
 static int nofilecheck = 0;
 static int no_limits = 0;
-#ifdef PNGCRUSH_LOCO
 static int new_mng = 0;
-#endif
 static png_bytep row_buf;
 #ifdef PNGCRUSH_MULTIPLE_ROWS
 static png_bytepp row_pointers;
@@ -1675,9 +1681,10 @@ static png_structp read_ptr, write_ptr, mng_ptr;
 static png_infop read_info_ptr, write_info_ptr;
 static png_infop end_info_ptr;
 static png_infop write_end_info_ptr;
-static FILE *fpin, *fpout, *mng_out;
+static FILE *fpin, *fpout;
 png_uint_32 measure_idats(FILE * fp);
 #ifdef PNGCRUSH_LOCO
+static FILE *mng_out;
 static int do_loco = 0;
 static int input_format = 0;    /* 0: PNG  1: MNG */
 static int output_format = 0;
@@ -2532,7 +2539,7 @@ void pngcrush_write_png(png_structp write_pointer, png_bytep data,
 static void pngcrush_flush(png_structp png_ptr)
 {
    /* Do nothing. */
-   PNG_UNUSED(png_ptr)
+   PNGCRUSH_UNUSED(png_ptr)
 }
 
 
@@ -4010,9 +4017,8 @@ int main(int argc, char *argv[])
                png_set_write_fn(mng_ptr, (png_voidp) mng_out,
                                 (png_rw_ptr) pngcrush_write_png,
                                 pngcrush_flush);
-#endif /* PNGCRUSH_LOCO */
-
             }
+#endif /* PNGCRUSH_LOCO */
 
             idat_length[0] = measure_idats(fpin);
 
@@ -4372,11 +4378,13 @@ int main(int argc, char *argv[])
                 if (read_ptr == NULL)
                     Throw "pngcrush could not create read_ptr";
 
-#if PNG_LIBPNG_VER >= 10400
+#ifdef PNG_BENIGN_ERRORS_SUPPORTED
+# if PNG_LIBPNG_VER >= 10400
                 /* Allow certain errors in the input file to be handled
                  * as warnings.
                  */
                 png_set_benign_errors(read_ptr, 1);
+# endif
 #endif
 
 #ifdef PNG_SET_USER_LIMITS_SUPPORTED
@@ -7258,6 +7266,9 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
                     intent = 0;
                 }
             }
+            /* To do: recognize other sRGB iCCP chunks and replace them with
+             * sRGB chunk
+             */
         }
 #endif /* PNG_iCCP_SUPPORTED */
 
@@ -7285,7 +7296,9 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
 #endif
 
 
+#ifdef PNGCRUSH_LOCO
         if (input_format == 0)
+#endif
         {
 #ifdef PNG_UINT_IEND
             if (png_get_uint_32(chunk_name) == PNG_UINT_IEND)
