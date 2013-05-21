@@ -307,7 +307,7 @@
 
 Change log:
 
-Version 1.7.59 (built with libpng-1.6.3beta06 and zlib-1.2.8)
+Version 1.7.59 (built with libpng-1.5.15 and zlib-1.2.8)
   Show the acTL chunk in the chunk list in verbose output.
   Fixed several bugs reported by pornel at users.sf.net:
     Do not call png_set_benign_errors when PNG_BENIGN_ERRORS_SUPPORTED

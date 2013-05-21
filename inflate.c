@@ -1113,7 +1113,7 @@ int flush;
             }
 #ifdef INFLATE_STRICT
             if (state->offset > state->dmax) {
-                strm->msg = (char *)"invalid distance too far back (strict)";
+                strm->msg = (char *)"invalid distance too far back";
                 state->mode = BAD;
                 break;
             }
