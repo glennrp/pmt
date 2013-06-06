@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.59"
+#define PNGCRUSH_VERSION "1.7.60"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -306,6 +306,9 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.60 (built with libpng-1.5.16 and zlib-1.2.8)
+  Revise -reduce so reducing from color-type 6 to grayscale works.
 
 Version 1.7.59 (built with libpng-1.5.16 and zlib-1.2.8)
   Show the acTL chunk in the chunk list in verbose output.
@@ -2587,10 +2590,17 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
 
       i=(int) row_info->rowbytes-1;
 
-      if (row_info->color_type == 2 && make_gray == 1) /* RGB */
+      if ((row_info->color_type == 2 || row_info->color_type == 6) &&
+          make_gray == 1) /* RGB */
       {
         if (row_info->bit_depth == 8)
           {
+            int incr=3;
+            if (row_info->color_type == 6)
+            {
+               incr=4;
+               i--;
+            }
             for ( ; i > 0 ; )
             {
                if (data[i] != data[i-1] || data[i] != data[i-2])
@@ -2598,12 +2608,18 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
                    make_gray = 2;
                  }
 
-               i-=3;
+               i-=incr;
             }
           }
 
         else /* bit depth == 16 */
           {
+            int incr=6;
+            if (row_info->color_type == 6)
+            {
+               incr=8;
+               i-=2;
+            }
             for ( ; i > 0 ; )
             {
                if (data[i] != data[i-2] || data[i] != data[i-4] ||
@@ -2611,7 +2627,7 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
                {
                   make_gray = 2;
                }
-               i-=6;
+               i-=incr;
             }
           }
       }
