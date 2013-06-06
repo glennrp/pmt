@@ -309,6 +309,7 @@ Change log:
 
 Version 1.7.60 (built with libpng-1.5.16 and zlib-1.2.8)
   Revise -reduce so reducing from color-type 6 to grayscale works.
+  Do not reduce to grayscale if a color bKGD chunk or iCCP chunk is present.
 
 Version 1.7.59 (built with libpng-1.5.16 and zlib-1.2.8)
   Show the acTL chunk in the chunk list in verbose output.
@@ -1495,7 +1496,9 @@ static PNG_CONST char *extension = "_C" DOT "png";
 
 static png_uint_32 width, height;
 static png_uint_32 measured_idat_length;
+static int found_color_bKGD = 0;
 static int found_gAMA = 0;
+static int found_iCCP = 0;
 static int found_IDAT = 0;
 #ifdef PNG_cHRM_SUPPORTED
 static int found_cHRM = 0;
@@ -4122,6 +4125,7 @@ int main(int argc, char *argv[])
         {
             for (i = 0; i <= DEFAULT_METHODS; i++)
                 try_method[i] = 0;
+
             /*
             Uncomment these in pngcrush-1.8.0
             make_gray = 1;
@@ -4142,8 +4146,14 @@ int main(int argc, char *argv[])
 
         if (make_gray)
         {
-           make_gray = 1;
-           try_method[0] = 0;
+           if ((found_iCCP && keep_unknown_chunk("iCCP", argv)) ||
+               (found_color_bKGD && keep_unknown_chunk("bKGD", argv)))
+              make_gray = 0;
+           else
+           {
+              make_gray = 1;
+              try_method[0] = 0;
+           }
         }
 
         if (make_opaque)
@@ -7239,6 +7249,25 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
           found_gAMA=1;
 #endif /* PNG_gAMA_SUPPORTED */
 
+#ifdef PNG_bKGD_SUPPORTED
+#ifdef PNG_UINT_bKGD
+        if (png_get_uint_32(chunk_name) == PNG_UINT_bKGD)
+#else
+        if (!png_memcmp(chunk_name, png_bKGD, 4))
+#endif
+          if (length == 6)
+            {
+                /* Set found_color_bKGD if the components are different,
+                 * so we do not do reduction of color-type from color to gray
+                 */
+                png_crc_read(png_ptr, buff, 6);
+                length -= 6;
+                if ((buff[0] != buff[2]) && (buff[0] != buff[4]) &&
+                    (buff[1] != buff[3]) && (buff[0] != buff[5]))
+                  found_color_bKGD=1;
+            }
+#endif /* PNG_bKGD_SUPPORTED */
+
 #ifdef PNG_cHRM_SUPPORTED
 #ifdef PNG_UINT_cHRM
         if (png_get_uint_32(chunk_name) == PNG_UINT_cHRM)
@@ -7256,6 +7285,8 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
         if (!png_memcmp(chunk_name, png_iCCP, 4))
 #endif
         {
+            found_iCCP = 1;
+
             /* Check for bad Photoshop iCCP chunk.  Libpng will reject the
              * bad chunk because the Adler-32 bytes are missing, but we check
              * here to see if it's really the sRGB profile, and if so, set the
