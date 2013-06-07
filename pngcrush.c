@@ -309,7 +309,12 @@ Change log:
 
 Version 1.7.60 (built with libpng-1.5.16 and zlib-1.2.8)
   Revise -reduce so reducing from color-type 6 to grayscale works.
-  Do not reduce to grayscale if a color bKGD chunk or iCCP chunk is present.
+  Issue a warning if reducing bit depth or color type would violate various
+    chunk dependencies and do not perform the action:
+    Do not reduce to grayscale if a color bKGD chunk, sBIT or iCCP chunk
+       is present.
+    Do not reduce bit depth if bKGD or sBIT chunk is present.
+    Do not reduce palette length if the hIST chunk is present.
 
 Version 1.7.59 (built with libpng-1.5.16 and zlib-1.2.8)
   Show the acTL chunk in the chunk list in verbose output.
@@ -1496,13 +1501,18 @@ static PNG_CONST char *extension = "_C" DOT "png";
 
 static png_uint_32 width, height;
 static png_uint_32 measured_idat_length;
+static int found_bKGD = 0;
 static int found_color_bKGD = 0;
-static int found_gAMA = 0;
-static int found_iCCP = 0;
-static int found_IDAT = 0;
 #ifdef PNG_cHRM_SUPPORTED
 static int found_cHRM = 0;
 #endif
+static int found_gAMA = 0;
+static int found_hIST = 0;
+static int found_iCCP = 0;
+static int found_IDAT = 0;
+static int found_sBIT = 0;
+static int found_sBIT_max = 0;
+static int found_sBIT_different_RGB_bits = 0;
 
 static int premultiply = 0;
 static int interlace_method = 0;
@@ -3215,8 +3225,8 @@ int main(int argc, char *argv[])
 #ifdef PNGCRUSH_LOCO
             do_loco = 1;
 #else
-            printf
-                ("Cannot do -loco because libpng was compiled"
+            fprintf
+                (STDERR,"Cannot do -loco because libpng was compiled"
                  " without MNG features");
 #endif
         }
@@ -4082,7 +4092,8 @@ int main(int argc, char *argv[])
         {
 
         if (do_color_count)
-            printf("   color counting (-cc option) is not supported.\n");
+            fprintf(STDERR,
+               "   color counting (-cc option) is not supported.\n");
 
         if (plte_len > 0 && force_output_bit_depth == 0)
           {
@@ -4144,11 +4155,35 @@ int main(int argc, char *argv[])
            try_method[0] = 0;
         }
 
+        /*
+         * From the PNG spec, various dependencies among chunk types
+         *   must be accounted for during any reduction of color type
+         *   or bit depth:
+         *
+         * IHDR valid bit depth depends on color type
+         *   valid filter type depends on color type (for MNG extensions)
+         * tRNS depends on color type
+         *   depends on num_palette for color type 3 (palette)
+         * iCCP valid profile depends on color type
+         * sBIT depends on color type and bit depth
+         * bKGD depends on color type and bit depth
+         * hIST depends on num_palette
+         *
+         * Chunk types present have been detected in the first pass over
+         *   the file, in the measure_idat() function.
+         */
+
         if (make_gray)
         {
            if ((found_iCCP && keep_unknown_chunk("iCCP", argv)) ||
-               (found_color_bKGD && keep_unknown_chunk("bKGD", argv)))
+               (found_color_bKGD && keep_unknown_chunk("bKGD", argv)) ||
+               (found_sBIT_different_RGB_bits &&
+               keep_unknown_chunk("sBIT", argv)))
+           {
+              fprintf(STDERR, "Cannot change colortype to gray when iCCP,"
+                  " bKGD, or sBIT chunk is present\n");
               make_gray = 0;
+           }
            else
            {
               make_gray = 1;
@@ -4164,12 +4199,33 @@ int main(int argc, char *argv[])
 
         if (make_8_bit)
         {
-           make_8_bit = 1;
-           try_method[0] = 0;
+           if ((found_bKGD && keep_unknown_chunk("bKGD", argv)) ||
+              (found_sBIT_max > 8 && keep_unknown_chunk("sBIT", argv)))
+           {
+              fprintf(STDERR, "Cannot reduce bit depth to 8 bKGD"
+                  " or sBIT chunk is present\n");
+              make_8_bit = 0;
+           }
+           else
+           {
+             make_8_bit = 1;
+             try_method[0] = 0;
+           }
         }
 
         if (reduce_palette)
-           try_method[0] = 0;
+        {
+           if ((found_hIST && keep_unknown_chunk("hIST", argv)))
+           {
+              fprintf(STDERR, "Cannot reduce palette length when hIST"
+                  " chunk is present\n");
+             reduce_palette = 0;
+           }
+           else
+           {
+             try_method[0] = 0;
+           }
+        }
 
         /* ////////////////////////////////////////////////////////////////////
         ////////////////                                   ////////////////////
@@ -4914,7 +4970,7 @@ int main(int argc, char *argv[])
 
                         if (color_type != 3 && output_color_type == 3)
                         {
-                            printf("  Cannot change to indexed color "
+                            fprintf(STDERR,"  Cannot change to indexed color "
                               "(color_type 3)\n");
                             output_color_type = input_color_type;
                         }
@@ -5571,8 +5627,8 @@ int main(int argc, char *argv[])
                         num_palette = plte_len;
                     if (do_pplt)
                     {
-                        printf("PPLT: %s\n", pplt_string);
-                        printf("Sorry, PPLT is not implemented yet.\n");
+                        fprintf(STDERR,"PPLT: %s\n", pplt_string);
+                        fprintf(STDERR,"Sorry, PPLT is not implemented yet.\n");
                     }
 
                     if (nosave == 0)
@@ -5802,12 +5858,15 @@ int main(int argc, char *argv[])
                                 if (verbose > 0 && last_trial)
                                 {
                                   if (added_text[0].compression < 0)
-                                      printf("   Added a tEXt chunk.\n");
+                                      fprintf(STDERR,
+                                         "   Added a tEXt chunk.\n");
                                   else if (added_text[0].compression == 0)
-                                      printf("   Added a zTXt chunk.\n");
+                                      fprintf(STDERR,
+                                         "   Added a zTXt chunk.\n");
 #ifdef PNG_iTXt_SUPPORTED
                                   else
-                                      printf("   Added a%scompressed iTXt chunk"
+                                      fprintf(STDERR,
+                                         "   Added a%scompressed iTXt chunk"
                                         ".\n", (added_text[0].compression == 1)?
                                         "n un" : " ");
 #endif
@@ -6421,7 +6480,7 @@ int main(int argc, char *argv[])
                     png_byte rgb_error =
                         png_get_rgb_to_gray_status(read_ptr);
                     if (last_trial && verbose > 0 && rgb_error)
-                        printf(
+                        fprintf(STDERR,
                           "   **** Converted non-gray image to gray. **** \n");
                 }
 #endif
@@ -6574,15 +6633,19 @@ int main(int argc, char *argv[])
                                 if (verbose > 0 && last_trial)
                                 {
                                   if (added_text[0].compression < 0)
-                                      printf("   Added a tEXt chunk.\n");
+                                      fprintf(STDERR,
+                                          "   Added a tEXt chunk.\n");
                                   else if (added_text[0].compression == 0)
-                                      printf("   Added a zTXt chunk.\n");
+                                      fprintf(STDERR,
+                                          "   Added a zTXt chunk.\n");
 #ifdef PNG_iTXt_SUPPORTED
                                   else if (added_text[0].compression == 1)
-                                      printf("   Added an uncompressed iTXt "
+                                      fprintf(STDERR,
+                                          "   Added an uncompressed iTXt "
                                         "chunk.\n");
                                   else
-                                      printf("   Added a compressed iTXt "
+                                      fprintf(STDERR,
+                                          "   Added a compressed iTXt "
                                         "chunk.\n");
 #endif
                                 }
@@ -6620,7 +6683,8 @@ int main(int argc, char *argv[])
                                                      &unknowns);
                     if (num_unknowns && nosave == 0)
                     {
-                        printf("Handling %d unknown chunks after IDAT\n",
+                        fprintf(STDERR,
+                               "Handling %d unknown chunks after IDAT\n",
                                num_unknowns);
                         png_set_unknown_chunks(write_ptr,
                                                write_end_info_ptr,
@@ -7198,20 +7262,20 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
             if (verbose > 1)
             {
                 chunk_name[4] = '\0';
-                printf("Reading %s chunk, length = %lu.\n", chunk_name,
+                fprintf(STDERR, "Reading %s chunk, length = %lu.\n", chunk_name,
                        (unsigned long)length);
             }
 
             if (png_get_uint_32(chunk_name) == PNG_UINT_CgBI)
             {
-                printf(" This is an Xcode CgBI file, not a PNG file.\n");
+                fprintf(STDERR, " This is an Xcode CgBI file, not a PNG file.\n");
                 if (fix)
                 {
-                    printf (" Removing the CgBI chunk.\n");
+                    fprintf (STDERR, " Removing the CgBI chunk.\n");
                 }
                 else
                 {
-                    printf (
+                    fprintf (STDERR,
                     " Try \"pngcrush -fix ...\" to attempt to read it.\n");
                 }
                 found_CgBI++;
@@ -7277,6 +7341,15 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
           found_cHRM=1;
 #endif /* PNG_cHRM_SUPPORTED */
 
+#ifdef PNG_hIST_SUPPORTED
+#ifdef PNG_UINT_hIST
+        if (png_get_uint_32(chunk_name) == PNG_UINT_hIST)
+#else
+        if (!png_memcmp(chunk_name, png_hIST, 4))
+#endif
+          found_hIST=1;
+#endif /* PNG_hIST_SUPPORTED */
+
 #ifdef PNG_iCCP_SUPPORTED
         /* check for bad Photoshop iCCP chunk */
 #ifdef PNG_UINT_iCCP
@@ -7301,7 +7374,8 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
                 if (!strncmp((png_const_charp) buff, "Photoshop ICC profile",
                      21))
                 {
-                    printf("   Replacing bad Photoshop iCCP chunk with an "
+                    fprintf(STDERR,
+                      "   Replacing bad Photoshop iCCP chunk with an "
                       "sRGB chunk\n");
 #ifdef PNG_gAMA_SUPPORTED
 #  ifdef PNG_FIXED_POINT_SUPPORTED
@@ -7318,6 +7392,21 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
              */
         }
 #endif /* PNG_iCCP_SUPPORTED */
+
+#ifdef PNG_sBIT_SUPPORTED
+#ifdef PNG_UINT_sBIT
+        if (png_get_uint_32(chunk_name) == PNG_UINT_sBIT)
+#else
+        if (!png_memcmp(chunk_name, png_sBIT, 4))
+#endif
+        {
+          found_sBIT = 1;
+          /* To do: check for actual max_sBIT */
+          found_sBIT_max = 16;
+          /* To do: check for different significant bits in sBIT */
+          found_sBIT_different_RGB_bits = 1;
+        }
+#endif /* PNG_sBIT_SUPPORTED */
 
         png_crc_finish(png_ptr, length);
 
