@@ -310,11 +310,12 @@ Change log:
 Version 1.7.60 (built with libpng-1.5.16 and zlib-1.2.8)
   Revise -reduce so reducing from color-type 6 to grayscale works.
   Issue a warning if reducing bit depth or color type would violate various
-    chunk dependencies and do not perform the action:
+    chunk dependencies, and do not perform the action:
     Do not reduce to grayscale if a color bKGD chunk, sBIT or iCCP chunk
        is present.
     Do not reduce bit depth if bKGD or sBIT chunk is present.
     Do not reduce palette length if the hIST chunk is present.
+  Set "found_iCCP" flag to zero to avoid re-reading a bad iCCP chunk.
 
 Version 1.7.59 (built with libpng-1.5.16 and zlib-1.2.8)
   Show the acTL chunk in the chunk list in verbose output.
@@ -1513,6 +1514,7 @@ static int found_IDAT = 0;
 static int found_sBIT = 0;
 static int found_sBIT_max = 0;
 static int found_sBIT_different_RGB_bits = 0;
+static int found_sRGB = 0;
 
 static int premultiply = 0;
 static int interlace_method = 0;
@@ -1706,7 +1708,7 @@ static int input_format = 0;    /* 0: PNG  1: MNG */
 static int output_format = 0;
 #endif
 static int do_color_count;
-png_uint_32 png_measure_idat(png_structp png_ptr);
+png_uint_32 pngcrush_measure_idat(png_structp png_ptr);
 
 static png_uint_32 idat_length[MAX_METHODSP1];
 static int filter_type, zlib_level;
@@ -1743,7 +1745,8 @@ static /* const */ png_byte chunks_to_ignore[] = {
 #endif
 
 /* Prototypes */
-static void png_cexcept_error(png_structp png_ptr, png_const_charp message);
+static void pngcrush_cexcept_error(png_structp png_ptr,
+  png_const_charp message);
 
 void PNGAPI pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
   png_size_t length);
@@ -1802,7 +1805,7 @@ int keep_unknown_chunk(png_const_charp name, char *argv[]);
 int keep_chunk(png_const_charp name, char *argv[]);
 void show_result(void);
 png_uint_32 measure_idats(FILE * fp);
-png_uint_32 png_measure_idat(png_structp png_ptr);
+png_uint_32 pngcrush_measure_idat(png_structp png_ptr);
 
 void print_version_info(void);
 void print_usage(int retval);
@@ -2101,7 +2104,8 @@ pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
 
 /* cexcept interface */
 
-static void png_cexcept_error(png_structp png_ptr, png_const_charp err_msg)
+static void pngcrush_cexcept_error(png_structp png_ptr,
+   png_const_charp err_msg)
 {
     if (png_ptr);
 
@@ -4022,14 +4026,14 @@ int main(int argc, char *argv[])
 #  ifdef PNG_USER_MEM_SUPPORTED
                if (verbose > 0)
                   mng_ptr = png_create_write_struct_2(PNG_LIBPNG_VER_STRING,
-                    (png_voidp) NULL, (png_error_ptr) png_cexcept_error,
+                    (png_voidp) NULL, (png_error_ptr) pngcrush_cexcept_error,
                     (png_error_ptr) NULL, (png_voidp) NULL,
                     (png_malloc_ptr) pngcrush_debug_malloc,
                     (png_free_ptr) pngcrush_debug_free);
                else
 #  endif
                   mng_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING,
-                    (png_voidp) NULL, (png_error_ptr) png_cexcept_error,
+                    (png_voidp) NULL, (png_error_ptr) pngcrush_cexcept_error,
                     (png_error_ptr) NULL);
                if (mng_ptr == NULL)
                   fprintf(STDERR, "pngcrush could not create mng_ptr");
@@ -4181,7 +4185,7 @@ int main(int argc, char *argv[])
                keep_unknown_chunk("sBIT", argv)))
            {
               fprintf(STDERR, "Cannot change colortype to gray when iCCP,"
-                  " bKGD, or sBIT chunk is present\n");
+                  " bKGD with color, or sBIT chunk is present\n");
               make_gray = 0;
            }
            else
@@ -4202,7 +4206,7 @@ int main(int argc, char *argv[])
            if ((found_bKGD && keep_unknown_chunk("bKGD", argv)) ||
               (found_sBIT_max > 8 && keep_unknown_chunk("sBIT", argv)))
            {
-              fprintf(STDERR, "Cannot reduce bit depth to 8 bKGD"
+              fprintf(STDERR, "Cannot reduce bit depth to 8 when bKGD"
                   " or sBIT chunk is present\n");
               make_8_bit = 0;
            }
@@ -4448,14 +4452,14 @@ int main(int argc, char *argv[])
 #ifdef PNG_USER_MEM_SUPPORTED
                 if (verbose > 0)
                    read_ptr = png_create_read_struct_2(PNG_LIBPNG_VER_STRING,
-                     (png_voidp) NULL, (png_error_ptr) png_cexcept_error,
+                     (png_voidp) NULL, (png_error_ptr) pngcrush_cexcept_error,
                      (png_error_ptr) NULL, (png_voidp) NULL,
                      (png_malloc_ptr) pngcrush_debug_malloc,
                      (png_free_ptr) pngcrush_debug_free);
                 else
 #endif /* PNG_USER_MEM_SUPPORTED */
                    read_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING,
-                     (png_voidp) NULL, (png_error_ptr) png_cexcept_error,
+                     (png_voidp) NULL, (png_error_ptr) pngcrush_cexcept_error,
                      (png_error_ptr) NULL);
                 if (read_ptr == NULL)
                     Throw "pngcrush could not create read_ptr";
@@ -4520,7 +4524,8 @@ int main(int argc, char *argv[])
                    if (verbose > 0)
                        write_ptr = png_create_write_struct_2(
                          PNG_LIBPNG_VER_STRING,
-                         (png_voidp) NULL, (png_error_ptr) png_cexcept_error,
+                         (png_voidp) NULL,
+                            (png_error_ptr) pngcrush_cexcept_error,
                          (png_error_ptr) NULL, (png_voidp) NULL,
                          (png_malloc_ptr) pngcrush_debug_malloc,
                          (png_free_ptr) pngcrush_debug_free);
@@ -4528,7 +4533,8 @@ int main(int argc, char *argv[])
 #endif
                        write_ptr = png_create_write_struct(
                          PNG_LIBPNG_VER_STRING,
-                         (png_voidp) NULL, (png_error_ptr) png_cexcept_error,
+                         (png_voidp) NULL,
+                         (png_error_ptr) pngcrush_cexcept_error,
                          (png_error_ptr) NULL);
                     if (write_ptr == NULL)
                         Throw "pngcrush could not create write_ptr";
@@ -4572,7 +4578,7 @@ int main(int argc, char *argv[])
                 pngcrush_pause();
 
                 /* We don't need to check CRC's because they were already
-                   checked in the png_measure_idat function */
+                   checked in the pngcrush_measure_idat function */
 
 #ifdef PNG_CRC_QUIET_USE
                 png_set_crc_action(read_ptr, PNG_CRC_QUIET_USE,
@@ -5310,7 +5316,7 @@ int main(int argc, char *argv[])
                             intent = file_intent;
                         }
                     }
-                    else if (intent >= 0)
+                    else if (found_sRGB)
                     {
 #ifdef PNG_gAMA_SUPPORTED
 #  ifdef PNG_FIXED_POINT_SUPPORTED
@@ -5359,7 +5365,7 @@ int main(int argc, char *argv[])
                     png_uint_32 proflen;
                     int compression_method;
 
-                    if (png_get_iCCP
+                    if (found_iCCP && png_get_iCCP
                         (read_ptr, read_info_ptr, &name,
                          &compression_method, &profile, &proflen))
                     {
@@ -6978,7 +6984,7 @@ png_uint_32 measure_idats(FILE * fp_in)
     Try {
         read_ptr =
             png_create_read_struct(PNG_LIBPNG_VER_STRING, (png_voidp) NULL,
-                                   (png_error_ptr) png_cexcept_error,
+                                   (png_error_ptr) pngcrush_cexcept_error,
                                    (png_error_ptr) NULL);
         P1( "Allocating read_info,  end_info structures\n");
         read_info_ptr = png_create_info_struct(read_ptr);
@@ -6991,7 +6997,7 @@ png_uint_32 measure_idats(FILE * fp_in)
 #endif
 
         png_set_sig_bytes(read_ptr, 0);
-        measured_idat_length = png_measure_idat(read_ptr);
+        measured_idat_length = pngcrush_measure_idat(read_ptr);
         P2("measure_idats: IDAT length=%lu\n",
           (unsigned long)measured_idat_length);
         P1( "Destroying data structs\n");
@@ -7011,7 +7017,7 @@ png_uint_32 measure_idats(FILE * fp_in)
 
 
 
-png_uint_32 png_measure_idat(png_structp png_ptr)
+png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
 {
     /* Copyright (C) 1999-2002, 2006-2013 Glenn Randers-Pehrson
        (glennrp@users.sf.net)
@@ -7384,6 +7390,8 @@ png_uint_32 png_measure_idat(png_structp png_ptr)
                     image_specified_gamma = 0.45455;
 #  endif
 #endif /* PNG_gAMA_SUPPORTED */
+                    found_iCCP = 0;
+                    found_sRGB = 1;
                     intent = 0;
                 }
             }
