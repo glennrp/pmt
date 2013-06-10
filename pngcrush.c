@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.60"
+#define PNGCRUSH_VERSION "1.7.61"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -306,6 +306,13 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.61 (built with libpng-1.5.16 and zlib-1.2.8)
+  Check sBIT chunk data to see if reduction to gray or to 8-bit is permitted,
+    i.e., the RGB sBIT values are equal to each other or the sBIT values are
+    not greater than 8, respectively.
+  Do not try to make_opaque if the tRNS chunk is found.
+  Added warning when ignoring an invalid commandline option.
 
 Version 1.7.60 (built with libpng-1.5.16 and zlib-1.2.8)
   Revise -reduce so reducing from color-type 6 to grayscale works.
@@ -1515,8 +1522,10 @@ static int found_sBIT = 0;
 static int found_sBIT_max = 0;
 static int found_sBIT_different_RGB_bits = 0;
 static int found_sRGB = 0;
+static int found_tRNS = 0;
 
 static int premultiply = 0;
+static int printed_version_info = 0;
 static int interlace_method = 0;
 #if (PNG_LIBPNG_VER < 10400)
 png_size_t max_bytes;
@@ -2593,6 +2602,7 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
       if (row_info->color_type < 4)
       {
         blacken = 3;  /* It doesn't have an alpha channel */
+        /* To do: check if tRNS chunk can be removed from color type 0 or 2 */
         make_opaque = 3;
       }
 
@@ -3056,7 +3066,6 @@ int main(int argc, char *argv[])
         if (!strncmp(argv[i], "-", 1))
             names++;
 
-
         /* GRR:  start of giant else-if block */
         if (!strncmp(argv[i], "-fast", 5))
         {
@@ -3198,29 +3207,10 @@ int main(int argc, char *argv[])
                 fm[method] = specified_filter;
             else
             {
-                for (filt = 0; filt < 6; filt++)
+                if (brute_force_filter == 0)
+                  for (filt = 0; filt < 6; filt++)
                     brute_force_filters[filt] = 1;
                 brute_force_filters[specified_filter] = 0;
-                method = 11;
-                for (filt = 0; filt < 6; filt++)
-                {
-                    try_method[method] = brute_force_filters[filt] |
-                        brute_force_strategies[2];
-                    method++;
-                }
-                for (lev = 0; lev < 10; lev++)
-                {
-                    for (strat = 0; strat < 2; strat++)
-                    {
-                        for (filt = 0; filt < 6; filt++)
-                        {
-                            try_method[method] = brute_force_levels[lev] |
-                                brute_force_filters[filt] |
-                                brute_force_strategies[strat];
-                            method++;
-                        }
-                    }
-                }
                 brute_force_filter++;
             }
         }
@@ -3234,7 +3224,7 @@ int main(int argc, char *argv[])
                  " without MNG features");
 #endif
         }
-        else if (!strncmp(argv[i], "-l", 2))
+        else if (!strncmp(argv[i], "-l", 3))
         {
             int specified_level = atoi(argv[++i]);
             if (specified_level > 9 || specified_level < 0)
@@ -3248,25 +3238,6 @@ int main(int argc, char *argv[])
                     for (lev = 0; lev < 10; lev++)
                         brute_force_levels[lev] = 1;
                 brute_force_levels[specified_level] = 0;
-                method = 11;
-                for (filt = 0; filt < 6; filt++)
-                {
-                    lv[method] = specified_level;
-                    method++;
-                }
-                for (lev = 0; lev < 10; lev++)
-                {
-                    for (strat = 0; strat < 2; strat++)
-                    {
-                        for (filt = 0; filt < 6; filt++)
-                        {
-                            try_method[method] = brute_force_levels[lev] |
-                                brute_force_filters[filt] |
-                                brute_force_strategies[strat];
-                            method++;
-                        }
-                    }
-                }
                 brute_force_level++;
             }
         }
@@ -3312,6 +3283,7 @@ int main(int argc, char *argv[])
         {
             ++verbose;
             print_version_info();
+            printed_version_info++;
             print_usage(0);   /* this exits */
         }
 
@@ -3745,33 +3717,23 @@ int main(int argc, char *argv[])
                     for (strat = 0; strat < 2; strat++)
                         brute_force_strategies[strat] = 1;
                 brute_force_strategies[specified_strategy] = 0;
-                method = 11;
-                for (filt = 0; filt < 6; filt++)
-                {
-                    if (specified_strategy != 2)
-                        try_method[method] = 1;
-                    method++;
-                }
-                for (lev = 0; lev < 10; lev++)
-                {
-                    for (strat = 0; strat < 2; strat++)
-                    {
-                        for (filt = 0; filt < 6; filt++)
-                        {
-                            try_method[method] = brute_force_levels[lev] |
-                                brute_force_filters[filt] |
-                                brute_force_strategies[strat];
-                            method++;
-                        }
-                    }
-                }
+                brute_force_strategy++;
             }
-            brute_force_strategy++;
+        }
+        else if (!strncmp(argv[i], "-", 1))
+        {
+            if (verbose > 0 && printed_version_info == 0)
+            {
+              print_version_info();
+              printed_version_info++;
+            }
+            fprintf(STDERR, "\n  Ignoring invalid option: %s\n",
+                    argv[i]);
         } /* GRR:  end of giant if-else block */
     } /* end of loop over args ============================================ */
 
 
-    if (verbose > 0)
+    if (verbose > 0 && printed_version_info == 0)
         print_version_info();
 
     if (default_compression_window == 32)
@@ -4197,8 +4159,13 @@ int main(int argc, char *argv[])
 
         if (make_opaque)
         {
-           make_opaque = 1;
-           try_method[0] = 0;
+           if (found_tRNS)
+             make_opaque = 0;
+           else
+           {
+             make_opaque = 1;
+             try_method[0] = 0;
+           }
         }
 
         if (make_8_bit)
@@ -4230,6 +4197,40 @@ int main(int argc, char *argv[])
              try_method[0] = 0;
            }
         }
+
+        /* Handle specified brute_force options */
+        if (brute_force_level || brute_force_filter || brute_force_strategy)
+        {
+          for (method = 1; method < num_methods; method++)
+             {
+                int option;
+
+                try_method[method]=1;
+                if (brute_force_level)
+                {
+                   for (option = 0; option < 10; option++)
+                      if (option == lv[method])
+                         try_method[method]=brute_force_levels[option];
+                }
+
+                if ((try_method[method] == 0) && brute_force_filter)
+                {
+                   for (option = 0; option < 6; option++)
+                      if (option == fm[method])
+                         try_method[method]=brute_force_filters[option];
+                }
+
+                if ((try_method[method] == 0) && brute_force_strategy)
+                {
+                   for (option = 0; option < NUM_STRATEGIES; option++)
+                      if (option == zs[method])
+                         try_method[method]=brute_force_strategies[option];
+                }
+
+                if (method && method < 11)
+                   try_method[method] = 1;
+           }
+         }
 
         /* ////////////////////////////////////////////////////////////////////
         ////////////////                                   ////////////////////
@@ -7408,13 +7409,33 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
         if (!png_memcmp(chunk_name, png_sBIT, 4))
 #endif
         {
-          found_sBIT = 1;
-          /* To do: check for actual max_sBIT */
-          found_sBIT_max = 16;
-          /* To do: check for different significant bits in sBIT */
-          found_sBIT_different_RGB_bits = 1;
+          if (length <= 4)
+          {
+            int i;
+            png_crc_read(png_ptr, buff, length);
+            found_sBIT_max=0;
+            for (i=length; i; i--)
+              if (buff[i] > found_sBIT_max)
+                 found_sBIT_max=buff[i];
+
+            if (length > 2)
+              if (buff[0] != buff[1] || buff[0] != buff[2])
+                found_sBIT_different_RGB_bits = 1;
+
+            found_sBIT = 1;
+            length = 0;
+          }
         }
 #endif /* PNG_sBIT_SUPPORTED */
+
+#ifdef PNG_tRNS_SUPPORTED
+#ifdef PNG_UINT_tRNS
+        if (png_get_uint_32(chunk_name) == PNG_UINT_tRNS)
+#else
+        if (!png_memcmp(chunk_name, png_tRNS, 4))
+#endif
+          found_tRNS=1;
+#endif /* PNG_tRNS_SUPPORTED */
 
         png_crc_finish(png_ptr, length);
 
