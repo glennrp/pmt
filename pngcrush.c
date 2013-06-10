@@ -3153,7 +3153,7 @@ int main(int argc, char *argv[])
         {
             do_color_count = 0;
         }
-        else if (!strncmp(argv[i], "-c", 2))
+        else if (!strncmp(argv[i], "-c", 3) && !strncmp(argv[i], "-col", 4))
         {
             names++;
             BUMP_I;
@@ -3167,7 +3167,7 @@ int main(int argc, char *argv[])
             global_things_have_changed = 1;
         }
 #endif
-        else if (!strncmp(argv[i], "-d", 2))
+        else if (!strncmp(argv[i], "-d", 3) && !strncmp(argv[i], "-dir", 4))
         {
             BUMP_I;
             if (pngcrush_mode == EXTENSION_MODE)
@@ -3180,7 +3180,7 @@ int main(int argc, char *argv[])
         {
             pngcrush_must_exit = 1;
         }
-        else if (!strncmp(argv[i], "-e", 2))
+        else if (!strncmp(argv[i], "-e", 3) && !strncmp(argv[i], "-ext", 4))
         {
             BUMP_I;
             if (pngcrush_mode == DIRECTORY_MODE)
@@ -3197,7 +3197,7 @@ int main(int argc, char *argv[])
         {
             fix++;
         }
-        else if (!strncmp(argv[i], "-f", 2))
+        else if (!strncmp(argv[i], "-f", 3) && !strncmp(argv[i], "-fil", 4))
         {
             int specified_filter = atoi(argv[++i]);
             if (specified_filter > 5 || specified_filter < 0)
@@ -3224,7 +3224,7 @@ int main(int argc, char *argv[])
                  " without MNG features");
 #endif
         }
-        else if (!strncmp(argv[i], "-l", 3))
+        else if (!strncmp(argv[i], "-l", 3) && !strncmp(argv[i], "-lev", 4))
         {
             int specified_level = atoi(argv[++i]);
             if (specified_level > 9 || specified_level < 0)
@@ -3243,7 +3243,7 @@ int main(int argc, char *argv[])
         }
 
 #ifdef PNG_gAMA_SUPPORTED
-        else if (!strncmp(argv[i], "-g", 2))
+        else if (!strncmp(argv[i], "-g", 3) && !strncmp(argv[i], "-gam", 4))
         {
             names++;
             BUMP_I;
@@ -3279,7 +3279,7 @@ int main(int argc, char *argv[])
         }
 
 #endif /* PNG_gAMA_SUPPORTED */
-        else if (!strncmp(argv[i], "-h", 2))
+        else if (!strncmp(argv[i], "-h", 3) && !strncmp(argv[i], "-hel", 4))
         {
             ++verbose;
             print_version_info();
@@ -3349,7 +3349,7 @@ int main(int argc, char *argv[])
             new_mng++;
 #endif
         }
-        else if (!strncmp(argv[i], "-m", 2))
+        else if (!strncmp(argv[i], "-m", 3) && !strncmp(argv[i], "-met", 4))
         {
             names++;
             BUMP_I;
@@ -3394,7 +3394,7 @@ int main(int argc, char *argv[])
             reduce_palette = 0;
         }
 
-        else if (!strncmp(argv[i], "-nosave", 2))
+        else if (!strncmp(argv[i], "-nosave", 5))
         {
             /* no save; I just use this for testing decode speed */
             /* also to avoid saving if a CgBI chunk was found */
@@ -3434,11 +3434,11 @@ int main(int argc, char *argv[])
             strcpy(pplt_string, argv[i]);
             global_things_have_changed = 1;
         }
-        else if (!strncmp(argv[i], "-p", 2))
+        else if (!strncmp(argv[i], "-p", 3) && !strncmp(argv[i], "-pau", 4))
         {
             pauses++;
         }
-        else if (!strncmp(argv[i], "-q", 2))
+        else if (!strncmp(argv[i], "-q", 3) && !strncmp(argv[i], "-qui", 4))
         {
             verbose = 0;
         }
@@ -3502,7 +3502,7 @@ int main(int argc, char *argv[])
             max_rows_at_a_time = atoi(argv[i]);
         }
 #endif
-        else if (!strncmp(argv[i], "-r", 2))
+        else if (!strncmp(argv[i], "-r", 3) && !strncmp(argv[i], "-rem", 4))
         {
             remove_chunks = i;
             names++;
@@ -3552,7 +3552,7 @@ int main(int argc, char *argv[])
             else
                 i--;
         }
-        else if (!strncmp(argv[i], "-s", 2))
+        else if (!strncmp(argv[i], "-s", 3) && !strncmp(argv[i], "-sil", 4))
         {
             verbose = 0;
         }
@@ -3587,10 +3587,10 @@ int main(int argc, char *argv[])
                 }
                 else
 #endif
-                if (!strncmp(argv[i], "-z", 2))
+                if (!strncmp(argv[i], "-z", 3))
                     text_compression[text_inputs] =
                         PNG_TEXT_COMPRESSION_zTXt;
-                else if (!strncmp(argv[i], "-t", 2))
+                else if (!strncmp(argv[i], "-t", 3))
                     text_compression[text_inputs] =
                         PNG_TEXT_COMPRESSION_NONE;
 #ifdef PNG_iTXt_SUPPORTED
@@ -3637,8 +3637,7 @@ int main(int argc, char *argv[])
                 i += 3;
                 names += 3;
 #ifdef PNG_iTXt_SUPPORTED
-                if (!strncmp(argv[i], "-i", 2)
-                    || !strncmp(argv[i], "-zi", 3))
+                if (!strncmp(argv[i], "-i", 3) && !strncmp(argv[i], "-itx", 4))
                 {
                     i++;
                     BUMP_I;
@@ -3688,22 +3687,22 @@ int main(int argc, char *argv[])
             fprintf(STDERR, " for the most recent version.\n");
             verbose = 0;
         }
-        else if (!strncmp(argv[i], "-v", 2))
+        else if (!strncmp(argv[i], "-v", 3) && !strncmp(argv[i], "-ver", 4))
         {
             verbose++;
         }
-        else if (!strncmp(argv[i], "-w", 2))
+        else if (!strncmp(argv[i], "-w", 3) && !strncmp(argv[i], "-win", 4))
         {
             default_compression_window = atoi(argv[++i]);
             force_compression_window++;
             names++;
         }
-        else if (!strncmp(argv[i], "-zm", 3))
+        else if (!strncmp(argv[i], "-zm", 4))
         {
             compression_mem_level = atoi(argv[++i]);
             names++;
         }
-        else if (!strncmp(argv[i], "-z", 2))
+        else if (!strncmp(argv[i], "-z", 3))
         {
             int specified_strategy = atoi(argv[++i]);
             if (specified_strategy > 2 || specified_strategy < 0)
