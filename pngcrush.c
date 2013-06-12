@@ -308,6 +308,10 @@
 Change log:
 
 Version 1.7.62 (built with libpng-1.5.16 and zlib-1.2.8)
+  Remove old filename before renaming, when using the "-ow" option on
+    any Windows platform, not just CYGWIN (see log entry for pngcrush-1.7.43).
+  Reverted error with handling single-character options like "-v", introduced
+    in 1.7.61.
 
 Version 1.7.61 (built with libpng-1.5.16 and zlib-1.2.8)
   Check sBIT chunk data to see if reduction to gray or to 8-bit is permitted,
@@ -1463,9 +1467,9 @@ png_uint_32 pngcrush_crc;
 #define STRNGIFY_STAGE1(x) #x
 #define STRNGIFY(x) STRNGIFY_STAGE1(x)
 
-#define STR_BUF_SIZE      256
+#define STR_BUF_SIZE      260
 #define MAX_IDAT_SIZE     524288L
-#define MAX_METHODS       200
+#define MAX_METHODS       150
 #define MAX_METHODSP1     (MAX_METHODS+1)
 #define DEFAULT_METHODS   10
 #define FAKE_PAUSE_STRING "P"
@@ -3156,7 +3160,7 @@ int main(int argc, char *argv[])
         {
             do_color_count = 0;
         }
-        else if (!strncmp(argv[i], "-c", 3) && !strncmp(argv[i], "-col", 4))
+        else if (!strncmp(argv[i], "-c", 3) || !strncmp(argv[i], "-col", 4))
         {
             names++;
             BUMP_I;
@@ -3170,7 +3174,7 @@ int main(int argc, char *argv[])
             global_things_have_changed = 1;
         }
 #endif
-        else if (!strncmp(argv[i], "-d", 3) && !strncmp(argv[i], "-dir", 4))
+        else if (!strncmp(argv[i], "-d", 3) || !strncmp(argv[i], "-dir", 4))
         {
             BUMP_I;
             if (pngcrush_mode == EXTENSION_MODE)
@@ -3183,7 +3187,7 @@ int main(int argc, char *argv[])
         {
             pngcrush_must_exit = 1;
         }
-        else if (!strncmp(argv[i], "-e", 3) && !strncmp(argv[i], "-ext", 4))
+        else if (!strncmp(argv[i], "-e", 3) || !strncmp(argv[i], "-ext", 4))
         {
             BUMP_I;
             if (pngcrush_mode == DIRECTORY_MODE)
@@ -3200,7 +3204,7 @@ int main(int argc, char *argv[])
         {
             fix++;
         }
-        else if (!strncmp(argv[i], "-f", 3) && !strncmp(argv[i], "-fil", 4))
+        else if (!strncmp(argv[i], "-f", 3) || !strncmp(argv[i], "-fil", 4))
         {
             int specified_filter = atoi(argv[++i]);
             if (specified_filter > 5 || specified_filter < 0)
@@ -3227,7 +3231,7 @@ int main(int argc, char *argv[])
                  " without MNG features");
 #endif
         }
-        else if (!strncmp(argv[i], "-l", 3) && !strncmp(argv[i], "-lev", 4))
+        else if (!strncmp(argv[i], "-l", 3) || !strncmp(argv[i], "-lev", 4))
         {
             int specified_level = atoi(argv[++i]);
             if (specified_level > 9 || specified_level < 0)
@@ -3246,7 +3250,7 @@ int main(int argc, char *argv[])
         }
 
 #ifdef PNG_gAMA_SUPPORTED
-        else if (!strncmp(argv[i], "-g", 3) && !strncmp(argv[i], "-gam", 4))
+        else if (!strncmp(argv[i], "-g", 3) || !strncmp(argv[i], "-gam", 4))
         {
             names++;
             BUMP_I;
@@ -3282,7 +3286,7 @@ int main(int argc, char *argv[])
         }
 
 #endif /* PNG_gAMA_SUPPORTED */
-        else if (!strncmp(argv[i], "-h", 3) && !strncmp(argv[i], "-hel", 4))
+        else if (!strncmp(argv[i], "-h", 3) || !strncmp(argv[i], "-hel", 4))
         {
             ++verbose;
             print_version_info();
@@ -3352,7 +3356,7 @@ int main(int argc, char *argv[])
             new_mng++;
 #endif
         }
-        else if (!strncmp(argv[i], "-m", 3) && !strncmp(argv[i], "-met", 4))
+        else if (!strncmp(argv[i], "-m", 3) || !strncmp(argv[i], "-met", 4))
         {
             names++;
             BUMP_I;
@@ -3397,7 +3401,7 @@ int main(int argc, char *argv[])
             reduce_palette = 0;
         }
 
-        else if (!strncmp(argv[i], "-nosave", 5))
+        else if (!strncmp(argv[i], "-n", 3) || !strncmp(argv[i], "-nos", 4))
         {
             /* no save; I just use this for testing decode speed */
             /* also to avoid saving if a CgBI chunk was found */
@@ -3437,11 +3441,11 @@ int main(int argc, char *argv[])
             strcpy(pplt_string, argv[i]);
             global_things_have_changed = 1;
         }
-        else if (!strncmp(argv[i], "-p", 3) && !strncmp(argv[i], "-pau", 4))
+        else if (!strncmp(argv[i], "-p", 3) || !strncmp(argv[i], "-pau", 4))
         {
             pauses++;
         }
-        else if (!strncmp(argv[i], "-q", 3) && !strncmp(argv[i], "-qui", 4))
+        else if (!strncmp(argv[i], "-q", 3) || !strncmp(argv[i], "-qui", 4))
         {
             verbose = 0;
         }
@@ -3505,7 +3509,7 @@ int main(int argc, char *argv[])
             max_rows_at_a_time = atoi(argv[i]);
         }
 #endif
-        else if (!strncmp(argv[i], "-r", 3) && !strncmp(argv[i], "-rem", 4))
+        else if (!strncmp(argv[i], "-r", 3) || !strncmp(argv[i], "-rem", 4))
         {
             remove_chunks = i;
             names++;
@@ -3555,7 +3559,7 @@ int main(int argc, char *argv[])
             else
                 i--;
         }
-        else if (!strncmp(argv[i], "-s", 3) && !strncmp(argv[i], "-sil", 4))
+        else if (!strncmp(argv[i], "-s", 3) || !strncmp(argv[i], "-sil", 4))
         {
             verbose = 0;
         }
@@ -3640,7 +3644,7 @@ int main(int argc, char *argv[])
                 i += 3;
                 names += 3;
 #ifdef PNG_iTXt_SUPPORTED
-                if (!strncmp(argv[i], "-i", 3) && !strncmp(argv[i], "-itx", 4))
+                if (!strncmp(argv[i], "-i", 3) || !strncmp(argv[i], "-itx", 4))
                 {
                     i++;
                     BUMP_I;
@@ -3690,11 +3694,11 @@ int main(int argc, char *argv[])
             fprintf(STDERR, " for the most recent version.\n");
             verbose = 0;
         }
-        else if (!strncmp(argv[i], "-v", 3) && !strncmp(argv[i], "-ver", 4))
+        else if (!strncmp(argv[i], "-v", 3) || !strncmp(argv[i], "-ver", 4))
         {
             verbose++;
         }
-        else if (!strncmp(argv[i], "-w", 3) && !strncmp(argv[i], "-win", 4))
+        else if (!strncmp(argv[i], "-w", 3) || !strncmp(argv[i], "-win", 4))
         {
             default_compression_window = atoi(argv[++i]);
             force_compression_window++;
@@ -6867,7 +6871,9 @@ int main(int argc, char *argv[])
         {
             /* rename the new file , outname = inname */
             if (
-#ifdef CYGWIN
+#if (defined(_Windows) || defined(_WINDOWS) || defined(WIN32) ||  \
+   defined(_WIN32) || defined(__WIN32__) || defined(__CYGWIN__) || \
+   defined(__DJGPP__) || defined(CYGWIN))
               remove(inname) != 0 ||
 #endif
               rename(outname, inname) != 0 )
@@ -7546,7 +7552,7 @@ void print_version_info(void)
 #  if defined(__DJGPP__)
     fprintf(STDERR,
       "\n"
-      " | under DJGPP %d.%d, Copyright (C) 1995, D. J. Delorie\n"
+      " | under DJGPP %d.%d, Copyright (C) 1995, DJ Delorie\n"
       " | and loaded with PMODE/DJ, by Thomas Pytel and Matthias Grimrath\n"
       " |    Copyright (C) 1996, Matthias Grimrath.\n",
       __DJGPP__, __DJGPP_MINOR__);
