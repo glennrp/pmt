@@ -313,6 +313,7 @@ Version 1.7.61 (built with libpng-1.5.16 and zlib-1.2.8)
     not greater than 8, respectively.
   Do not try to make_opaque if the tRNS chunk is found.
   Added warning when ignoring an invalid commandline option.
+  Improved brute_force handling with specified level, filter, or strategy.
 
 Version 1.7.60 (built with libpng-1.5.16 and zlib-1.2.8)
   Revise -reduce so reducing from color-type 6 to grayscale works.
