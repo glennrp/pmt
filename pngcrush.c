@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.61"
+#define PNGCRUSH_VERSION "1.7.62"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -306,6 +306,8 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.62 (built with libpng-1.5.16 and zlib-1.2.8)
 
 Version 1.7.61 (built with libpng-1.5.16 and zlib-1.2.8)
   Check sBIT chunk data to see if reduction to gray or to 8-bit is permitted,
