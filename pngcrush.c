@@ -307,6 +307,10 @@
 
 Change log:
 
+Version 1.7.63 (built with libpng-1.5.16 and zlib-1.2.8)
+  Add "int dowildcard=-1;" in an attempt to get wildcard arguments working
+    in the cross-compiled MinGW executables.
+
 Version 1.7.62 (built with libpng-1.5.16 and zlib-1.2.8)
   Remove old filename before renaming, when using the "-ow" option on
     any Windows platform, not just CYGWIN (see log entry for pngcrush-1.7.43).
@@ -1503,6 +1507,11 @@ struct options_help
     int verbosity;          /* if verbose >= this value, then print line */
     const char *textline;   /* static string with newline chopped off */
 };
+
+#ifdef MINGW32
+   /* enable commandline wildcard interpretation */
+   int _dowildcard = -1;
+#endif
 
 /* Input and output filenames */
 static PNG_CONST char *progname;
