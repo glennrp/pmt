@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.63"
+#define PNGCRUSH_VERSION "1.7.64"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -306,6 +306,8 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.64 (built with libpng-1.5.17 and zlib-1.2.8)
 
 Version 1.7.63 (built with libpng-1.5.16 and zlib-1.2.8)
   Add "int dowildcard=-1;" in an attempt to get wildcard arguments working
@@ -1509,8 +1511,8 @@ struct options_help
 };
 
 #ifdef MINGW32
-   /* enable commandline wildcard interpretation */
-   int _dowildcard = -1;
+   /* enable commandline wildcard interpretation (doesn't necessarily work!) */
+   int _dowildcard = 1;
 #endif
 
 /* Input and output filenames */
@@ -4074,7 +4076,7 @@ int main(int argc, char *argv[])
 
         if (do_color_count)
             fprintf(STDERR,
-               "   color counting (-cc option) is not supported.\n");
+               "   The -cc option is not supported.\n");
 
         if (plte_len > 0 && force_output_bit_depth == 0)
           {
@@ -7614,9 +7616,9 @@ static const char *pngcrush_legal[] = {
 
 static const char *pngcrush_usage[] = {
     "\nusage: %s [options] infile.png outfile.png\n",
-    "       %s -e ext [other options] files.png ...\n",
-    "       %s -d dir/ [other options] files.png ...\n",
-    "       %s -n -v files.png ...\n"
+    "       %s -e ext [other options] file.png ...\n",
+    "       %s -d dir/ [other options] file.png ...\n",
+    "       %s -n -v file.png ...\n"
 };
 
 struct options_help pngcrush_options[] = {
