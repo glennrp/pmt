@@ -309,6 +309,7 @@ Change log:
 
 Version 1.7.65 (built with libpng-1.5.17 and zlib-1.2.8)
   Do not allow any colortype or depth reductions if acTL is present.
+  Added warnings to explain why reductions were not allowed.
 
 Version 1.7.64 (built with libpng-1.5.17 and zlib-1.2.8)
 
@@ -4181,7 +4182,11 @@ int main(int argc, char *argv[])
         if (make_opaque)
         {
            if (found_tRNS || found_acTL_chunk == 1)
+           {
+             fprintf(STDERR, "Cannot remove the alpha channel when tRNS"
+                  " or acTL chunk is present\n");
              make_opaque = 0;
+           }
            else
            {
              make_opaque = 1;
@@ -4195,8 +4200,8 @@ int main(int argc, char *argv[])
               found_acTL_chunk == 1 ||
               (found_sBIT_max > 8 && keep_unknown_chunk("sBIT", argv)))
            {
-              fprintf(STDERR, "Cannot reduce bit depth to 8 when bKGD"
-                  " or sBIT chunk is present\n");
+              fprintf(STDERR, "Cannot reduce bit depth to 8 when bKGD,"
+                  " sBIT or acTL chunk is present\n");
               make_8_bit = 0;
            }
            else
@@ -4208,13 +4213,11 @@ int main(int argc, char *argv[])
 
         if (reduce_palette)
         {
-           if (found_acTL_chunk == 1)
-             reduce_palette = 0;
-
-           if ((found_hIST && keep_unknown_chunk("hIST", argv)))
+           if ((found_hIST && keep_unknown_chunk("hIST", argv)) ||
+              found_acTL_chunk == 1)
            {
              fprintf(STDERR, "Cannot reduce palette length when hIST"
-                 " chunk is present\n");
+                 " or acTL chunk is present\n");
              reduce_palette = 0;
            }
            else
