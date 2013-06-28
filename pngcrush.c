@@ -4163,7 +4163,7 @@ int main(int argc, char *argv[])
         {
            if ((found_iCCP && keep_unknown_chunk("iCCP", argv)) ||
                (found_color_bKGD && keep_unknown_chunk("bKGD", argv)) ||
-               found_acTL_chunk ||
+               found_acTL_chunk == 1 ||
                (found_sBIT_different_RGB_bits &&
                keep_unknown_chunk("sBIT", argv)))
            {
@@ -4180,7 +4180,7 @@ int main(int argc, char *argv[])
 
         if (make_opaque)
         {
-           if (found_tRNS || found_acTL_chunk)
+           if (found_tRNS || found_acTL_chunk == 1)
              make_opaque = 0;
            else
            {
@@ -4192,7 +4192,7 @@ int main(int argc, char *argv[])
         if (make_8_bit)
         {
            if ((found_bKGD && keep_unknown_chunk("bKGD", argv)) ||
-              found_acTL_chunk ||
+              found_acTL_chunk == 1 ||
               (found_sBIT_max > 8 && keep_unknown_chunk("sBIT", argv)))
            {
               fprintf(STDERR, "Cannot reduce bit depth to 8 when bKGD"
@@ -4208,7 +4208,7 @@ int main(int argc, char *argv[])
 
         if (reduce_palette)
         {
-           if (found_acTL_chunk)
+           if (found_acTL_chunk == 1)
              reduce_palette = 0;
 
            if ((found_hIST && keep_unknown_chunk("hIST", argv)))
