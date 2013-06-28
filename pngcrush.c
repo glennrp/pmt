@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.64"
+#define PNGCRUSH_VERSION "1.7.65"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -306,6 +306,9 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.65 (built with libpng-1.5.17 and zlib-1.2.8)
+  Do not allow any colortype or depth reductions if acTL is present.
 
 Version 1.7.64 (built with libpng-1.5.17 and zlib-1.2.8)
 
@@ -4160,11 +4163,12 @@ int main(int argc, char *argv[])
         {
            if ((found_iCCP && keep_unknown_chunk("iCCP", argv)) ||
                (found_color_bKGD && keep_unknown_chunk("bKGD", argv)) ||
+               found_acTL_chunk ||
                (found_sBIT_different_RGB_bits &&
                keep_unknown_chunk("sBIT", argv)))
            {
               fprintf(STDERR, "Cannot change colortype to gray when iCCP,"
-                  " bKGD with color, or sBIT chunk is present\n");
+                  " acTL, bKGD with color, or sBIT chunk is present\n");
               make_gray = 0;
            }
            else
@@ -4176,7 +4180,7 @@ int main(int argc, char *argv[])
 
         if (make_opaque)
         {
-           if (found_tRNS)
+           if (found_tRNS || found_acTL_chunk)
              make_opaque = 0;
            else
            {
@@ -4188,6 +4192,7 @@ int main(int argc, char *argv[])
         if (make_8_bit)
         {
            if ((found_bKGD && keep_unknown_chunk("bKGD", argv)) ||
+              found_acTL_chunk ||
               (found_sBIT_max > 8 && keep_unknown_chunk("sBIT", argv)))
            {
               fprintf(STDERR, "Cannot reduce bit depth to 8 when bKGD"
@@ -4203,10 +4208,13 @@ int main(int argc, char *argv[])
 
         if (reduce_palette)
         {
+           if (found_acTL_chunk)
+             reduce_palette = 0;
+
            if ((found_hIST && keep_unknown_chunk("hIST", argv)))
            {
-              fprintf(STDERR, "Cannot reduce palette length when hIST"
-                  " chunk is present\n");
+             fprintf(STDERR, "Cannot reduce palette length when hIST"
+                 " chunk is present\n");
              reduce_palette = 0;
            }
            else
