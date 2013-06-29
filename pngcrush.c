@@ -229,7 +229,8 @@
  *
  *   3. Add choice of interlaced or non-interlaced output. Currently you
  *   can change interlaced to non-interlaced and vice versa by using
- *   ImageMagick before running pngcrush.
+ *   ImageMagick before running pngcrush.  Note, when implementing this,
+ *   disallow changing interlacing if APNG chunks are being copied.
  *
  *   4. Use a better compression algorithm for "deflating" (result must
  *   still be readable with zlib!)  e.g., http://en.wikipedia.org/wiki/7-Zip
@@ -309,7 +310,7 @@ Change log:
 
 Version 1.7.65 (built with libpng-1.5.17 and zlib-1.2.8)
   Do not allow any colortype or depth reductions if acTL is present.
-  Added warnings to explain why reductions were not allowed.
+  Added warnings to explain why any requested reductions were not allowed.
 
 Version 1.7.64 (built with libpng-1.5.17 and zlib-1.2.8)
 
@@ -7535,6 +7536,7 @@ void print_version_info(void)
          zlib_copyright="-2012";
          break;
       case 0x1271:
+      case 0x1280:
          zlib_copyright="-2013";
          break;
       default:
