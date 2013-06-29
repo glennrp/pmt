@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.65"
+#define PNGCRUSH_VERSION "1.7.66"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -307,6 +307,8 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.66 (built with libpng-1.5.17 and zlib-1.2.8)
 
 Version 1.7.65 (built with libpng-1.5.17 and zlib-1.2.8)
   Do not allow any colortype or depth reductions if acTL is present.

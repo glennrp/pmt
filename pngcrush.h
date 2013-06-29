@@ -5,7 +5,7 @@
  * license (see LICENSE, in pngcrush.c).
  */
 
-/* Special defines for pngcrush version 1.7.65 */
+/* Special defines for pngcrush version 1.7.66 */
 
 #ifndef PNGCRUSH_H
 #define PNGCRUSH_H
