@@ -309,6 +309,7 @@
 Change log:
 
 Version 1.7.66 (built with libpng-1.5.17 and zlib-1.2.8)
+  Revised pngcrush_examine_pixels_fn() to fix some incorrect reductions.
 
 Version 1.7.65 (built with libpng-1.5.17 and zlib-1.2.8)
   Do not allow any colortype or depth reductions if acTL is present.
@@ -2141,25 +2142,30 @@ pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
 static void pngcrush_cexcept_error(png_structp png_ptr,
    png_const_charp err_msg)
 {
-    if (png_ptr);
-
-/* Handle "Too many IDAT's found" error.  In libpng-1.4.x this became
- * a benign error, "Too many IDATs found".
- */
 #if PNG_LIBPNG_VER < 10400
+/* Handle "Too many IDAT's found" error.  In libpng-1.4.x this became
+ * a benign error, "Too many IDATs found".  This scheme will not work
+ * in libpng-1.5.0 and later.
+ */
 #  ifdef PNGCRUSH_H
     if (!strcmp(err_msg, "Too many IDAT's found")) {
 #    ifdef PNG_CONSOLE_IO_SUPPORTED
-        fprintf(stderr, "\nIn %s, correcting ", inname);
+        fprintf(stderr, "\nIn %s, correcting %s\n", inname,err_msg);
 #    else
         png_warning(png_ptr, err_msg);
 #    endif
-    } else
+     return;
+    }
 #  endif /* PNGCRUSH_H */
 #endif /* PNG_LIBPNG_VER */
+
     {
         Throw err_msg;
     }
+
+#  ifndef PNGCRUSH_H
+    PNGCRUSH_UNUSED(png_ptr)
+#  endif /* PNGCRUSH_H */
 }
 
 
@@ -2687,16 +2693,18 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
       else if (row_info->color_type == 4 && (blacken == 1 ||
                make_opaque == 1)) /* GA */
       {
+        i=(int) row_info->rowbytes-1;
+
         if (row_info->bit_depth == 8)
           {
             for ( ; i > 0 ; )
             {
-               if (data[i] == 0 &&  data[i-1] != 0)
+               if (blacken == 1 && data[i] == 0 &&  data[i-1] != 0)
                {
                    blacken = 2;
                }
 
-               if (data[i] != 0)
+               if (make_opaque == 1 && data[i] != 255)
                {
                    make_opaque = 2;
                }
@@ -2708,12 +2716,13 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
           {
             for ( ; i > 0 ; )
             {
-               if ((data[i] == 0 && data[i-1] == 0) && (data[i-2] != 0 ||
-                    data[i-3] != 0))
+               if (blacken == 1 && (data[i] == 0 && data[i-1] == 0) &&
+                   (data[i-2] != 0 || data[i-3] != 0))
                {
                   blacken = 2;
                }
-               if (data[i] != 0 || data[i-1] != 0)
+
+               if (make_opaque == 1 && (data[i] != 255 || data[i-1] != 255))
                {
                    make_opaque = 2;
                }
@@ -2723,25 +2732,28 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
       }
 
       /* color_type == 6, RGBA */
-      else if (row_info->color_type == 6 && (blacken == 1 || make_gray == 1 ||
+      if (row_info->color_type == 6 && (blacken == 1 || make_gray == 1 ||
                make_opaque == 1))
       {
+        i=(int) row_info->rowbytes-1;
+
         if (row_info->bit_depth == 8)
           {
             for ( ; i > 0 ; )
             {
-               if (data[i] == 0 && (data[i-1] != 0 || data[i-2] != 0 ||
-                   data[i-3] != 0))
+               if (blacken == 1 && data[i] == 0 &&
+                   (data[i-1] != 0 || data[i-2] != 0 || data[i-3] != 0))
                  {
                    blacken = 2;
                  }
 
-               if (data[i] != data[i-1] || data[i] != data[i-2])
+               if (make_gray == 1 &&
+                  (data[i-1] != data[i-2] || data[i-1] != data[i-3]))
                  {
                    make_gray = 2;
                  }
 
-               if (data[i] != 255)
+               if (make_opaque == 1 && data[i] != 255)
                  {
                    make_opaque = 2;
                  }
@@ -2754,20 +2766,21 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
           {
             for ( ; i > 0 ; )
             {
-               if ((data[i]==0 && data[i-1]== 0) &&
+               if (blacken == 1 && (data[i]==0 && data[i-1]== 0) &&
                    (data[i-2] != 0 || data[i-3] != 0 || data[i-4] != 0 ||
                    data[i-5] != 0 || data[i-6] != 0 || data[i-7] != 0))
                  {
                    blacken = 2;
                  }
 
-               if (data[i] != data[i-2] || data[i] != data[i-4] ||
-                   data[i-1] != data[i-3] || data[i-1] != data[i-5])
+               if (make_gray == 1 &&
+                   (data[i-2] != data[i-4] || data[i-2] != data[i-6] ||
+                   data[i-3] != data[i-5] || data[i-3] != data[i-7]))
                  {
                    make_gray = 2;
                  }
 
-               if (data[i] != 255 || data[i-1] != 255)
+               if (make_opaque == 1 && (data[i] != 255 || data[i-1] != 255))
                  {
                    make_opaque = 2;
                  }
@@ -2856,8 +2869,7 @@ void pngcrush_transform_pixels_fn(png_structp png_ptr, png_row_infop row_info,
           {
             for ( ; i > 0 ; )
             {
-               if ((data[i] == 0 && data[i-1] == 0) && (data[i-2] != 0 ||
-                    data[i-3] != 0))
+               if (data[i] == 0 && data[i-1] == 0)
                   {
                     data[i-2]=0;
                     data[i-3]=0;
@@ -2873,8 +2885,7 @@ void pngcrush_transform_pixels_fn(png_structp png_ptr, png_row_infop row_info,
           {
             for ( ; i > 0 ; )
             {
-               if (data[i] == 0 && (data[i-1] != 0 || data[i-2] != 0 ||
-                   data[i-3] != 0))
+               if (data[i] == 0)
                  {
                    data[i-1]=0;
                    data[i-2]=0;
@@ -2888,9 +2899,7 @@ void pngcrush_transform_pixels_fn(png_structp png_ptr, png_row_infop row_info,
           {
             for ( ; i > 0 ; )
             {
-               if ((data[i]==0 && data[i-1]== 0) &&
-                   (data[i-2] != 0 || data[i-3] != 0 || data[i-4] != 0 ||
-                   data[i-5] != 0 || data[i-6] != 0 || data[i-7] != 0))
+               if (data[i]==0 && data[i-1]== 0)
                  {
                    data[i-2]=0;
                    data[i-3]=0;
@@ -2904,11 +2913,6 @@ void pngcrush_transform_pixels_fn(png_structp png_ptr, png_row_infop row_info,
           }
       }
    }
-
-   /* Future versions will make other transformations such as removing
-    * an all-opaque alpha channel or changing RGB to gray if all pixels
-    * are gray.
-    */
 }
 
 
