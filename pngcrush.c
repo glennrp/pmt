@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.66"
+#define PNGCRUSH_VERSION "1.7.67"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -307,6 +307,11 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.67 (built with libpng-1.5.17 and zlib-1.2.8)
+  Fixed handling of "-text" and "-ztext" options for text input. They had been
+    reduced to "-t" and "-z" with an incorrect argument (3 instead of 2) in
+    version 1.7.62. Bug report and patch from Tsukasa Oi.
 
 Version 1.7.66 (built with libpng-1.5.17 and zlib-1.2.8)
   Revised pngcrush_examine_pixels_fn() to fix some incorrect reductions.
@@ -2766,7 +2771,7 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
           {
             for ( ; i > 0 ; )
             {
-               if (blacken == 1 && (data[i]==0 && data[i-1]== 0) &&
+               if (blacken == 1 && (data[i] == 0 && data[i-1]== 0) &&
                    (data[i-2] != 0 || data[i-3] != 0 || data[i-4] != 0 ||
                    data[i-5] != 0 || data[i-6] != 0 || data[i-7] != 0))
                  {
@@ -2899,7 +2904,7 @@ void pngcrush_transform_pixels_fn(png_structp png_ptr, png_row_infop row_info,
           {
             for ( ; i > 0 ; )
             {
-               if (data[i]==0 && data[i-1]== 0)
+               if (data[i] == 0 && data[i-1] == 0)
                  {
                    data[i-2]=0;
                    data[i-3]=0;
@@ -3616,10 +3621,10 @@ int main(int argc, char *argv[])
                 }
                 else
 #endif
-                if (!strncmp(argv[i], "-z", 3))
+                if (!strncmp(argv[i], "-z", 2))
                     text_compression[text_inputs] =
                         PNG_TEXT_COMPRESSION_zTXt;
-                else if (!strncmp(argv[i], "-t", 3))
+                else if (!strncmp(argv[i], "-t", 2))
                     text_compression[text_inputs] =
                         PNG_TEXT_COMPRESSION_NONE;
 #ifdef PNG_iTXt_SUPPORTED
@@ -6857,7 +6862,7 @@ int main(int argc, char *argv[])
 
             if (verbose > 0 && trial != MAX_METHODS)
             {
-                if (bail==0 &&
+                if (bail == 0 &&
                     pngcrush_write_byte_count > pngcrush_best_byte_count)
                    fprintf(STDERR,
                      "   Critical chunk length, method %3d"
