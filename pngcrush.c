@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.67"
+#define PNGCRUSH_VERSION "1.7.68"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -307,6 +307,10 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.68 (built with libpng-1.5.17 and zlib-1.2.8)
+  Check for NULL return from malloc().
+  Undefine CLOCKS_PER_SECOND "1000" found in some version of MinGW.
 
 Version 1.7.67 (built with libpng-1.5.17 and zlib-1.2.8)
   Fixed handling of "-text" and "-ztext" options for text input. They had been
@@ -1503,6 +1507,12 @@ png_uint_32 pngcrush_crc;
 #  include <mem.h>
 #endif
 
+#ifdef CLOCKS_PER_SECOND
+#  if CLOCKS_PER_SECOND == '"1000"'
+#    undef CLOCKS_PER_SEC
+#  endif
+#endif
+
 #ifndef CLOCKS_PER_SEC
 #  define CLOCKS_PER_SEC 1000
 #endif
@@ -2219,6 +2229,8 @@ png_voidp pngcrush_debug_malloc(png_structp png_ptr, png_uint_32 size)
      */
     {
         memory_infop pinfo = (memory_infop)malloc(sizeof *pinfo);
+        if (pinfo == NULL)
+           png_error(png_ptr, "malloc of pinfo failed");
         pinfo->size = size;
         current_allocation += size;
         if (current_allocation > maximum_allocation)
@@ -2952,26 +2964,7 @@ int main(int argc, char *argv[])
     char *cp;
     int i;
 
-    unsigned char z_cmf[8];
-    unsigned char z_flg[8];
-
     t_start = (TIME_T) clock();
-
-    /* Precompute z_cmf and z_flg bytes */
-    for (i=0; i<8; i++)
-    {
-       int cmf=(i+8)*16 + 8;
-
-       /* 3 means max compression */
-       int cmf_flg=256*cmf+(3*64);
-
-       /* cmf+flg must be a multiple of 31 */
-       int fcheck=31-cmf_flg%31;
-       cmf_flg+=fcheck; /* cmf+flg must be a multiple of 31 */
-
-       z_cmf[i]=(cmf_flg>>8 & 0xFF);
-       z_flg[i]=(cmf_flg & 0xFF);
-    }
 
     if (strcmp(png_libpng_ver, PNG_LIBPNG_VER_STRING))
     {
@@ -3340,6 +3333,11 @@ int main(int argc, char *argv[])
                 int ic;
                 number_of_open_files++;
                 iccp_text = (char*)malloc(iccp_length);
+                if (iccp_text == NULL)
+                {
+                   fprintf(STDERR, "malloc of iccp_text failed\n");
+                   iccp_length = 0;
+                }
 
                 for (ic = 0; ic < iccp_length; ic++)
                 {
@@ -3816,12 +3814,6 @@ int main(int argc, char *argv[])
             }
         }
     }
-
-    if (verbose == 3)
-        for (i=0; i<8; i++)
-        {
-            printf("  CMF[%d]= 0x%x,0x%x\n",i+8,z_cmf[i],z_flg[i]);
-        }
 
     for (ia = 0; ia < 256; ia++)
         trns_array[ia]=255;
@@ -7154,10 +7146,6 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
          */
         inflateUndermine(&png_ptr->zstream, 1);
 #endif
-
-        /* To do: always use a 32k window while decompressing (replace the
-         * first two bytes of the first input IDAT with z_cmf[8], z_flg[8]?)
-         */
     }
 
     for (;;)
@@ -7686,6 +7674,8 @@ struct options_help pngcrush_options[] = {
     {2, "               with \"-f filter\", \"-l level\", or \"-z strategy\"."},
     {2, ""},
 
+    {0, FAKE_PAUSE_STRING},
+
     {0, "            -c color_type of output file [0, 2, 4, or 6]"},
     {2, ""},
     {2, "               Color type for the output file.  Future versions"},
@@ -7730,6 +7720,8 @@ struct options_help pngcrush_options[] = {
     {2, "               preceding '-m method' or '-brute_force' argument."},
     {2, "               0: none; 1-4: use specified filter; 5: adaptive."},
     {2, ""},
+
+    {0, FAKE_PAUSE_STRING},
 
     {0, "          -fix (fix otherwise fatal conditions such as bad CRCs)"},
     {2, ""},
@@ -7792,6 +7784,8 @@ struct options_help pngcrush_options[] = {
     {2, ""},
 
 #ifdef PNGCRUSH_LOCO
+    {0, FAKE_PAUSE_STRING},
+
     {0, "         -loco (\"loco crush\" truecolor PNGs)"},
     {2, ""},
     {2, "               Make the file more compressible by performing a"},
@@ -7840,6 +7834,8 @@ struct options_help pngcrush_options[] = {
     {2, "               exact filesize achieved by each trial."},
     {2, ""},
 
+    {0, FAKE_PAUSE_STRING},
+
     {0, "  -nofilecheck (do not check for infile.png == outfile.png)"},
     {2, ""},
     {2, "               To avoid false hits from MSVC-compiled code.  Note"},
@@ -7852,7 +7848,7 @@ struct options_help pngcrush_options[] = {
     {2, "               Instead, the user limits are inherited from libpng."},
     {2, ""},
 
-    {0, "     -noreduce (turns off \"-reduce\" operations)"},
+    {0, "     -noreduce (turns off all \"-reduce\" operations)"},
     {2, ""},
 
     {0, "          -old (Use old default settings (no -force and no -reduce))"},
@@ -7869,7 +7865,7 @@ struct options_help pngcrush_options[] = {
     {2, "               and therefore they must reside on the same filesystem"},
     {2, ""},
 
-    {0, "   -plte_len n (obsolete; positive \"n\" enables palette reduction)"},
+    {0, "   -plte_len n (obsolete; any \"n\" enables palette reduction)"},
     {2, ""},
 
     {0, "            -q (quiet)"},
@@ -7879,7 +7875,9 @@ struct options_help pngcrush_options[] = {
     {2, ""},
     {2, "               (if possible).  Also reduces palette length if"},
     {2, "               possible.  Currently only attempts to reduce the"},
-    {2, "               bit depth from 16 to 8"},
+    {2, "               bit depth from 16 to 8.  Reduces all-gray RGB"},
+    {2, "               or RGBA image to gray or gray-alpha.  Reduces"},
+    {2, "               all-opaque RGBA or GA image to RGB or grayscale."},
     {2, ""},
 
     {0, "          -rem chunkname (or \"alla\" or \"allb\")"},
@@ -7972,6 +7970,8 @@ struct options_help pngcrush_options[] = {
     {2, "               color type, scaled to the output bit depth."},
     {2, ""},
 #endif
+
+    {0, FAKE_PAUSE_STRING},
 
     {0, "            -v (display more detailed information)"},
     {2, ""},
