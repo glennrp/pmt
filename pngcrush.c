@@ -308,9 +308,14 @@
 
 Change log:
 
-Version 1.7.68 (built with libpng-1.5.17 and zlib-1.2.8)
+Version 1.7.68 (built with libpng-1.6.4 and zlib-1.2.8)
   Check for NULL return from malloc().
   Undefine CLOCKS_PER_SECOND "1000" found in some version of MinGW.
+  Replaced most "atoi(argv[++i])" with "pngcrush_get_long" which does
+    "BUMP_I; strtol(argv[i],ptr,10)" and added pngcrush_check_long macro
+    to detect malformed or missing parameters (debian bug 716149).
+  Added global_things_have_changed=1 when reading -bkgd.
+  The "-bit_depth N" option did not work reliably and has been removed.
 
 Version 1.7.67 (built with libpng-1.5.17 and zlib-1.2.8)
   Fixed handling of "-text" and "-ztext" options for text input. They had been
@@ -1471,6 +1476,7 @@ png_uint_32 pngcrush_crc;
 #include <stdlib.h>
 #include <time.h>
 #include <assert.h>
+#include <errno.h>
 
 #if defined(_MBCS) || defined(WIN32) || defined(__WIN32__)
 #  include <direct.h>
@@ -2942,6 +2948,8 @@ int main(int argc, char *argv[])
 
     int try10 = 0;
 
+    char *endptr = NULL;
+
     /* try_method[n]: 0 means try this method;
      *
      *              : 1 means do not try this method.
@@ -3083,13 +3091,28 @@ int main(int argc, char *argv[])
 
     num_methods = method;   /* GRR */
 
-#define BUMP_I i++;if(i >= argc) {printf("insufficient parameters\n");exit(1);}
+#define pngcrush_get_long strtol(argv[i],&endptr,10)
+
+#define pngcrush_check_long \
+    {if (errno || endptr == argv[i] || *endptr != '\0') \
+      { fprintf(STDERR, "pngcrush: malformed or missing argument\n"); \
+        exit(1); \
+      } \
+    }
+
+#define BUMP_I \
+        { i++; \
+        if(i >= argc) {fprintf(STDERR,"pngcrush: insufficient parameters\n");\
+        exit(1);} }
+
     names = 1;
 
     /* ===================================================================== */
     /* FIXME:  move args-processing block into separate function (470 lines) */
     for (i = 1; i < argc; i++)
     {
+        errno=0;
+
         if (!strncmp(argv[i], "-", 1))
             names++;
 
@@ -3126,7 +3149,8 @@ int main(int argc, char *argv[])
         {
             names++;
             BUMP_I;
-            crushed_idat_size = (png_uint_32) atoi(argv[i]);
+            crushed_idat_size = (png_uint_32) pngcrush_get_long;
+            pngcrush_check_long;
         }
 
         else if (!strncmp(argv[i], "-bail", 5))
@@ -3140,10 +3164,17 @@ int main(int argc, char *argv[])
         {
             names += 3;
             have_bkgd = 1;
-            bkgd_red = (png_uint_16) atoi(argv[++i]);
-            bkgd_green = (png_uint_16) atoi(argv[++i]);
-            bkgd_blue = (png_uint_16) atoi(argv[++i]);
+            BUMP_I;
+            bkgd_red = (png_uint_16) pngcrush_get_long;
+            pngcrush_check_long;
+            BUMP_I;
+            bkgd_green = (png_uint_16) pngcrush_get_long;
+            pngcrush_check_long;
+            BUMP_I;
+            bkgd_blue = (png_uint_16) pngcrush_get_long;
+            pngcrush_check_long;
             bkgd_index = 0;
+            global_things_have_changed = 1;
         }
 
         else if (!strncmp(argv[i], "-blacken", 8))
@@ -3170,7 +3201,14 @@ int main(int argc, char *argv[])
         {
             names++;
             BUMP_I;
-            force_output_bit_depth = atoi(argv[i]);
+            force_output_bit_depth = pngcrush_get_long;
+            pngcrush_check_long;
+            /* Reducing bit_depth does not work */
+            { 
+               fprintf(STDERR,
+                  "pngcrush: the -bit_depth N option is longer functional.\n");
+               exit(1);
+            }
         }
         else if (!strncmp(argv[i], "-cc", 3))
         {
@@ -3184,7 +3222,8 @@ int main(int argc, char *argv[])
         {
             names++;
             BUMP_I;
-            force_output_color_type = atoi(argv[i]);
+            force_output_color_type = pngcrush_get_long;
+            pngcrush_check_long;
         }
 #ifdef PNG_gAMA_SUPPORTED
         else if (!strncmp(argv[i], "-dou", 4))
@@ -3226,7 +3265,10 @@ int main(int argc, char *argv[])
         }
         else if (!strncmp(argv[i], "-f", 3) || !strncmp(argv[i], "-fil", 4))
         {
-            int specified_filter = atoi(argv[++i]);
+            int specified_filter;
+            BUMP_I;
+            specified_filter = pngcrush_get_long;
+            pngcrush_check_long;
             if (specified_filter > 5 || specified_filter < 0)
                 specified_filter = 5;
             names++;
@@ -3253,7 +3295,10 @@ int main(int argc, char *argv[])
         }
         else if (!strncmp(argv[i], "-l", 3) || !strncmp(argv[i], "-lev", 4))
         {
-            int specified_level = atoi(argv[++i]);
+            int specified_level;
+            BUMP_I;
+            specified_level = pngcrush_get_long;
+            pngcrush_check_long;
             if (specified_level > 9 || specified_level < 0)
                 specified_level = 9;
             names++;
@@ -3298,9 +3343,11 @@ int main(int argc, char *argv[])
                 for (c = 0; c < nzeroes; c++)
                     *n++ = '0';
                 *n = '\0';
-                specified_gamma = atoi(number);
+                specified_gamma = pngcrush_get_long(number);
+                pngcrush_check_long;
 #else
-                specified_gamma = atof(argv[i]);
+                specified_gamma = strtof(argv[i],&endptr);
+                pngcrush_check_long;
 #endif
             }
         }
@@ -3320,10 +3367,14 @@ int main(int argc, char *argv[])
             FILE *iccp_fn;
             if (iccp_length)
                 free(iccp_text);
-            iccp_length = atoi(argv[++i]);
+            BUMP_I;
+            iccp_length = pngcrush_get_long;
+            pngcrush_check_long;
             names += 3;
-            strcpy(iccp_name, argv[++i]);
-            iccp_file = argv[++i];
+            BUMP_I;
+            strcpy(iccp_name, argv[i]);
+            BUMP_I;
+            iccp_file = argv[i];
             if ((iccp_fn = FOPEN(iccp_file, "rb")) == NULL) {
                 fprintf(STDERR, "Could not find file: %s\n", iccp_file);
                 iccp_length = 0;
@@ -3368,7 +3419,8 @@ int main(int argc, char *argv[])
         {
             names++;
             BUMP_I;
-            max_idat_size = (png_uint_32) atoi(argv[i]);
+            max_idat_size = (png_uint_32) pngcrush_get_long;
+            pngcrush_check_long;
             if (max_idat_size == 0 || max_idat_size > PNG_UINT_31_MAX)
                 max_idat_size = PNG_ZBUF_SIZE;
 #ifdef PNGCRUSH_LOCO
@@ -3385,7 +3437,8 @@ int main(int argc, char *argv[])
         {
             names++;
             BUMP_I;
-            method = atoi(argv[i]);
+            method = pngcrush_get_long;
+            pngcrush_check_long;
             if (method > 0 && method <= MAX_METHODS)
             {
               methods_specified = 1;
@@ -3508,9 +3561,11 @@ int main(int argc, char *argv[])
                 for (c = 0; c < nzeroes; c++)
                     *n++ = '0';
                 *n = '\0';
-                force_specified_gamma = atoi(number);
+                force_specified_gamma = pngcrush_get_long(number);
+                pngcrush_check_long;
 #else
-                force_specified_gamma = atof(argv[i]);
+                force_specified_gamma = strtof(argv[i],&endptr);
+                pngcrush_check_long;
 #endif
             }
             global_things_have_changed = 1;
@@ -3522,7 +3577,8 @@ int main(int argc, char *argv[])
         {
             names++;
             BUMP_I;
-            resolution = atoi(argv[i]);
+            resolution = pngcrush_get_long;
+            pngcrush_check_long;
             global_things_have_changed = 1;
         }
 #endif
@@ -3531,7 +3587,8 @@ int main(int argc, char *argv[])
         {
             names++;
             BUMP_I;
-            max_rows_at_a_time = atoi(argv[i]);
+            max_rows_at_a_time = pngcrush_get_long;
+            pngcrush_check_long;
         }
 #endif
         else if (!strncmp(argv[i], "-r", 3) || !strncmp(argv[i], "-rem", 4))
@@ -3564,7 +3621,8 @@ int main(int argc, char *argv[])
                 !strncmp(argv[i], "2", 1) || !strncmp(argv[i], "3", 1))
             {
                 names++;
-                specified_intent = (int) atoi(argv[i]);
+                specified_intent = (int) pngcrush_get_long;
+                pngcrush_check_long;
                 global_things_have_changed = 1;
             } else
                 i--;
@@ -3578,7 +3636,8 @@ int main(int argc, char *argv[])
                 !strncmp(argv[i], "1", 1))
             {
                 names++;
-                ster_mode = (int) atoi(argv[i]);
+                ster_mode = (int) pngcrush_get_long;
+                pngcrush_check_long;
                 global_things_have_changed = 1;
             }
             else
@@ -3686,13 +3745,18 @@ int main(int argc, char *argv[])
         else if (!strncmp(argv[i], "-trns_a", 7) ||
                  !strncmp(argv[i], "-tRNS_a", 7))
         {
-            num_trans_in = (png_uint_16) atoi(argv[++i]);
+            num_trans_in = (png_uint_16) pngcrush_get_long;
+            pngcrush_check_long;
             if (num_trans_in > 256)
                num_trans_in = 256;
             trns_index=num_trans_in-1;
             have_trns = 1;
             for (ia = 0; ia < num_trans_in; ia++)
-                trans_in[ia] = (png_byte) atoi(argv[++i]);
+            {
+                BUMP_I;
+                trans_in[ia] = (png_byte) pngcrush_get_long;
+                pngcrush_check_long;
+            }
             names += 1 + num_trans_in;
         }
         else if (!strncmp(argv[i], "-trns", 5) ||
@@ -3700,11 +3764,21 @@ int main(int argc, char *argv[])
         {
             names += 5;
             have_trns = 1;
-            trns_index = (png_uint_16) atoi(argv[++i]);
-            trns_red = (png_uint_16) atoi(argv[++i]);
-            trns_green = (png_uint_16) atoi(argv[++i]);
-            trns_blue = (png_uint_16) atoi(argv[++i]);
-            trns_gray = (png_uint_16) atoi(argv[++i]);
+            BUMP_I;
+            trns_index = (png_uint_16) pngcrush_get_long;
+            pngcrush_check_long;
+            BUMP_I;
+            trns_red = (png_uint_16) pngcrush_get_long;
+            pngcrush_check_long;
+            BUMP_I;
+            trns_green = (png_uint_16) pngcrush_get_long;
+            pngcrush_check_long;
+            BUMP_I;
+            trns_blue = (png_uint_16) pngcrush_get_long;
+            pngcrush_check_long;
+            BUMP_I;
+            trns_gray = (png_uint_16) pngcrush_get_long;
+            pngcrush_check_long;
         }
 #endif /* tRNS */
         else if (!strncmp(argv[i], "-version", 8))
@@ -3725,18 +3799,25 @@ int main(int argc, char *argv[])
         }
         else if (!strncmp(argv[i], "-w", 3) || !strncmp(argv[i], "-win", 4))
         {
-            default_compression_window = atoi(argv[++i]);
+            BUMP_I;
+            default_compression_window = pngcrush_get_long;
+            pngcrush_check_long;
             force_compression_window++;
             names++;
         }
         else if (!strncmp(argv[i], "-zm", 4))
         {
-            compression_mem_level = atoi(argv[++i]);
+            BUMP_I;
+            compression_mem_level = pngcrush_get_long;
+            pngcrush_check_long;
             names++;
         }
         else if (!strncmp(argv[i], "-z", 3))
         {
-            int specified_strategy = atoi(argv[++i]);
+            int specified_strategy;
+            BUMP_I;
+            specified_strategy = pngcrush_get_long;
+            pngcrush_check_long;
             if (specified_strategy > 2 || specified_strategy < 0)
                 specified_strategy = 0;
             names++;
@@ -3858,7 +3939,8 @@ int main(int argc, char *argv[])
                 if (mkdir(directory_name, 0755))
 #endif
                 {
-                    fprintf(STDERR, "could not create directory %s\n",
+                    fprintf(STDERR,
+                      "pngcrush: could not create directory %s\n",
                       directory_name);
                     exit(1);
                 }
@@ -3867,7 +3949,8 @@ int main(int argc, char *argv[])
             outlen = strlen(directory_name);
             if (outlen >= STR_BUF_SIZE-1)
             {
-                fprintf(STDERR, "directory %s is too long for buffer\n",
+                fprintf(STDERR,
+                  "pngcrush: directory %s is too long for buffer\n",
                   directory_name);
                 exit(1);
             }
@@ -3883,7 +3966,8 @@ int main(int argc, char *argv[])
             inlen = strlen(inname);
             if (inlen >= STR_BUF_SIZE)
             {
-                fprintf(STDERR, "filename %s is too long for buffer\n", inname);
+                fprintf(STDERR,
+                   "pngcrush: filename %s is too long for buffer\n", inname);
                 exit(1);
             }
             strcpy(in_string, inname);
@@ -3910,7 +3994,8 @@ int main(int argc, char *argv[])
 
             if (outlen + (inlen - (op - in_string)) >= STR_BUF_SIZE)
             {
-                fprintf(STDERR, "full path is too long for buffer\n");
+                fprintf(STDERR,
+                   "pngcrush: full path is too long for buffer\n");
                 exit(1);
             }
             strcpy(out_string+outlen, op);
@@ -4027,8 +4112,9 @@ int main(int argc, char *argv[])
 
                if ((mng_out = FOPEN(mngname, "wb")) == NULL)
                {
-                  fprintf(STDERR, "Could not open output file %s\n",
-                          mngname);
+                  fprintf(STDERR,
+                      "pngcrush: could not open output file %s\n",
+                      mngname);
                   FCLOSE(fpin);
                   exit(1);
                }
@@ -4056,7 +4142,7 @@ int main(int argc, char *argv[])
             if (verbose > 0)
             {
 
-                fprintf(STDERR, "   Recompressing %s\n", inname);
+                fprintf(STDERR, "   Recompressing IDAT chunks in %s\n", inname);
                 fprintf(STDERR,
                   "   Total length of data found in critical chunks = %8lu\n",
                   (unsigned long)idat_length[0]);
@@ -4326,8 +4412,9 @@ int main(int argc, char *argv[])
                     number_of_open_files++;
                     if ((fpout = FOPEN(outname, "wb")) == NULL)
                     {
-                        fprintf(STDERR, "Could not open output file %s\n",
-                                outname);
+                        fprintf(STDERR,
+                           "pngcrush: could not open output file %s\n",
+                           outname);
                         FCLOSE(fpin);
                         exit(1);
                     }
@@ -4456,7 +4543,7 @@ int main(int argc, char *argv[])
                     (stat_in.st_dev == stat_out.st_dev))
                 {
                     fprintf(STDERR,
-                            "\n   Cannot overwrite input file %s\n",
+                            "\n   pngcrush: cannot overwrite input file %s\n",
                             outname);
                     P1("   st_ino=%d, st_size=%d\n\n",
                        (int) stat_in.st_ino, (int) stat_in.st_size);
@@ -4466,7 +4553,8 @@ int main(int argc, char *argv[])
 #endif
                 if ((fpout = FOPEN(outname, "wb")) == NULL)
                 {
-                    fprintf(STDERR, "Could not open output file %s\n",
+                    fprintf(STDERR,
+                            "pngcrush: could not open output file %s\n",
                             outname);
                     FCLOSE(fpin);
                     exit(1);
@@ -4833,12 +4921,14 @@ int main(int argc, char *argv[])
                         /* iCCP and zTXt are probably unreadable
                          * because of the nonstandard deflate */
 
+#ifdef PNG_WRITE_UNKNOWN_CHUNKS_SUPPORTED
                         png_set_keep_unknown_chunks(read_ptr,
                             PNG_HANDLE_CHUNK_NEVER,
                             (png_bytep)"iCCP", 1);
                         png_set_keep_unknown_chunks(read_ptr,
                             PNG_HANDLE_CHUNK_NEVER,
                             (png_bytep)"zTXt", 1);
+#endif
                     }
                 }
 
@@ -6941,7 +7031,8 @@ int main(int argc, char *argv[])
                 if (best == 0)
                 {
                   fprintf(STDERR,
-                  "   Best pngcrush method = 0 (settings undetermined) for %s\n",
+                  "   Best pngcrush method = 0 (settings undetermined)\n"
+                  "     for output to %s\n",
                   outname);
                 }
 
@@ -6949,7 +7040,7 @@ int main(int argc, char *argv[])
                 {
                 fprintf(STDERR,
                   "   Best pngcrush method        =   %d "
-                  "(ws %d fm %d zl %d zs %d) = %8lu\n      for %s\n", best,
+                  "(ws %d fm %d zl %d zs %d) = %8lu\n     for output to %s\n", best,
                   compression_window, fm[best], lv[best], zs[best],
                   (unsigned long)idat_length[best], outname);
                 }
@@ -7650,9 +7741,9 @@ struct options_help pngcrush_options[] = {
     {2, "               option to prevent that."},
     {2, ""},
 
-    {0, "    -bit_depth depth (bit_depth to use in output file)"},
+    {0, "    -bit_depth depth (deprecated)"},
     {2, ""},
-    {2, "               Default output depth is same as input depth."},
+    {2, "               This option no longer does anything."},
     {2, ""},
 
     {0, "      -blacken (zero samples underlying fully-transparent pixels)"},
