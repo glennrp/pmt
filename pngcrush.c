@@ -308,6 +308,8 @@
 
 Change log:
 
+Version 1.7.69 (built with libpng-1.6.6 and zlib-1.2.8)
+
 Version 1.7.68 (built with libpng-1.6.4 and zlib-1.2.8)
   Check for NULL return from malloc().
   Undefine CLOCKS_PER_SECOND "1000" found in some version of MinGW.
@@ -3343,12 +3345,11 @@ int main(int argc, char *argv[])
                 for (c = 0; c < nzeroes; c++)
                     *n++ = '0';
                 *n = '\0';
-                specified_gamma = pngcrush_get_long;
-                pngcrush_check_long;
+                specified_gamma = strtol(number,&endptr,10);
 #else
                 specified_gamma = strtof(argv[i],&endptr);
-                pngcrush_check_long;
 #endif
+                pngcrush_check_long;
             }
         }
 
@@ -3561,12 +3562,11 @@ int main(int argc, char *argv[])
                 for (c = 0; c < nzeroes; c++)
                     *n++ = '0';
                 *n = '\0';
-                force_specified_gamma = pngcrush_get_long;
-                pngcrush_check_long;
+                force_specified_gamma = strtol(number,&endptr,10);
 #else
                 force_specified_gamma = strtof(argv[i],&endptr);
-                pngcrush_check_long;
 #endif
+                pngcrush_check_long;
             }
             global_things_have_changed = 1;
         }
@@ -4628,11 +4628,8 @@ int main(int argc, char *argv[])
                 if (last_trial == 0)
                 {
                    png_set_keep_unknown_chunks(read_ptr,
-#if PNG_LIBPNG_VER < 10700
-                        PNG_HANDLE_CHUNK_IF_SAFE, (png_bytep) NULL, 0);
-#else
                         PNG_HANDLE_CHUNK_NEVER, (png_bytep) NULL, 0);
-#endif
+
                    png_set_keep_unknown_chunks(read_ptr,
                         PNG_HANDLE_CHUNK_NEVER, chunks_to_ignore,
                         sizeof (chunks_to_ignore)/5);
@@ -4787,11 +4784,7 @@ int main(int argc, char *argv[])
                                                     0);
                         else
                             png_set_keep_unknown_chunks(write_ptr,
-#if PNG_LIBPNG_VER < 10700
-                                                    PNG_HANDLE_CHUNK_IF_SAFE,
-#else
                                                     PNG_HANDLE_CHUNK_NEVER,
-#endif
                                                     (png_bytep) NULL,
                                                     0);
 

@@ -3,6 +3,70 @@
 
 Change log:
 
+Version 1.7.69 (built with libpng-1.6.6 and zlib-1.2.8)
+
+Version 1.7.68 (built with libpng-1.6.4 and zlib-1.2.8)
+  Check for NULL return from malloc().
+  Undefine CLOCKS_PER_SECOND "1000" found in some version of MinGW.
+  Replaced most "atoi(argv[++i])" with "pngcrush_get_long" which does
+    "BUMP_I; strtol(argv[i],ptr,10)" and added pngcrush_check_long macro
+    to detect malformed or missing parameters (debian bug 716149).
+  Added global_things_have_changed=1 when reading -bkgd.
+  The "-bit_depth N" option did not work reliably and has been removed.
+
+Version 1.7.67 (built with libpng-1.5.17 and zlib-1.2.8)
+  Fixed handling of "-text" and "-ztext" options for text input. They had been
+    reduced to "-t" and "-z" with an incorrect argument (3 instead of 2) in
+    version 1.7.62. Bug report and patch from Tsukasa Oi.
+
+Version 1.7.66 (built with libpng-1.5.17 and zlib-1.2.8)
+  Revised pngcrush_examine_pixels_fn() to fix some incorrect reductions.
+
+Version 1.7.65 (built with libpng-1.5.17 and zlib-1.2.8)
+  Do not allow any colortype or depth reductions if acTL is present.
+  Added warnings to explain why any requested reductions were not allowed.
+
+Version 1.7.64 (built with libpng-1.5.17 and zlib-1.2.8)
+
+Version 1.7.63 (built with libpng-1.5.16 and zlib-1.2.8)
+  Add "int dowildcard=-1;" in an attempt to get wildcard arguments working
+    in the cross-compiled MinGW executables.
+
+Version 1.7.62 (built with libpng-1.5.16 and zlib-1.2.8)
+  Remove old filename before renaming, when using the "-ow" option on
+    any Windows platform, not just CYGWIN (see log entry for pngcrush-1.7.43).
+  Reverted error with handling single-character options like "-v", introduced
+    in 1.7.61.
+
+Version 1.7.61 (built with libpng-1.5.16 and zlib-1.2.8)
+  Check sBIT chunk data to see if reduction to gray or to 8-bit is permitted,
+    i.e., the RGB sBIT values are equal to each other or the sBIT values are
+    not greater than 8, respectively.
+  Do not try to make_opaque if the tRNS chunk is found.
+  Added warning when ignoring an invalid commandline option.
+  Improved brute_force handling with specified level, filter, or strategy.
+
+Version 1.7.60 (built with libpng-1.5.16 and zlib-1.2.8)
+  Revise -reduce so reducing from color-type 6 to grayscale works.
+  Issue a warning if reducing bit depth or color type would violate various
+    chunk dependencies, and do not perform the action:
+    Do not reduce to grayscale if a color bKGD chunk, sBIT or iCCP chunk
+       is present.
+    Do not reduce bit depth if bKGD or sBIT chunk is present.
+    Do not reduce palette length if the hIST chunk is present.
+  Set "found_iCCP" flag to zero to avoid re-reading a bad iCCP chunk.
+
+Version 1.7.59 (built with libpng-1.5.16 and zlib-1.2.8)
+  Show the acTL chunk in the chunk list in verbose output.
+  Fixed several bugs reported by pornel at users.sf.net:
+    Do not call png_set_benign_errors when PNG_BENIGN_ERRORS_SUPPORTED
+      is not defined
+    Renamed PNG_UNUSED() macro PNGCRUSH_UNUSED().
+    Moved a closing bracket inside the PNGCRUSH_LOCO block.
+    Moved the declaration of "new_mng" outside a PNGCRUSH_LOCO block.
+    Put reference to "input_format" inside a PNGCRUSH_LOCO block.
+    Moved declarations of mng_out and mngname inside a PNGCRUSH_LOGO block.
+
 Version 1.7.58 (built with libpng-1.5.15 and zlib-1.2.7-1)
   Do not enable reduce_palette by default for "-reduce", "-new", or "-old".
     It still is failing for some files.
