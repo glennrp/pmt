@@ -3343,12 +3343,11 @@ int main(int argc, char *argv[])
                 for (c = 0; c < nzeroes; c++)
                     *n++ = '0';
                 *n = '\0';
-                specified_gamma = pngcrush_get_long;
-                pngcrush_check_long;
+                specified_gamma = strtol(number,&endptr,10);
 #else
                 specified_gamma = strtof(argv[i],&endptr);
-                pngcrush_check_long;
 #endif
+                pngcrush_check_long;
             }
         }
 
@@ -3561,12 +3560,11 @@ int main(int argc, char *argv[])
                 for (c = 0; c < nzeroes; c++)
                     *n++ = '0';
                 *n = '\0';
-                force_specified_gamma = pngcrush_get_long;
-                pngcrush_check_long;
+                force_specified_gamma = strtol(number,&endptr,10);
 #else
                 force_specified_gamma = strtof(argv[i],&endptr);
-                pngcrush_check_long;
 #endif
+                pngcrush_check_long;
             }
             global_things_have_changed = 1;
         }
