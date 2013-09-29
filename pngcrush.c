@@ -3343,7 +3343,7 @@ int main(int argc, char *argv[])
                 for (c = 0; c < nzeroes; c++)
                     *n++ = '0';
                 *n = '\0';
-                specified_gamma = pngcrush_get_long(number);
+                specified_gamma = pngcrush_get_long;
                 pngcrush_check_long;
 #else
                 specified_gamma = strtof(argv[i],&endptr);
@@ -3561,7 +3561,7 @@ int main(int argc, char *argv[])
                 for (c = 0; c < nzeroes; c++)
                     *n++ = '0';
                 *n = '\0';
-                force_specified_gamma = pngcrush_get_long(number);
+                force_specified_gamma = pngcrush_get_long;
                 pngcrush_check_long;
 #else
                 force_specified_gamma = strtof(argv[i],&endptr);
