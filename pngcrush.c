@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.68"
+#define PNGCRUSH_VERSION "1.7.70"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -308,7 +308,10 @@
 
 Change log:
 
+Version 1.7.70 (built with libpng-1.6.8 and zlib-1.2.8)
+
 Version 1.7.69 (built with libpng-1.6.6 and zlib-1.2.8)
+  Updated libpng to version 1.6.6.
 
 Version 1.7.68 (built with libpng-1.6.4 and zlib-1.2.8)
   Check for NULL return from malloc().
@@ -7747,9 +7750,9 @@ struct options_help pngcrush_options[] = {
     {2, ""},
 
 #ifdef Z_RLE
-    {0, "        -brute (use brute-force: try 138 different methods [11-148])"},
+    {0, "        -brute (use brute-force: try 148 different methods)"},
 #else
-    {0, "        -brute (use brute-force: try 126 different methods [11-136])"},
+    {0, "        -brute (use brute-force: try 136 different methods)"},
 #endif
     {2, ""},
     {2, "               Very time-consuming and generally not worthwhile."},
