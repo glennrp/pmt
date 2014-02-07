@@ -1,6 +1,6 @@
 /*
  * pngcrush.c - recompresses png files
- * Copyright (C) 1998-2002, 2006-2013 Glenn Randers-Pehrson
+ * Copyright (C) 1998-2002, 2006-2014 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
  * Portions copyright (C) 2005       Greg Roelofs
  *
@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.70"
+#define PNGCRUSH_VERSION "1.7.71"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -101,7 +101,7 @@
  *
  * COPYRIGHT:
  *
- * Copyright (C) 1998-2002, 2006-2013 Glenn Randers-Pehrson
+ * Copyright (C) 1998-2002, 2006-2014 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
  * Portions copyright (C) 2005       Greg Roelofs
  *
@@ -307,6 +307,12 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.71 (built with libpng-1.6.9 and zlib-1.2.8)
+  Built the Windows binaries using -DTOO_FAR=32767; neglected to do this
+    in versions 1.7.42 through 1.7.70, which caused the Windows binaries
+    to produce different (usually a few bytes larger) results than Linux.
+    Thanks to F. Kayser for reporting the discrepancy.
 
 Version 1.7.70 (built with libpng-1.6.8 and zlib-1.2.8)
 
@@ -7097,8 +7103,8 @@ int main(int argc, char *argv[])
 
 png_uint_32 measure_idats(FILE * fp_in)
 {
-    /* Copyright (C) 1999-2002, 2006-2013 Glenn Randers-Pehrson
-       (glennrp@users.sf.net).  See notice in pngcrush.c for conditions of
+    /* Copyright (C) 1999-2002, 2006-2014 Glenn Randers-Pehrson
+       (glennrp at users.sf.net).  See notice in pngcrush.c for conditions of
        use and distribution */
     P2("\nmeasure_idats:\n");
     P1( "Allocating read structure\n");
@@ -7141,8 +7147,8 @@ png_uint_32 measure_idats(FILE * fp_in)
 
 png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
 {
-    /* Copyright (C) 1999-2002, 2006-2013 Glenn Randers-Pehrson
-       (glennrp@users.sf.net)
+    /* Copyright (C) 1999-2002, 2006-2014 Glenn Randers-Pehrson
+       (glennrp at users.sf.net)
        See notice in pngcrush.c for conditions of use and distribution */
 
     /* Signature + IHDR + IEND; we'll add PLTE + IDAT lengths */
@@ -7636,7 +7642,7 @@ void print_version_info(void)
       " | pngcrush %s\n"
       /* If you have modified this source, you may insert additional notices
        * immediately after this sentence: */
-      " |    Copyright (C) 1998-2002, 2006-2013 Glenn Randers-Pehrson\n"
+      " |    Copyright (C) 1998-2002, 2006-2014 Glenn Randers-Pehrson\n"
       " |    Portions copyright (C) 2005       Greg Roelofs\n"
       " | This is a free, open-source program.  Permission is irrevocably\n"
       " | granted to everyone to use this version of pngcrush without\n"
@@ -7644,7 +7650,7 @@ void print_version_info(void)
       " | Executable name is %s\n"
       " | It was built with libpng version %s, and is\n"
       " | running with %s"
-      " |    Copyright (C) 1998-2004, 2006-2013 Glenn Randers-Pehrson,\n"
+      " |    Copyright (C) 1998-2004, 2006-2014 Glenn Randers-Pehrson,\n"
       " |    Copyright (C) 1996, 1997 Andreas Dilger,\n"
       " |    Copyright (C) 1995, Guy Eric Schalnat, Group 42 Inc.,\n"
       " | and zlib version %s, Copyright (C) 1995%s,\n"
@@ -7682,7 +7688,7 @@ static const char *pngcrush_legal[] = {
     "",
     "If you have modified this source, you may insert additional notices",
     "immediately after this sentence.",
-    "Copyright (C) 1998-2002, 2006-2013 Glenn Randers-Pehrson",
+    "Copyright (C) 1998-2002, 2006-2014 Glenn Randers-Pehrson",
     "Portions copyright (C) 2005       Greg Roelofs",
     "",
     "DISCLAIMER: The pngcrush computer program is supplied \"AS IS\".",
