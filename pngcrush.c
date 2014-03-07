@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.71"
+#define PNGCRUSH_VERSION "1.7.72"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -307,6 +307,8 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.72 (built with libpng-1.6.10 and zlib-1.2.8)
 
 Version 1.7.71 (built with libpng-1.6.9 and zlib-1.2.8)
   Built the Windows binaries using -DTOO_FAR=32767; neglected to do this
@@ -4707,7 +4709,7 @@ int main(int argc, char *argv[])
                 /* We don't need to check CRC's because they were already
                    checked in the pngcrush_measure_idat function */
 
-#ifdef PNG_CRC_QUIET_USE
+#ifdef xPNG_CRC_QUIET_USE
                 png_set_crc_action(read_ptr, PNG_CRC_QUIET_USE,
                                    PNG_CRC_QUIET_USE);
 #endif
@@ -7230,7 +7232,7 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
 
     if (fix)
     {
-#ifdef PNG_CRC_WARN_USE
+#ifdef xPNG_CRC_WARN_USE
         png_set_crc_action(png_ptr, PNG_CRC_WARN_USE, PNG_CRC_WARN_USE);
 #endif
 #ifdef INFLATE_ALLOW_INVALID_DISTANCE_TOOFAR_ARRR

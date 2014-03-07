@@ -5,7 +5,7 @@
  * license (see LICENSE, in pngcrush.c).
  */
 
-/* Special defines for pngcrush version 1.7.71 */
+/* Special defines for pngcrush version 1.7.72 */
 
 #ifndef PNGCRUSH_H
 #define PNGCRUSH_H
@@ -14,7 +14,7 @@
 #undef PNG_BUILD_GRAYSCALE_PALETTE_SUPPORTED
 #undef PNG_CONVERT_tIME_SUPPORTED
 #undef PNG_EASY_ACCESS_SUPPORTED
-#undef PNG_FIXED_POINT_SUPPORTED
+/* #undef PNG_FIXED_POINT_SUPPORTED */
 #undef PNG_INCH_CONVERSIONS_SUPPORTED
 #undef PNG_INFO_IMAGE_SUPPORTED
 #undef PNG_IO_STATE_SUPPORTED
