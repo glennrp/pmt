@@ -5200,22 +5200,28 @@ int main(int argc, char *argv[])
 
                         if (trial > 0 && make_8_bit == 1)
                         {
-#ifdef PNG_READ_STRIP_16_TO_8_SUPPORTED
+#if defined(PNG_READ_SCALE_16_TO_8_SUPPORTED) || \
+    defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                            output_bit_depth = 8;
                            force_output_bit_depth = 8;
-#if 0
                            if (verbose > 0 && last_trial)
-#endif
                              fprintf(STDERR,
                              "   Stripping 16-bit depth to 8, trial = %d\n",
                              trial);
 
-                           /* png_set_strip_16(read_ptr); */
+#ifdef PNG_READ_STRIP_16_TO_8_SUPPORTED
+                           png_set_strip_16(read_ptr);
+#else
+#ifdef PNG_READ_SCALE_16_TO_8_SUPPORTED
+                           png_set_scale_16(read_ptr);
 #else
                            fprintf(STDERR,
                            "   PNG_READ_STRIP_16_TO_8 NOT SUPPORTED\n");
 #endif
+#endif
+#endif
                         }
+
                         if (last_trial == 1)
                         {
                         if (save_apng_chunks == 1 || found_acTL_chunk == 1)
