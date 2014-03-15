@@ -5,7 +5,7 @@
  * license (see LICENSE, in pngcrush.c).
  */
 
-/* Special defines for pngcrush version 1.7.72 */
+/* Special defines for pngcrush version 1.7.73 */
 
 #ifndef PNGCRUSH_H
 #define PNGCRUSH_H
@@ -25,7 +25,7 @@
 #if PNG_LIBPNG_VER >= 10600
 #  undef PNG_READ_GAMMA_SUPPORTED
 #endif
-#undef PNG_READ_STRIP_16_TO_8_SUPPORTED
+#define PNG_READ_STRIP_16_TO_8_SUPPORTED
 #undef PNG_READ_SWAP_ALPHA_SUPPORTED
 #undef PNG_READ_SWAP_SUPPORTED
 #undef PNG_READ_INVERT_ALPHA_SUPPORTED

@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.72"
+#define PNGCRUSH_VERSION "1.7.73"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -308,6 +308,15 @@
 
 Change log:
 
+Version 1.7.73 (built with libpng-1.6.10 and zlib-1.2.8)
+  Restored calls to png_set_crc_action() which had been removed from
+    version 1.7.72 for some testing and inadvertently not restored. 
+  Changed "fix" internal variable name to "salvage" (still set with "-fix")
+  Added code to fix/salvage PNG with "bad adaptive filter value" error.
+  Avoid calculating CRC during compression trials except for the last trial,
+    when the output is actually written.
+  Fixed a bug with reducing 16-bit images to 8-bit.
+    
 Version 1.7.72 (built with libpng-1.6.10 and zlib-1.2.8)
 
 Version 1.7.71 (built with libpng-1.6.9 and zlib-1.2.8)
@@ -1433,7 +1442,9 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 # define PNGCRUSH_LOCO
 #endif
 
-#ifndef PNGCRUSH_H
+#ifdef PNGCRUSH_H
+int png_ignore_crc = 0;
+#else
 png_uint_32 pngcrush_crc;
 #endif
 
@@ -1671,7 +1682,7 @@ static png_uint_32 pngcrush_write_byte_count;
 static png_uint_32 pngcrush_best_byte_count=0xffffffff;
 
 static int verbose = 1;
-static int fix = 0;
+static int salvage = 0;
 static int bail = 0; /* if 0, bail out of trials early */
 static int blacken = 0; /* if 0, or 2 after the first trial,
                            do not blacken color samples */
@@ -1680,7 +1691,7 @@ static int make_gray = 0; /* if 0, 2, or 3 after the first trial,
 static int make_opaque = 0; /* if 0, 2, or 3 after the first trial,
                            do not change color_type to opaque */
 static int make_8_bit = 0; /* if 0, 2, or 3 after the first trial,
-                           do not change color_type to gray */
+                           do not reduce bit_depth from 16 */
 static int reduce_palette = 0;
 static int things_have_changed = 0;
 static int global_things_have_changed = 0;
@@ -2080,7 +2091,7 @@ pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
    if ((png_uint_32)check != (png_uint_32)length)
       png_error(png_ptr, "read Error");
 #if 0
-   if (fix)
+   if (salvage)
    {
      found_IDAT == 1)
      {
@@ -2176,12 +2187,23 @@ pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
 static void pngcrush_cexcept_error(png_structp png_ptr,
    png_const_charp err_msg)
 {
+
+/* Handle "bad adaptive filter value" error.  */
+   if (!strcmp(err_msg, "bad adaptive filter value")) {
+#ifdef PNG_CONSOLE_IO_SUPPORTED
+        fprintf(stderr, "\nIn %s, correcting %s\n", inname,err_msg);
+#else
+        png_warning(png_ptr, err_msg);
+#endif
+     return;
+    }
+
 #if PNG_LIBPNG_VER < 10400
 /* Handle "Too many IDAT's found" error.  In libpng-1.4.x this became
  * a benign error, "Too many IDATs found".  This scheme will not work
  * in libpng-1.5.0 and later.
  */
-#  ifdef PNGCRUSH_H
+#  ifdef PNGCRUSH_H  /* Why would this not work with the system library? */
     if (!strcmp(err_msg, "Too many IDAT's found")) {
 #    ifdef PNG_CONSOLE_IO_SUPPORTED
         fprintf(stderr, "\nIn %s, correcting %s\n", inname,err_msg);
@@ -2196,10 +2218,6 @@ static void pngcrush_cexcept_error(png_structp png_ptr,
     {
         Throw err_msg;
     }
-
-#  ifndef PNGCRUSH_H
-    PNGCRUSH_UNUSED(png_ptr)
-#  endif /* PNGCRUSH_H */
 }
 
 
@@ -2658,7 +2676,6 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
        * set make_gray == 2. If the PNG colortype is already gray, set
        * make_gray = 3.
        *
-       * To do:
        * Check if any 16-bit pixels do not have identical high and low
        * bytes.  If one is found, set make_8_bit == 2. If the PNG bit_depth
        * is not 16-bits, set make_8_bit = 3.
@@ -3274,7 +3291,7 @@ int main(int argc, char *argv[])
         }
         else if (!strncmp(argv[i], "-fix", 4))
         {
-            fix++;
+            salvage++;
         }
         else if (!strncmp(argv[i], "-f", 3) || !strncmp(argv[i], "-fil", 4))
         {
@@ -4374,6 +4391,10 @@ int main(int argc, char *argv[])
             if (nosave || trial == MAX_METHODS)
                last_trial = 1;
 
+            if (verbose > 1)
+            fprintf(STDERR,
+               "pngcrush: trial = %d\n",trial);
+
             pngcrush_write_byte_count=0;
             found_IDAT = 0;
 
@@ -4700,18 +4721,21 @@ int main(int argc, char *argv[])
 
                 if (nosave == 0)
                     png_set_write_fn(write_ptr, (png_voidp) fpout,
-                                     (png_rw_ptr) pngcrush_write_png,
-                                     pngcrush_flush);
+                        (png_rw_ptr) pngcrush_write_png, pngcrush_flush);
 
                 P2("io has been initialized.\n");
                 pngcrush_pause();
 
+#ifdef PNG_CRC_QUIET_USE
                 /* We don't need to check CRC's because they were already
                    checked in the pngcrush_measure_idat function */
-
-#ifdef xPNG_CRC_QUIET_USE
                 png_set_crc_action(read_ptr, PNG_CRC_QUIET_USE,
                                    PNG_CRC_QUIET_USE);
+
+                if (last_trial == 0)
+                    /* Only calculate CRC while writing the final output */
+                    png_set_crc_action(write_ptr, PNG_CRC_QUIET_USE,
+                        PNG_CRC_QUIET_USE);
 #endif
 
 #ifdef PNG_READ_CHECK_FOR_INVALID_INDEX_SUPPORTED
@@ -4916,7 +4940,7 @@ int main(int argc, char *argv[])
                         png_error(read_ptr,
                             "PNG file corrupted by ASCII conversion");
                     }
-                    if (fix && found_CgBI)
+                    if (salvage && found_CgBI)
                     {
                         /* Skip the CgBI chunk */
 
@@ -5035,7 +5059,8 @@ int main(int argc, char *argv[])
                             output_color_type = input_color_type;
                         }
 
-                        if (verbose > 1 && last_trial)
+                        /* if (verbose > 1 && last_trial) */
+                        if (verbose > 1 && trial == 0)
                         {
                             fprintf(STDERR, "   IHDR chunk data:\n");
                             fprintf(STDERR,
@@ -5054,11 +5079,7 @@ int main(int argc, char *argv[])
                                     interlace_method);
                         }
 
-                        if (make_8_bit == 1)
-                        {
-                           output_bit_depth = 8;
-                        }
-                        else
+
                         {
 #ifndef PNG_WRITE_PACK_SUPPORTED
                           if (output_bit_depth == 0)
@@ -5069,11 +5090,11 @@ int main(int argc, char *argv[])
                             output_bit_depth = input_bit_depth;
                           }
                         }
-                          if ((output_color_type != 3
-                             || output_bit_depth > 8)
-                            && output_bit_depth >= 8
-                            && output_bit_depth != input_bit_depth)
-                            need_expand = 1;
+
+                        if ((output_color_type != 3 || output_bit_depth > 8)
+                           && output_bit_depth >= 8
+                           && output_bit_depth > input_bit_depth)
+                          need_expand = 1;
 
 #ifdef PNG_READ_RGB_TO_GRAY_SUPPORTED
                         if ((color_type == 2 ||
@@ -5176,6 +5197,25 @@ int main(int argc, char *argv[])
                             png_set_shift(read_ptr, &true_bits);
                         }
 #endif
+
+                        if (trial > 0 && make_8_bit == 1)
+                        {
+#ifdef PNG_READ_STRIP_16_TO_8_SUPPORTED
+                           output_bit_depth = 8;
+                           force_output_bit_depth = 8;
+#if 0
+                           if (verbose > 0 && last_trial)
+#endif
+                             fprintf(STDERR,
+                             "   Stripping 16-bit depth to 8, trial = %d\n",
+                             trial);
+
+                           /* png_set_strip_16(read_ptr); */
+#else
+                           fprintf(STDERR,
+                           "   PNG_READ_STRIP_16_TO_8 NOT SUPPORTED\n");
+#endif
+                        }
                         if (last_trial == 1)
                         {
                         if (save_apng_chunks == 1 || found_acTL_chunk == 1)
@@ -5236,8 +5276,9 @@ int main(int argc, char *argv[])
                                      output_color_type, interlace_method,
                                      compression_method, filter_method);
 
-                        if (output_color_type != input_color_type)
-                            things_have_changed = 1;
+                        if (output_color_type != input_color_type ||
+                            output_bit_depth != input_bit_depth)
+                           things_have_changed = 1;
 
                     }
                 }
@@ -7230,9 +7271,9 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
         }
     }
 
-    if (fix)
+    if (salvage)
     {
-#ifdef xPNG_CRC_WARN_USE
+#ifdef PNG_CRC_WARN_USE
         png_set_crc_action(png_ptr, PNG_CRC_WARN_USE, PNG_CRC_WARN_USE);
 #endif
 #ifdef INFLATE_ALLOW_INVALID_DISTANCE_TOOFAR_ARRR
@@ -7400,8 +7441,9 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
 
             if (png_get_uint_32(chunk_name) == PNG_UINT_CgBI)
             {
-                fprintf(STDERR, " This is an Xcode CgBI file, not a PNG file.\n");
-                if (fix)
+                fprintf(STDERR,
+                    " This is an Xcode CgBI file, not a PNG file.\n");
+                if (salvage)
                 {
                     fprintf (STDERR, " Removing the CgBI chunk.\n");
                 }
@@ -7596,7 +7638,7 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
             if (!png_memcmp(chunk_name, png_IEND, 4))
 #endif
             {
-                if (!fix && found_CgBI)
+                if (!salvage && found_CgBI)
                     return 0;
                 else
                     return sum_idat_length;
@@ -7818,7 +7860,8 @@ struct options_help pngcrush_options[] = {
 
     {0, FAKE_PAUSE_STRING},
 
-    {0, "          -fix (fix otherwise fatal conditions such as bad CRCs)"},
+    {0, "          -fix (salvage PNG with  otherwise fatal conditions such"},
+    {2, "               as bad CRCs and adaptive filter bytes)"},
     {2, ""},
 
     {0, "        -force (write a new output file even if larger than input)"},
