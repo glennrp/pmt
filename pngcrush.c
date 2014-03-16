@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.73"
+#define PNGCRUSH_VERSION "1.7.74"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -308,6 +308,8 @@
 
 Change log:
 
+Version 1.7.74 (built with libpng-1.6.10 and zlib-1.2.8)
+
 Version 1.7.73 (built with libpng-1.6.10 and zlib-1.2.8)
   Restored calls to png_set_crc_action() which had been removed from
     version 1.7.72 for some testing and inadvertently not restored. 
@@ -315,7 +317,7 @@ Version 1.7.73 (built with libpng-1.6.10 and zlib-1.2.8)
   Added code to fix/salvage PNG with "bad adaptive filter value" error.
   Avoid calculating CRC during compression trials except for the last trial,
     when the output is actually written.
-  Fixed a bug with reducing 16-bit images to 8-bit.
+  Fixed a bug with reducing 16-bit images to 8-bit using "-reduce" option.
     
 Version 1.7.72 (built with libpng-1.6.10 and zlib-1.2.8)
 
