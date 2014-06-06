@@ -308,7 +308,8 @@
 
 Change log:
 
-Version 1.7.74 (built with libpng-1.6.10 and zlib-1.2.8)
+Version 1.7.74 (built with libpng-1.6.11 and zlib-1.2.8)
+  Fixed "-zmem" option (only "-zm" would work since version 1.7.62).
 
 Version 1.7.73 (built with libpng-1.6.10 and zlib-1.2.8)
   Restored calls to png_set_crc_action() which had been removed from
@@ -2624,7 +2625,7 @@ void show_result(void)
             t_encode / (float) CLOCKS_PER_SEC);
     fprintf(STDERR, " other %.3f,",
             t_misc / (float) CLOCKS_PER_SEC);
-    fprintf(STDERR, " total %.3f seconds\n\n",
+    fprintf(STDERR, " total %.3f sec.\n\n",
             (t_misc + t_decode + t_encode) / (float) CLOCKS_PER_SEC);
 #ifdef PNG_USER_MEM_SUPPORTED
     if (current_allocation) {
@@ -2632,7 +2633,7 @@ void show_result(void)
         fprintf(STDERR, "MEMORY ERROR: %d bytes still allocated\n",
                 current_allocation);
         while (pinfo != NULL) {
-            fprintf(STDERR, " %8lu bytes at %p\n", (unsigned long)pinfo->size,
+            fprintf(STDERR, "%10lu bytes at %p\n", (unsigned long)pinfo->size,
                     (png_voidp) pinfo->pointer);
             free(pinfo->pointer);
             pinfo = pinfo->next;
@@ -3835,7 +3836,7 @@ int main(int argc, char *argv[])
             force_compression_window++;
             names++;
         }
-        else if (!strncmp(argv[i], "-zm", 4))
+        else if (!strncmp(argv[i], "-zm", 4) || !strncmp(argv[i], "-zmem", 5))
         {
             BUMP_I;
             compression_mem_level = pngcrush_get_long;
@@ -4174,8 +4175,8 @@ int main(int argc, char *argv[])
 
                 fprintf(STDERR, "   Recompressing IDAT chunks in %s\n", inname);
                 fprintf(STDERR,
-                  "   Total length of data found in critical chunks = %8lu\n",
-                  (unsigned long)idat_length[0]);
+                  "   Total length of data found in critical chunks         "
+                  "   =%10lu\n", (unsigned long)idat_length[0]);
                 fflush(STDERR);
             }
 
@@ -7001,14 +7002,14 @@ int main(int argc, char *argv[])
                     pngcrush_write_byte_count > pngcrush_best_byte_count)
                    fprintf(STDERR,
                      "   Critical chunk length, method %3d"
-                     " (ws %d fm %d zl %d zs %d) > %8lu\n",
+                     " (ws %d fm %d zl %d zs %d) >%10lu\n",
                      trial, compression_window,
                      filter_type, zlib_level, z_strategy,
                      (unsigned long)pngcrush_best_byte_count);
                 else
                    fprintf(STDERR,
                      "   Critical chunk length, method %3d"
-                     " (ws %d fm %d zl %d zs %d) = %8lu\n",
+                     " (ws %d fm %d zl %d zs %d) =%10lu\n",
                      trial, compression_window,
                      filter_type, zlib_level, z_strategy,
                      (unsigned long)idat_length[trial]);
@@ -7092,9 +7093,9 @@ int main(int argc, char *argv[])
                 else if (!already_crushed && !image_is_immutable)
                 {
                 fprintf(STDERR,
-                  "   Best pngcrush method        =   %d "
-                  "(ws %d fm %d zl %d zs %d) = %8lu\n     for output to %s\n", best,
-                  compression_window, fm[best], lv[best], zs[best],
+                  "   Best pngcrush method        = %3d "
+                  "(ws %d fm %d zl %d zs %d) =%10lu\n     for output to %s\n",
+                  best, compression_window, fm[best], lv[best], zs[best],
                   (unsigned long)idat_length[best], outname);
                 }
 
