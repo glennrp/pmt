@@ -3,6 +3,24 @@
 
 Change log:
 
+Version 1.7.76 (built with libpng-1.6.12 and zlib-1.2.8)
+  Updated libpng to version 1.6.12.
+
+Version 1.7.75 (built with libpng-1.6.10 and zlib-1.2.8)
+  Reverted libpng to version 1.6.10 due to a misplaced statement in png.c
+
+Version 1.7.74 (built with libpng-1.6.11 and zlib-1.2.8)
+  Fixed "-zmem" option (only "-zm" would work since version 1.7.62).
+
+Version 1.7.73 (built with libpng-1.6.10 and zlib-1.2.8)
+  Restored calls to png_set_crc_action() which had been removed from
+    version 1.7.72 for some testing and inadvertently not restored. 
+  Changed "fix" internal variable name to "salvage" (still set with "-fix")
+  Added code to fix/salvage PNG with "bad adaptive filter value" error.
+  Avoid calculating CRC during compression trials except for the last trial,
+    when the output is actually written.
+  Fixed a bug with reducing 16-bit images to 8-bit using "-reduce" option.
+    
 Version 1.7.72 (built with libpng-1.6.10 and zlib-1.2.8)
 
 Version 1.7.71 (built with libpng-1.6.9 and zlib-1.2.8)
