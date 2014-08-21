@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.76"
+#define PNGCRUSH_VERSION "1.7.77"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -307,6 +307,9 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.77 (built with libpng-1.6.13 and zlib-1.2.8)
+  Updated libpng to version 1.6.13.
 
 Version 1.7.76 (built with libpng-1.6.12 and zlib-1.2.8)
   Updated libpng to version 1.6.12.
