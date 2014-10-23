@@ -308,7 +308,8 @@
 
 Change log:
 
-Version 1.7.78 (built with libpng-1.6.13 and zlib-1.2.8)
+Version 1.7.78 (built with libpng-1.6.14 and zlib-1.2.8)
+  Made "-s | -silent" option suppress libpng warnings.
 
 Version 1.7.77 (built with libpng-1.6.13 and zlib-1.2.8)
   Updated libpng to version 1.6.13.
@@ -1842,6 +1843,9 @@ static /* const */ png_byte chunks_to_ignore[] = {
 static void pngcrush_cexcept_error(png_structp png_ptr,
   png_const_charp message);
 
+static void pngcrush_warning(png_structp png_ptr,
+  png_const_charp message);
+
 void PNGAPI pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
   png_size_t length);
 
@@ -2195,6 +2199,13 @@ pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
 #endif /* USE_FAR_KEYWORD */
 #endif /* PNG_STDIO_SUPPORTED */
 
+static void pngcrush_warning(png_structp png_ptr,
+   png_const_charp warning_msg)
+{
+   if (verbose >= 0)
+      fprintf(stderr, "pngcrush: %s\n", warning_msg);
+   return;
+}
 
 /* cexcept interface */
 
@@ -2207,7 +2218,7 @@ static void pngcrush_cexcept_error(png_structp png_ptr,
 #ifdef PNG_CONSOLE_IO_SUPPORTED
         fprintf(stderr, "\nIn %s, correcting %s\n", inname,err_msg);
 #else
-        png_warning(png_ptr, err_msg);
+        pngcrush_warning(png_ptr, err_msg);
 #endif
      return;
     }
@@ -2222,7 +2233,7 @@ static void pngcrush_cexcept_error(png_structp png_ptr,
 #    ifdef PNG_CONSOLE_IO_SUPPORTED
         fprintf(stderr, "\nIn %s, correcting %s\n", inname,err_msg);
 #    else
-        png_warning(png_ptr, err_msg);
+        pngcrush_warning(png_ptr, err_msg);
 #    endif
      return;
     }
@@ -3161,35 +3172,7 @@ int main(int argc, char *argv[])
             names++;
 
         /* GRR:  start of giant else-if block */
-        if (!strncmp(argv[i], "-fast", 5))
-        {
-            /* try two fast filters */
-            methods_specified = 1;
-            try_method[16] = 0;
-            try_method[53] = 0;
-        }
-        else if (!strncmp(argv[i], "-huffman", 8))
-        {
-            /* try all filters with huffman */
-            methods_specified = 1;
-            for (method = 11; method <= 16; method++)
-            {
-                try_method[method] = 0;
-            }
-#ifdef Z_RLE
-        }
-        else if (!strncmp(argv[i], "-rle", 4))
-        {
-            /* try all filters with RLE */
-            methods_specified = 1;
-            for (method = 125; method <= 136; method++)
-            {
-                try_method[method] = 0;
-            }
-#endif
-        }
-
-        else if (!strncmp(argv[i], "-already", 8))
+        if (!strncmp(argv[i], "-already", 8))
         {
             names++;
             BUMP_I;
@@ -3199,9 +3182,6 @@ int main(int argc, char *argv[])
 
         else if (!strncmp(argv[i], "-bail", 5))
             bail=0;
-
-        else if (!strncmp(argv[i], "-nobail", 7))
-            bail=1;
 
         else if (!strncmp(argv[i], "-bkgd", 5) ||
                  !strncmp(argv[i], "-bKGD", 5))
@@ -3241,6 +3221,7 @@ int main(int argc, char *argv[])
                 for (strat = 0; strat < NUM_STRATEGIES; strat++)
                     brute_force_strategies[strat] = 0;
         }
+
         else if (!strncmp(argv[i], "-bit_depth", 10))
         {
             names++;
@@ -3254,14 +3235,12 @@ int main(int argc, char *argv[])
                exit(1);
             }
         }
+
         else if (!strncmp(argv[i], "-cc", 3))
         {
             do_color_count = 1;
         }
-        else if (!strncmp(argv[i], "-no_cc", 6))
-        {
-            do_color_count = 0;
-        }
+
         else if (!strncmp(argv[i], "-c", 3) || !strncmp(argv[i], "-col", 4))
         {
             names++;
@@ -3269,6 +3248,7 @@ int main(int argc, char *argv[])
             force_output_color_type = pngcrush_get_long;
             pngcrush_check_long;
         }
+
 #ifdef PNG_gAMA_SUPPORTED
         else if (!strncmp(argv[i], "-dou", 4))
         {
@@ -3277,6 +3257,7 @@ int main(int argc, char *argv[])
             global_things_have_changed = 1;
         }
 #endif
+
         else if (!strncmp(argv[i], "-d", 3) || !strncmp(argv[i], "-dir", 4))
         {
             BUMP_I;
@@ -3286,10 +3267,12 @@ int main(int argc, char *argv[])
                 pngcrush_mode = DIRECTORY_MODE;
             directory_name = argv[names++];
         }
+
         else if (!strncmp(argv[i], "-exit", 5))
         {
             pngcrush_must_exit = 1;
         }
+
         else if (!strncmp(argv[i], "-e", 3) || !strncmp(argv[i], "-ext", 4))
         {
             BUMP_I;
@@ -3299,14 +3282,25 @@ int main(int argc, char *argv[])
                 pngcrush_mode = EXTENSION_MODE;
             extension = argv[names++];
         }
+
+        else if (!strncmp(argv[i], "-fast", 5))
+        {
+            /* try two fast filters */
+            methods_specified = 1;
+            try_method[16] = 0;
+            try_method[53] = 0;
+        }
+
         else if (!strncmp(argv[i], "-force", 6))
         {
             global_things_have_changed = 1;
         }
+
         else if (!strncmp(argv[i], "-fix", 4))
         {
             salvage++;
         }
+
         else if (!strncmp(argv[i], "-f", 3) || !strncmp(argv[i], "-fil", 4))
         {
             int specified_filter;
@@ -3325,36 +3319,6 @@ int main(int argc, char *argv[])
                     brute_force_filters[filt] = 1;
                 brute_force_filters[specified_filter] = 0;
                 brute_force_filter++;
-            }
-        }
-        else if (!strncmp(argv[i], "-loco", 5))
-        {
-#ifdef PNGCRUSH_LOCO
-            do_loco = 1;
-#else
-            fprintf
-                (STDERR,"Cannot do -loco because libpng was compiled"
-                 " without MNG features");
-#endif
-        }
-        else if (!strncmp(argv[i], "-l", 3) || !strncmp(argv[i], "-lev", 4))
-        {
-            int specified_level;
-            BUMP_I;
-            specified_level = pngcrush_get_long;
-            pngcrush_check_long;
-            if (specified_level > 9 || specified_level < 0)
-                specified_level = 9;
-            names++;
-            if (brute_force == 0)
-                lv[method] = specified_level;
-            else
-            {
-                if (brute_force_level == 0)
-                    for (lev = 0; lev < 10; lev++)
-                        brute_force_levels[lev] = 1;
-                brute_force_levels[specified_level] = 0;
-                brute_force_level++;
             }
         }
 
@@ -3394,14 +3358,24 @@ int main(int argc, char *argv[])
                 pngcrush_check_long;
             }
         }
-
 #endif /* PNG_gAMA_SUPPORTED */
+
         else if (!strncmp(argv[i], "-h", 3) || !strncmp(argv[i], "-hel", 4))
         {
             ++verbose;
             print_version_info();
             printed_version_info++;
             print_usage(0);   /* this exits */
+        }
+
+        else if (!strncmp(argv[i], "-huffman", 8))
+        {
+            /* try all filters with huffman */
+            methods_specified = 1;
+            for (method = 11; method <= 16; method++)
+            {
+                try_method[method] = 0;
+            }
         }
 
 #ifdef PNG_iCCP_SUPPORTED
@@ -3458,6 +3432,38 @@ int main(int argc, char *argv[])
               found_any_chunk=1;
         }
 
+        else if (!strncmp(argv[i], "-l", 3) || !strncmp(argv[i], "-lev", 4))
+        {
+            int specified_level;
+            BUMP_I;
+            specified_level = pngcrush_get_long;
+            pngcrush_check_long;
+            if (specified_level > 9 || specified_level < 0)
+                specified_level = 9;
+            names++;
+            if (brute_force == 0)
+                lv[method] = specified_level;
+            else
+            {
+                if (brute_force_level == 0)
+                    for (lev = 0; lev < 10; lev++)
+                        brute_force_levels[lev] = 1;
+                brute_force_levels[specified_level] = 0;
+                brute_force_level++;
+            }
+        }
+
+        else if (!strncmp(argv[i], "-loco", 5))
+        {
+#ifdef PNGCRUSH_LOCO
+            do_loco = 1;
+#else
+            fprintf
+                (STDERR,"Cannot do -loco because libpng was compiled"
+                 " without MNG features");
+#endif
+        }
+
         else if (!strncmp(argv[i], "-max", 4))
         {
             names++;
@@ -3466,16 +3472,8 @@ int main(int argc, char *argv[])
             pngcrush_check_long;
             if (max_idat_size == 0 || max_idat_size > PNG_UINT_31_MAX)
                 max_idat_size = PNG_ZBUF_SIZE;
-#ifdef PNGCRUSH_LOCO
         }
-        else if (!strncmp(argv[i], "-mng", 4))
-        {
-            names++;
-            BUMP_I;
-            mngname = argv[i];
-            new_mng++;
-#endif
-        }
+
         else if (!strncmp(argv[i], "-m", 3) || !strncmp(argv[i], "-met", 4))
         {
             names++;
@@ -3496,12 +3494,30 @@ int main(int argc, char *argv[])
             }
         }
 
+#ifdef PNGCRUSH_LOCO
+        else if (!strncmp(argv[i], "-mng", 4))
+        {
+            names++;
+            BUMP_I;
+            mngname = argv[i];
+            new_mng++;
+        }
+#endif
+
         else if (!strncmp(argv[i], "-new", 4))
         {
             global_things_have_changed = 1;  /* -force */
             make_opaque = 1;                 /* -reduce */
             make_gray = 1;                   /* -reduce */
             make_8_bit = 1;                  /* -reduce */
+        }
+
+        else if (!strncmp(argv[i], "-nobail", 7))
+            bail=1;
+
+        else if (!strncmp(argv[i], "-no_cc", 6))
+        {
+            do_color_count = 0;
         }
 
         else if (!strncmp(argv[i], "-nofilecheck", 5))
@@ -3529,10 +3545,12 @@ int main(int argc, char *argv[])
             nosave++;
             pngcrush_mode = EXTENSION_MODE;
         }
+
         else if (!strncmp(argv[i], "-oldtimestamp", 5))
         {
             new_time_stamp=0;
         }
+
         else if (!strncmp(argv[i], "-old", 4))
         {
             global_things_have_changed = 0;  /* no -force */
@@ -3540,14 +3558,17 @@ int main(int argc, char *argv[])
             make_gray = 0;                   /* no -reduce */
             make_8_bit = 0;                  /* no -reduce */
         }
+
         else if(!strncmp(argv[i], "-ow",3))
         {
             overwrite = 1;
         }
+
         else if (!strncmp(argv[i], "-premultiply", 5))
         {
             premultiply=2;
         }
+
         else if (!strncmp(argv[i], "-plte_len", 9))
         {
             names++;
@@ -3555,6 +3576,7 @@ int main(int argc, char *argv[])
             reduce_palette = 1;
         }
         else if (!strncmp(argv[i], "-pplt", 3))
+
         {
             names++;
             do_pplt++;
@@ -3562,20 +3584,24 @@ int main(int argc, char *argv[])
             strcpy(pplt_string, argv[i]);
             global_things_have_changed = 1;
         }
+
         else if (!strncmp(argv[i], "-p", 3) || !strncmp(argv[i], "-pau", 4))
         {
             pauses++;
         }
+
         else if (!strncmp(argv[i], "-q", 3) || !strncmp(argv[i], "-qui", 4))
         {
             verbose = 0;
         }
+
         else if (!strncmp(argv[i], "-reduce", 7))
         {
             make_opaque = 1;
             make_gray = 1;
             make_8_bit = 1;
         }
+
 #ifdef PNG_gAMA_SUPPORTED
         else if (!strncmp(argv[i], "-replace_gamma", 4))
         {
@@ -3624,6 +3650,19 @@ int main(int argc, char *argv[])
             global_things_have_changed = 1;
         }
 #endif
+
+#ifdef Z_RLE
+        else if (!strncmp(argv[i], "-rle", 4))
+        {
+            /* try all filters with RLE */
+            methods_specified = 1;
+            for (method = 125; method <= 136; method++)
+            {
+                try_method[method] = 0;
+            }
+        }
+#endif
+
 #ifdef PNGCRUSH_MULTIPLE_ROWS
         else if (!strncmp(argv[i], "-rows", 5))
         {
@@ -3633,6 +3672,7 @@ int main(int argc, char *argv[])
             pngcrush_check_long;
         }
 #endif
+
         else if (!strncmp(argv[i], "-r", 3) || !strncmp(argv[i], "-rem", 4))
         {
             remove_chunks = i;
@@ -3642,10 +3682,12 @@ int main(int argc, char *argv[])
                  && (!strncmp(argv[i], "dsig", 4)))
                image_is_immutable=0;
         }
+
         else if (!strncmp(argv[i], "-save", 5))
         {
             all_chunks_are_safe++;
         }
+
         else if (!strncmp(argv[i], "-srgb", 5) ||
                    !strncmp(argv[i], "-sRGB", 5))
         {
@@ -3669,6 +3711,7 @@ int main(int argc, char *argv[])
             } else
                 i--;
         }
+
         else if (!strncmp(argv[i], "-ster", 5) ||
                    !strncmp(argv[i], "-sTER", 5))
         {
@@ -3685,14 +3728,17 @@ int main(int argc, char *argv[])
             else
                 i--;
         }
+
         else if (!strncmp(argv[i], "-s", 3) || !strncmp(argv[i], "-sil", 4))
         {
-            verbose = 0;
+            verbose = -1;
         }
+
         else if(!strncmp(argv[i], "-try10",6))
         {
             try10 = 1;
         }
+
         else if (!strncmp(argv[i], "-text", 5)
                  || !strncmp(argv[i], "-tEXt", 5) ||
 #ifdef PNG_iTXt_SUPPORTED
@@ -3779,6 +3825,7 @@ int main(int argc, char *argv[])
 #endif
             }
         }
+
         else if (!strncmp(argv[i], "-time_stamp", 5) ||  /* legacy */
                  !strncmp(argv[i], "-newtimestamp", 5))
             new_time_stamp=1;
@@ -3801,6 +3848,7 @@ int main(int argc, char *argv[])
             }
             names += 1 + num_trans_in;
         }
+
         else if (!strncmp(argv[i], "-trns", 5) ||
                    !strncmp(argv[i], "-tRNS", 5))
         {
@@ -3823,6 +3871,7 @@ int main(int argc, char *argv[])
             pngcrush_check_long;
         }
 #endif /* tRNS */
+
         else if (!strncmp(argv[i], "-version", 8))
         {
             fprintf(STDERR, " pngcrush ");
@@ -3835,10 +3884,12 @@ int main(int argc, char *argv[])
             fprintf(STDERR, " for the most recent version.\n");
             verbose = 0;
         }
+
         else if (!strncmp(argv[i], "-v", 3) || !strncmp(argv[i], "-ver", 4))
         {
             verbose++;
         }
+
         else if (!strncmp(argv[i], "-w", 3) || !strncmp(argv[i], "-win", 4))
         {
             BUMP_I;
@@ -3847,6 +3898,7 @@ int main(int argc, char *argv[])
             force_compression_window++;
             names++;
         }
+
         else if (!strncmp(argv[i], "-zm", 4) || !strncmp(argv[i], "-zmem", 5))
         {
             BUMP_I;
@@ -3854,6 +3906,7 @@ int main(int argc, char *argv[])
             pngcrush_check_long;
             names++;
         }
+
         else if (!strncmp(argv[i], "-z", 3))
         {
             int specified_strategy;
@@ -3874,6 +3927,7 @@ int main(int argc, char *argv[])
                 brute_force_strategy++;
             }
         }
+
         else if (!strncmp(argv[i], "-", 1))
         {
             if (verbose > 0 && printed_version_info == 0)
@@ -3920,18 +3974,20 @@ int main(int argc, char *argv[])
             inname = argv[names];
             outname = argv[names + 1];
         }
+
         else if (overwrite)
         {
                 inname = argv[names];
                 outname = outname;
         }
+
         else
         {
             if ((argc - names == 1 || nosave))
             {
                 inname = argv[names];
             }
-            if (verbose && !nosave)
+            if (verbose > 0 && !nosave)
             {
                 print_usage(1);   /* this exits */
             }
@@ -4141,14 +4197,15 @@ int main(int argc, char *argv[])
                if (verbose > 0)
                   mng_ptr = png_create_write_struct_2(PNG_LIBPNG_VER_STRING,
                     (png_voidp) NULL, (png_error_ptr) pngcrush_cexcept_error,
-                    (png_error_ptr) NULL, (png_voidp) NULL,
+                    (png_error_ptr) pngcrush_warning, (png_error_ptr) NULL, 
                     (png_malloc_ptr) pngcrush_debug_malloc,
                     (png_free_ptr) pngcrush_debug_free);
                else
 #  endif
                   mng_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING,
-                    (png_voidp) NULL, (png_error_ptr) pngcrush_cexcept_error,
-                    (png_error_ptr) NULL);
+                    (png_voidp) NULL,
+                    (png_error_ptr) pngcrush_cexcept_error,
+                    (png_error_ptr) pngcrush_warning);
                if (mng_ptr == NULL)
                   fprintf(STDERR, "pngcrush could not create mng_ptr");
 
@@ -4195,6 +4252,7 @@ int main(int argc, char *argv[])
                 continue;
 
         }
+
         else
             idat_length[0] = 1;
 
@@ -4202,11 +4260,13 @@ int main(int argc, char *argv[])
         {
             fprintf(STDERR, "   File %s has already been crushed.\n", inname);
         }
+
         if (image_is_immutable)
         {
             fprintf(STDERR,
               "   Image %s has a dSIG chunk and is immutable.\n", inname);
         }
+
         if (!already_crushed && !image_is_immutable)
         {
 
@@ -4237,6 +4297,7 @@ int main(int argc, char *argv[])
               force_output_bit_depth);
             force_output_bit_depth=0;
         }
+
         if (force_output_color_type != 8 &&
             force_output_color_type != 0 &&
             force_output_color_type != 2 &&
@@ -4507,6 +4568,7 @@ int main(int argc, char *argv[])
                 if (trial > 2 && trial < 5 && idat_length[trial - 1]
                     < idat_length[best_of_three])
                     best_of_three = trial - 1;
+
                 if (try_method[trial])
                 {
                     P2("skipping \"late\" trial %d\n", trial);
@@ -4620,14 +4682,15 @@ int main(int argc, char *argv[])
                 if (verbose > 0)
                    read_ptr = png_create_read_struct_2(PNG_LIBPNG_VER_STRING,
                      (png_voidp) NULL, (png_error_ptr) pngcrush_cexcept_error,
-                     (png_error_ptr) NULL, (png_voidp) NULL,
+                     (png_error_ptr) pngcrush_warning,
+                     (png_voidp) NULL,
                      (png_malloc_ptr) pngcrush_debug_malloc,
                      (png_free_ptr) pngcrush_debug_free);
                 else
 #endif /* PNG_USER_MEM_SUPPORTED */
                    read_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING,
                      (png_voidp) NULL, (png_error_ptr) pngcrush_cexcept_error,
-                     (png_error_ptr) NULL);
+                     (png_error_ptr) pngcrush_warning);
                 if (read_ptr == NULL)
                     Throw "pngcrush could not create read_ptr";
 
@@ -4652,6 +4715,15 @@ int main(int argc, char *argv[])
 # endif
                 }
 #endif /* PNG_SET_USER_LIMITS_SUPPORTED */
+
+#if defined(PNG_MAXIMUM_INFLATE_WINDOW) && defined(PNG_OPTION_ON)
+                if (salvage)
+                {
+                   png_set_option(read_ptr, PNG_MAXIMUM_INFLATE_WINDOW,
+                       PNG_OPTION_ON);
+                   printf(" Setting MAXIMUM_INFLATE_WINDOW\n");
+                }
+#endif
 
 #if 0
                 /* Use a smaller decompression buffer for speed */
@@ -4706,16 +4778,20 @@ int main(int argc, char *argv[])
                 }
                 P1("Allocating read_info, write_info, end_info structures\n");
                 read_info_ptr = png_create_info_struct(read_ptr);
+
                 if (read_info_ptr == NULL)
                     Throw "pngcrush could not create read_info_ptr";
+
                 end_info_ptr = png_create_info_struct(read_ptr);
                 if (end_info_ptr == NULL)
                     Throw "pngcrush could not create end_info_ptr";
+
                 if (nosave == 0)
                 {
                     write_info_ptr = png_create_info_struct(write_ptr);
                     if (write_info_ptr == NULL)
                         Throw "pngcrush could not create write_info_ptr";
+
                     write_end_info_ptr = png_create_info_struct(write_ptr);
                     if (write_end_info_ptr == NULL)
                         Throw
@@ -4792,6 +4868,7 @@ int main(int argc, char *argv[])
                                                 PNG_HANDLE_CHUNK_ALWAYS,
                                                 (png_bytep) "fdAT", 1);
                     }
+
                     if (found_any_chunk == 1)
                        png_set_keep_unknown_chunks(write_ptr,
                                                 PNG_HANDLE_CHUNK_ALWAYS,
@@ -4814,6 +4891,7 @@ int main(int argc, char *argv[])
                                                 (png_bytep) "fdAT", 1);
                         }
                     }
+
                     else {
 #if !defined(PNG_cHRM_SUPPORTED) || !defined(PNG_hIST_SUPPORTED) || \
     !defined(PNG_iCCP_SUPPORTED) || !defined(PNG_sCAL_SUPPORTED) || \
@@ -4944,6 +5022,7 @@ int main(int argc, char *argv[])
                         png_skip_chunk(read_ptr);
                         input_format = 1;
                     }
+
                     else
 #endif
                     if (png_sig_cmp(png_signature, 0, 8))
@@ -4991,6 +5070,7 @@ int main(int argc, char *argv[])
                      if (output_color_type == 6)
                         output_color_type = 2;
                   }
+
                   else
                      P1(" make_opaque=%d\n",make_opaque);
 
@@ -5009,7 +5089,7 @@ int main(int argc, char *argv[])
                      if (output_color_type == 2)
                         output_color_type = 0;
                   }
-                     P1(" make_gray=%d\n",make_gray);
+                  P1(" make_gray=%d\n",make_gray);
 
                   if (make_8_bit == 1)
                   {
@@ -5020,7 +5100,7 @@ int main(int argc, char *argv[])
                       */
                      P1(" Reduce 16-bit image losslessly to 8-bit\n");
                   }
-                     P1(" make_8_bit=%d\n",make_8_bit);
+                  P1(" make_8_bit=%d\n",make_8_bit);
 
                   if (make_opaque != 1 && blacken == 2)
                   {
@@ -6243,7 +6323,7 @@ int main(int argc, char *argv[])
                             { 138, 77, 78, 71, 13, 10, 26, 10 };
                         /* write the MNG 8-byte signature */
                         if (outname[strlen(outname) - 3] == 'p')
-                            png_warning(read_ptr,
+                            pngcrush_warning(read_ptr,
                               "  Writing a MNG file with a .png extension");
                         pngcrush_default_write_data(write_ptr,
                                        &mng_signature[0],
@@ -6277,7 +6357,7 @@ int main(int argc, char *argv[])
 
                     if (found_CgBI)
                     {
-                        png_warning(read_ptr,
+                        pngcrush_warning(read_ptr,
                             "Cannot read Xcode CgBI PNG");
                     }
                     P1( "\nWriting info struct\n");
@@ -7247,7 +7327,7 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
             for (b=0; b<40; b++)
               buff[b]='\0';
             pngcrush_default_read_data(read_ptr, buff, length);
-            if (verbose) {
+            if (verbose > 0) {
             printf("  width=%lu\n",(unsigned long)(buff[3]+(buff[2]<<8)
                       +(buff[1]<<16)+(buff[0]<<24)));
             printf("  height=%lu\n",(unsigned long)(buff[7]+(buff[6]<<8)
@@ -8026,7 +8106,7 @@ struct options_help pngcrush_options[] = {
     {0, "   -plte_len n (obsolete; any \"n\" enables palette reduction)"},
     {2, ""},
 
-    {0, "            -q (quiet)"},
+    {0, "            -q (quiet) suppresses console output except for warnings"},
     {2, ""},
 
     {0, "       -reduce (do lossless color-type or bit-depth reduction)"},
@@ -8080,6 +8160,9 @@ struct options_help pngcrush_options[] = {
     {2, "               otherwise."},
     {2, ""},
 #endif
+
+    {0, "            -s (silent) suppresses console output including warnings"},
+    {2, ""},
 
     {0, "         -save (keep all copy-unsafe PNG chunks)"},
     {2, ""},
@@ -8195,7 +8278,7 @@ void print_usage(int retval)
 {
     int j, jmax;
 
-    if (verbose)
+    if (verbose > 0)
     {
         jmax = sizeof(pngcrush_legal) / sizeof(char *);
         for (j = 0;  j < jmax;  ++j)
