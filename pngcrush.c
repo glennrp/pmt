@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.78"
+#define PNGCRUSH_VERSION "1.7.79"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -308,8 +308,11 @@
 
 Change log:
 
+Version 1.7.79 (built with libpng-1.6.14 and zlib-1.2.8)
+  Fixed bug in -reduce_palette (or -plte_len N) option.
+
 Version 1.7.78 (built with libpng-1.6.14 and zlib-1.2.8)
-  Made "-s | -silent" option suppress libpng warnings.
+  Made "-s" and "-silent" options suppress libpng warnings.
 
 Version 1.7.77 (built with libpng-1.6.13 and zlib-1.2.8)
   Updated libpng to version 1.6.13.
@@ -2685,8 +2688,6 @@ static void pngcrush_flush(png_structp png_ptr)
 void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
     row_info, png_bytep data)
 {
-
-
    if (blacken == 1 || make_gray == 1 || make_opaque == 1)
    {
       /* Check if there are any fully transparent pixels.  If one is found,
@@ -2724,7 +2725,7 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
       if (row_info->bit_depth < 16)
         make_8_bit = 3;
 
-      i=(int) row_info->rowbytes-1;
+      i = (int) row_info->rowbytes-1;
 
       if ((row_info->color_type == 2 || row_info->color_type == 6) &&
           make_gray == 1) /* RGB */
@@ -2750,10 +2751,10 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
 
         else /* bit depth == 16 */
           {
-            int incr=6;
+            int incr = 6;
             if (row_info->color_type == 6)
             {
-               incr=8;
+               incr = 8;
                i-=2;
             }
             for ( ; i > 0 ; )
@@ -2771,7 +2772,7 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
       else if (row_info->color_type == 4 && (blacken == 1 ||
                make_opaque == 1)) /* GA */
       {
-        i=(int) row_info->rowbytes-1;
+        i = (int) row_info->rowbytes-1;
 
         if (row_info->bit_depth == 8)
           {
@@ -2813,7 +2814,7 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
       if (row_info->color_type == 6 && (blacken == 1 || make_gray == 1 ||
                make_opaque == 1))
       {
-        i=(int) row_info->rowbytes-1;
+        i = (int) row_info->rowbytes-1;
 
         if (row_info->bit_depth == 8)
           {
@@ -2872,7 +2873,7 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
    if (make_8_bit == 1)
    {
       int i;
-      i=(int) row_info->rowbytes-1;
+      i = (int) row_info->rowbytes-1;
 
       if (row_info->color_type == 0)
       {
@@ -2914,6 +2915,18 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
                   make_8_bit = 2;
                i-=8;
          }
+      }
+   }
+
+   if (reduce_palette == 1 && row_info->color_type == 3)
+   {
+      int i;
+      i = (int) row_info->rowbytes-1;
+      
+      for ( ; i > 0 ; i--)
+      {
+         if (data[i] > plte_len)
+            plte_len = data[i];
       }
    }
 }
@@ -3574,6 +3587,7 @@ int main(int argc, char *argv[])
             names++;
             BUMP_I; /* Ignore old plte_len argument */
             reduce_palette = 1;
+            specified_plte_len = 0;
         }
         else if (!strncmp(argv[i], "-pplt", 3))
 
@@ -4274,17 +4288,18 @@ int main(int argc, char *argv[])
             fprintf(STDERR,
                "   The -cc option is not supported.\n");
 
-        if (plte_len > 0 && force_output_bit_depth == 0)
-          {
-            if (plte_len <= 2)
-              force_output_bit_depth = 1;
-            else if (plte_len <= 4)
-              force_output_bit_depth = 2;
-            else if (plte_len <= 16)
-              force_output_bit_depth = 4;
-            else
-              force_output_bit_depth = 8;
-          }
+        if (force_output_color_type != 8 &&
+            force_output_color_type != 0 &&
+            force_output_color_type != 2 &&
+            force_output_color_type != 3 &&
+            force_output_color_type != 4 &&
+            force_output_color_type != 6)
+        {
+            fprintf(STDERR, "\n  Ignoring invalid color_type: %d\n",
+              force_output_color_type);
+            force_output_color_type=8;
+        }
+        output_color_type = force_output_color_type;
 
         if (force_output_bit_depth != 0 &&
             force_output_bit_depth != 1 &&
@@ -4298,18 +4313,19 @@ int main(int argc, char *argv[])
             force_output_bit_depth=0;
         }
 
-        if (force_output_color_type != 8 &&
-            force_output_color_type != 0 &&
-            force_output_color_type != 2 &&
-            force_output_color_type != 3 &&
-            force_output_color_type != 4 &&
-            force_output_color_type != 6)
-        {
-            fprintf(STDERR, "\n  Ignoring invalid color_type: %d\n",
-              force_output_color_type);
-            force_output_color_type=8;
-        }
-        output_color_type = force_output_color_type;
+        if (plte_len > 0 && output_color_type == 3 &&
+            force_output_bit_depth == 0)
+          {
+            if (plte_len <= 2)
+              force_output_bit_depth = 1;
+            else if (plte_len <= 4)
+              force_output_bit_depth = 2;
+            else if (plte_len <= 16)
+              force_output_bit_depth = 4;
+            else
+              force_output_bit_depth = 8;
+          }
+
         output_bit_depth = force_output_bit_depth;
 
         if (!methods_specified || try10 != 0)
@@ -4404,7 +4420,7 @@ int main(int argc, char *argv[])
            }
         }
 
-        if (reduce_palette)
+        if (input_color_type == 3 && reduce_palette)
         {
            if ((found_hIST && keep_unknown_chunk("hIST", argv)) ||
               found_acTL_chunk == 1)
@@ -4416,6 +4432,7 @@ int main(int argc, char *argv[])
            else
            {
              try_method[0] = 0;
+             plte_len = 0;
            }
         }
 
@@ -4737,7 +4754,8 @@ int main(int argc, char *argv[])
      * Reduce 16-bit image to 8-bit if possible without loss.
      */
     if (trial == 0 &&
-        (blacken == 1 || make_gray == 1 || make_opaque == 1 || make_8_bit == 1))
+        (blacken == 1 || make_gray == 1 || make_opaque == 1 ||
+        make_8_bit == 1 || reduce_palette == 1))
     {
       P1(" Examine image for possible lossless reductions\n");
       png_set_read_user_transform_fn(read_ptr, pngcrush_examine_pixels_fn);
@@ -4832,16 +4850,20 @@ int main(int argc, char *argv[])
                 /* Only run this test (new in libpng-1.5.10) during the
                  * 0th and last trial
                  */
-                if ((last_trial && reduce_palette == 0) ||
-                    (trial == 0 && reduce_palette == 1))
+                if ((input_color_type == 3) &&
+                    ((last_trial && reduce_palette == 0) ||
+                    (trial == 0 && reduce_palette == 1)))
                 {
-                  P1(" Check the palette\n");
-                  png_set_check_for_invalid_index (read_ptr, 1);
+                   P1(" Check the read palette\n");
+                   png_set_check_for_invalid_index (read_ptr, 1);
                 }
 #endif
 #ifdef PNG_WRITE_CHECK_FOR_INVALID_INDEX_SUPPORTED
-                if (last_trial && nosave == 0)
+                if (last_trial && nosave == 0 && output_color_type == 3)
+                {
+                   P1(" Check the written palette\n");
                    png_set_check_for_invalid_index (write_ptr, 1);
+                }
 #endif
 
             if (last_trial == 1)
@@ -4892,7 +4914,8 @@ int main(int argc, char *argv[])
                         }
                     }
 
-                    else {
+                    else
+                    {
 #if !defined(PNG_cHRM_SUPPORTED) || !defined(PNG_hIST_SUPPORTED) || \
     !defined(PNG_iCCP_SUPPORTED) || !defined(PNG_sCAL_SUPPORTED) || \
     !defined(PNG_pCAL_SUPPORTED) || !defined(PNG_sPLT_SUPPORTED) || \
@@ -4997,118 +5020,129 @@ int main(int argc, char *argv[])
                         }
 #endif
                     }
-                }
+                } /* nosave == 0 */
 #endif /* PNG_WRITE_UNKNOWN_CHUNKS_SUPPORTED */
-            } /* Ancillary chunk handling */
+            } /* last trial */
 
-                P1( "Reading info struct\n");
-                {
+            P1( "Reading signature bytes\n");
+            {
 #ifdef PNGCRUSH_LOCO
-                    png_byte mng_signature[8] =
-                        { 138, 77, 78, 71, 13, 10, 26, 10 };
+              png_byte mng_signature[8] =
+                  { 138, 77, 78, 71, 13, 10, 26, 10 };
 #endif
-                    png_byte png_signature[8] =
-                        { 137, 80, 78, 71, 13, 10, 26, 10 };
+              png_byte png_signature[8] =
+                  { 137, 80, 78, 71, 13, 10, 26, 10 };
 
-                    pngcrush_default_read_data(read_ptr, png_signature, 8);
-                    png_set_sig_bytes(read_ptr, 8);
+              pngcrush_default_read_data(read_ptr, png_signature, 8);
+              png_set_sig_bytes(read_ptr, 8);
 
 #ifdef PNGCRUSH_LOCO
-                    if (!(int)(png_memcmp(mng_signature, png_signature, 8)))
-                    {
-                        /* Skip the MHDR */
-                        png_permit_mng_features(read_ptr,
-                                            PNG_FLAG_MNG_FILTER_64);
-                        png_skip_chunk(read_ptr);
-                        input_format = 1;
-                    }
+              if (!(int)(png_memcmp(mng_signature, png_signature, 8)))
+              {
+                  /* Skip the MHDR */
+                  png_permit_mng_features(read_ptr,
+                                      PNG_FLAG_MNG_FILTER_64);
+                  png_skip_chunk(read_ptr);
+                  input_format = 1;
+              }
 
-                    else
+              else
 #endif
-                    if (png_sig_cmp(png_signature, 0, 8))
-                    {
-                        if (png_sig_cmp(png_signature, 0, 4))
-                            png_error(read_ptr, "Not a PNG file!");
-                    else
-                        png_error(read_ptr,
-                            "PNG file corrupted by ASCII conversion");
-                    }
-                    if (salvage && found_CgBI)
-                    {
-                        /* Skip the CgBI chunk */
+              if (png_sig_cmp(png_signature, 0, 8))
+              {
+                  if (png_sig_cmp(png_signature, 0, 4))
+                      png_error(read_ptr, "Not a PNG file!");
+              else
+                  png_error(read_ptr,
+                      "PNG file corrupted by ASCII conversion");
+              }
+              if (salvage && found_CgBI)
+              {
+                  /* Skip the CgBI chunk */
 
-                        png_skip_chunk(read_ptr);
+                  png_skip_chunk(read_ptr);
 
-                        /* iCCP and zTXt are probably unreadable
-                         * because of the nonstandard deflate */
+                  /* iCCP and zTXt are probably unreadable
+                   * because of the nonstandard deflate */
 
 #ifdef PNG_WRITE_UNKNOWN_CHUNKS_SUPPORTED
-                        png_set_keep_unknown_chunks(read_ptr,
-                            PNG_HANDLE_CHUNK_NEVER,
-                            (png_bytep)"iCCP", 1);
-                        png_set_keep_unknown_chunks(read_ptr,
-                            PNG_HANDLE_CHUNK_NEVER,
-                            (png_bytep)"zTXt", 1);
+                  png_set_keep_unknown_chunks(read_ptr,
+                      PNG_HANDLE_CHUNK_NEVER,
+                      (png_bytep)"iCCP", 1);
+                  png_set_keep_unknown_chunks(read_ptr,
+                      PNG_HANDLE_CHUNK_NEVER,
+                      (png_bytep)"zTXt", 1);
 #endif
-                    }
-                }
+              }
+            }
 
 #ifndef PNG_READ_PREMULTIPLY_ALPHA_SUPPORTED
-                if (premultiply)
-                   png_error(read_ptr, "Premultiplied alpha is not supported");
+            if (premultiply)
+                 png_error(read_ptr, "Premultiplied alpha is not supported");
 #endif
 
-                png_read_info(read_ptr, read_info_ptr);
+            P1( "Reading info struct\n");
+            png_read_info(read_ptr, read_info_ptr);
 
-                if (trial != 0)
-                {
-                  if (make_opaque == 1)
-                  {
-                     P1(" Remove all-opaque alpha channel\n");
-                     if (output_color_type == 4)
-                        output_color_type = 0;
-                     if (output_color_type == 6)
-                        output_color_type = 2;
-                  }
+            if (trial != 0)
+            {
+               if (make_opaque == 1)
+               {
+                  P1(" Remove all-opaque alpha channel\n");
+                  if (output_color_type == 4)
+                     output_color_type = 0;
+                  if (output_color_type == 6)
+                     output_color_type = 2;
+               }
+               P1(" make_opaque=    %d\n",make_opaque);
 
-                  else
-                     P1(" make_opaque=%d\n",make_opaque);
+               if (make_gray == 1)
+               {
+                  /* Note: Take care that iCCP, sBIT, and bKGD data are not
+                   * lost or become invalid when reducing images from
+                   * truecolor to grayscale or when reducing the bit depth.
+                   * (To do: test this; it's probably OK)
+                   */
+                  /* To do: check bKGD color */
 
-                  if (make_gray == 1)
-                  {
-                     /* Note: Take care that sBIT and bKGD data are not
-                      * lost or become invalid when reducing images from
-                      * truecolor to grayscale or when reducing the bit depth.
-                      * (To do: test this; it's probably OK)
-                      */
-                     /* To do: check bKGD color */
+                  P1(" Encode all-gray image with a gray colortype\n");
+                  if (output_color_type == 6)
+                     output_color_type = 4;
+                  if (output_color_type == 2)
+                     output_color_type = 0;
+               }
+               P1(" make_gray=      %d\n",make_gray);
 
-                     P1(" Encode all-gray image with a gray colortype\n");
-                     if (output_color_type == 6)
-                        output_color_type = 4;
-                     if (output_color_type == 2)
-                        output_color_type = 0;
-                  }
-                  P1(" make_gray=%d\n",make_gray);
+               if (make_8_bit == 1)
+               {
+                  /* Note: Take care that sBIT and bKGD data are not
+                   * lost or become invalid when reducing the bit depth.
+                   * (To do: test this; it's probably OK)
+                   */
+                  P1(" Reduce 16-bit image losslessly to 8-bit\n");
+               }
+               P1(" make_8_bit=     %d\n",make_8_bit);
 
-                  if (make_8_bit == 1)
-                  {
-                     /* Note: Take care that sBIT and bKGD data are not
-                      * lost or become invalid when reducing images from
-                      * truecolor to grayscale or when reducing the bit depth.
-                      * (To do: test this; it's probably OK)
-                      */
-                     P1(" Reduce 16-bit image losslessly to 8-bit\n");
-                  }
-                  P1(" make_8_bit=%d\n",make_8_bit);
+               if (make_opaque != 1 && blacken == 2)
+               {
+                  P1(" Blacken the fully transparent pixels\n");
+                  png_set_read_user_transform_fn(read_ptr,
+                      pngcrush_transform_pixels_fn);
+               }
+               P1(" make_opaque=    %d\n",make_opaque);
+               P1(" blacken=        %d\n",blacken);
 
-                  if (make_opaque != 1 && blacken == 2)
-                  {
-                     P1(" Blacken the fully transparent pixels\n");
-                     png_set_read_user_transform_fn(read_ptr,
-                         pngcrush_transform_pixels_fn);
-                  }
-                }
+               if (reduce_palette == 1)
+               {
+                  /* Note: Take care that sBIT and bKGD data are not
+                   * lost or become invalid when reducing the bit depth.
+                   * (To do: test this; it's probably OK)
+                  P1(" Reduce palette by truncating unused entries\n");
+                   */
+               }
+               P1(" reduce_palette= %d\n",reduce_palette);
+               P1("  new plte_len = %d\n",plte_len);
+            }
 
                 /* { GRR added for quick %-navigation (1) */
 
@@ -5139,8 +5173,7 @@ int main(int argc, char *argv[])
 
                     P1( "Transferring info struct\n");
 
-                    if (png_get_IHDR
-                        (read_ptr, read_info_ptr, &width, &height,
+                    if (png_get_IHDR(read_ptr, read_info_ptr, &width, &height,
                          &bit_depth, &color_type, &interlace_method,
                          &compression_method, &filter_method))
                     {
@@ -5174,7 +5207,6 @@ int main(int argc, char *argv[])
                         }
 
 
-                        {
 #ifndef PNG_WRITE_PACK_SUPPORTED
                           if (output_bit_depth == 0)
 #else
@@ -5183,7 +5215,6 @@ int main(int argc, char *argv[])
                           {
                             output_bit_depth = input_bit_depth;
                           }
-                        }
 
                         if ((output_color_type != 3 || output_bit_depth > 8)
                            && output_bit_depth >= 8
@@ -5380,7 +5411,7 @@ int main(int argc, char *argv[])
                             output_bit_depth != input_bit_depth)
                            things_have_changed = 1;
 
-                    }
+                    } /* IHDR */
                 }
 
             if (premultiply == 1 || premultiply == 2)
@@ -6690,16 +6721,15 @@ int main(int argc, char *argv[])
                        break;
                 }
 
-#ifdef PNG_GET_PALETTE_MAX_SUPPORTED
                 if (color_type == 3)
                   {
                   if (trial == 0 && reduce_palette == 1)
                      {
                        int palette_length;
 
-                       palette_length = png_get_palette_max(read_ptr,
-                          read_info_ptr)+1;
+                       palette_length = plte_len;
                        P1("Measured palette length = %d\n", palette_length);
+
 #ifdef PNG_READ_bKGD_SUPPORTED
                        {
                          png_color_16p bkgd;
@@ -6731,7 +6761,6 @@ int main(int argc, char *argv[])
                         }
                      }
                   }
-#endif
 
                 if (nosave)
                 {
