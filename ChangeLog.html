@@ -3,6 +3,22 @@
 
 Change log:
 
+Version 1.7.81 (built with libpng-1.6.15 and zlib-1.2.8)
+  Fixed off-by-one error in calculation of plte_len. Bug report by Ivan Kuchin.
+
+Version 1.7.80 (built with libpng-1.6.14 and zlib-1.2.8)
+  Added "-reduce_palette" and "-noreduce_palette" options.  Enable
+    reduce_palette when the "-new" or "-reduce" option is used.
+
+Version 1.7.79 (built with libpng-1.6.14 and zlib-1.2.8)
+  Fixed bug in -plte_len N option.
+
+Version 1.7.78 (built with libpng-1.6.14 and zlib-1.2.8)
+  Made "-s" and "-silent" options suppress libpng warnings.
+
+Version 1.7.77 (built with libpng-1.6.13 and zlib-1.2.8)
+  Updated libpng to version 1.6.13.
+
 Version 1.7.76 (built with libpng-1.6.12 and zlib-1.2.8)
   Updated libpng to version 1.6.12.
 
@@ -142,7 +158,7 @@ Version 1.7.52 (built with libpng-1.6.1beta06 and zlib-1.2.7)
 Version 1.7.51 (built with libpng-1.6.0 and zlib-1.2.7)
   Added "-noreduce" option, in preparation for "-reduce" becoming the
     default behaviour in version 1.8.0.  This turns off lossless bit depth,
-    color type and palette reduction, and opaque alpha channel removal.
+    color type, palette reduction, and opaque alpha channel removal.
   Zero out the high byte of transparent color for color-type 0 and 2,
     when reducing from 16 bits to 8.
   Undefined a bunch of stuff in pngcrush.h that we do not use, saves about
