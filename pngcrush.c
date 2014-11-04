@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.79"
+#define PNGCRUSH_VERSION "1.7.80"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -308,8 +308,12 @@
 
 Change log:
 
+Version 1.7.80 (built with libpng-1.6.14 and zlib-1.2.8)
+  Added "-reduce_palette" and "-noreduce_palette" options.  Enable
+    reduce_palette when the "-new" or "-reduce" option is used.
+
 Version 1.7.79 (built with libpng-1.6.14 and zlib-1.2.8)
-  Fixed bug in -reduce_palette (or -plte_len N) option.
+  Fixed bug in -plte_len N option.
 
 Version 1.7.78 (built with libpng-1.6.14 and zlib-1.2.8)
   Made "-s" and "-silent" options suppress libpng warnings.
@@ -456,7 +460,7 @@ Version 1.7.52 (built with libpng-1.6.1beta06 and zlib-1.2.7)
 Version 1.7.51 (built with libpng-1.6.0 and zlib-1.2.7)
   Added "-noreduce" option, in preparation for "-reduce" becoming the
     default behaviour in version 1.8.0.  This turns off lossless bit depth,
-    color type and palette reduction, and opaque alpha channel removal.
+    color type, palette reduction, and opaque alpha channel removal.
   Zero out the high byte of transparent color for color-type 0 and 2,
     when reducing from 16 bits to 8.
   Undefined a bunch of stuff in pngcrush.h that we do not use, saves about
@@ -1748,7 +1752,6 @@ static int specified_intent = -1;
 static int intent = -1;
 static int ster_mode = -1;
 static int new_time_stamp = 1;
-static int specified_plte_len = -1;
 static int plte_len = -1;
 #ifdef PNG_FIXED_POINT_SUPPORTED
 static int specified_gamma = 0;
@@ -2312,9 +2315,6 @@ png_voidp pngcrush_debug_malloc(png_structp png_ptr, png_uint_32 size)
     }
 }
 
-
-
-
 /* Free a pointer.  It is removed from the list at the same time. */
 void pngcrush_debug_free(png_structp png_ptr, png_voidp ptr)
 {
@@ -2705,6 +2705,10 @@ void pngcrush_examine_pixels_fn(png_structp png_ptr, png_row_infop
        * Check if any 16-bit pixels do not have identical high and low
        * bytes.  If one is found, set make_8_bit == 2. If the PNG bit_depth
        * is not 16-bits, set make_8_bit = 3.
+       *
+       * Find the maximum palette entry present in the IDAT chunks of
+       * an indexed PNG.
+       *
        */
 
       int i;
@@ -3239,8 +3243,6 @@ int main(int argc, char *argv[])
         {
             names++;
             BUMP_I;
-            force_output_bit_depth = pngcrush_get_long;
-            pngcrush_check_long;
             /* Reducing bit_depth does not work */
             { 
                fprintf(STDERR,
@@ -3523,6 +3525,7 @@ int main(int argc, char *argv[])
             make_opaque = 1;                 /* -reduce */
             make_gray = 1;                   /* -reduce */
             make_8_bit = 1;                  /* -reduce */
+            reduce_palette = 1;
         }
 
         else if (!strncmp(argv[i], "-nobail", 7))
@@ -3541,6 +3544,11 @@ int main(int argc, char *argv[])
         else if (!strncmp(argv[i], "-nolimits", 5))
         {
             no_limits++;
+        }
+
+        else if (!strncmp(argv[i], "-noreduce_pal", 13))
+        {
+            reduce_palette = 0;
         }
 
         else if (!strncmp(argv[i], "-noreduce", 9))
@@ -3570,6 +3578,7 @@ int main(int argc, char *argv[])
             make_opaque = 0;                 /* no -reduce */
             make_gray = 0;                   /* no -reduce */
             make_8_bit = 0;                  /* no -reduce */
+            reduce_palette = 0;
         }
 
         else if(!strncmp(argv[i], "-ow",3))
@@ -3587,7 +3596,6 @@ int main(int argc, char *argv[])
             names++;
             BUMP_I; /* Ignore old plte_len argument */
             reduce_palette = 1;
-            specified_plte_len = 0;
         }
         else if (!strncmp(argv[i], "-pplt", 3))
 
@@ -3609,11 +3617,17 @@ int main(int argc, char *argv[])
             verbose = 0;
         }
 
+        else if (!strncmp(argv[i], "-reduce_pal", 11))
+        {
+            reduce_palette = 1;
+        }
+
         else if (!strncmp(argv[i], "-reduce", 7))
         {
             make_opaque = 1;
             make_gray = 1;
             make_8_bit = 1;
+            reduce_palette = 1;
         }
 
 #ifdef PNG_gAMA_SUPPORTED
@@ -4025,8 +4039,7 @@ int main(int argc, char *argv[])
 
         image_specified_gamma = 0;
         intent=specified_intent;
-        plte_len=specified_plte_len;
-
+        
         inname = argv[names++];
 
         if (inname == NULL)
@@ -4301,18 +4314,8 @@ int main(int argc, char *argv[])
         }
         output_color_type = force_output_color_type;
 
-        if (force_output_bit_depth != 0 &&
-            force_output_bit_depth != 1 &&
-            force_output_bit_depth != 2 &&
-            force_output_bit_depth != 4 &&
-            force_output_bit_depth != 8 &&
-            force_output_bit_depth != 16)
-        {
-            fprintf(STDERR, "\n  Ignoring invalid bit_depth: %d\n",
-              force_output_bit_depth);
-            force_output_bit_depth=0;
-        }
-
+#if 0
+        /* TO DO: have we got the right plte_len now? */
         if (plte_len > 0 && output_color_type == 3 &&
             force_output_bit_depth == 0)
           {
@@ -4325,6 +4328,7 @@ int main(int argc, char *argv[])
             else
               force_output_bit_depth = 8;
           }
+#endif /* 0 */
 
         output_bit_depth = force_output_bit_depth;
 
@@ -4428,6 +4432,7 @@ int main(int argc, char *argv[])
              fprintf(STDERR, "Cannot reduce palette length when hIST"
                  " or acTL chunk is present\n");
              reduce_palette = 0;
+             plte_len = -1;
            }
            else
            {
@@ -5137,8 +5142,8 @@ int main(int argc, char *argv[])
                   /* Note: Take care that sBIT and bKGD data are not
                    * lost or become invalid when reducing the bit depth.
                    * (To do: test this; it's probably OK)
-                  P1(" Reduce palette by truncating unused entries\n");
                    */
+                  P1(" Reduce palette by truncating unused entries\n");
                }
                P1(" reduce_palette= %d\n",reduce_palette);
                P1("  new plte_len = %d\n",plte_len);
@@ -5207,14 +5212,7 @@ int main(int argc, char *argv[])
                         }
 
 
-#ifndef PNG_WRITE_PACK_SUPPORTED
-                          if (output_bit_depth == 0)
-#else
-                          if (force_output_bit_depth == 0)
-#endif
-                          {
-                            output_bit_depth = input_bit_depth;
-                          }
+                        output_bit_depth = input_bit_depth;
 
                         if ((output_color_type != 3 || output_bit_depth > 8)
                            && output_bit_depth >= 8
@@ -8116,6 +8114,9 @@ struct options_help pngcrush_options[] = {
     {2, ""},
 
     {0, "     -noreduce (turns off all \"-reduce\" operations)"},
+    {2, ""},
+
+    {0, "-noreduce_palette (turns off \"-reduce_palette\" operation)"},
     {2, ""},
 
     {0, "          -old (Use old default settings (no -force and no -reduce))"},
