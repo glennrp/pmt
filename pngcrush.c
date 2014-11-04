@@ -308,6 +308,8 @@
 
 Change log:
 
+Version 1.7.81 (built with libpng-1.6.14 and zlib-1.2.8)
+
 Version 1.7.80 (built with libpng-1.6.14 and zlib-1.2.8)
   Added "-reduce_palette" and "-noreduce_palette" options.  Enable
     reduce_palette when the "-new" or "-reduce" option is used.
@@ -3521,11 +3523,11 @@ int main(int argc, char *argv[])
 
         else if (!strncmp(argv[i], "-new", 4))
         {
-            global_things_have_changed = 1;  /* -force */
+            global_things_have_changed = 1;  /* -force  */
             make_opaque = 1;                 /* -reduce */
             make_gray = 1;                   /* -reduce */
             make_8_bit = 1;                  /* -reduce */
-            reduce_palette = 1;
+            reduce_palette = 1;              /* -reduce */
         }
 
         else if (!strncmp(argv[i], "-nobail", 7))
@@ -3574,11 +3576,11 @@ int main(int argc, char *argv[])
 
         else if (!strncmp(argv[i], "-old", 4))
         {
-            global_things_have_changed = 0;  /* no -force */
+            global_things_have_changed = 0;  /* no -force  */
             make_opaque = 0;                 /* no -reduce */
             make_gray = 0;                   /* no -reduce */
             make_8_bit = 0;                  /* no -reduce */
-            reduce_palette = 0;
+            reduce_palette = 0;              /* no -reduce */
         }
 
         else if(!strncmp(argv[i], "-ow",3))
