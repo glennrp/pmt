@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.81"
+#define PNGCRUSH_VERSION "1.7.82"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -308,8 +308,11 @@
 
 Change log:
 
+Version 1.7.82 (built with libpng-1.6.16 and zlib-1.2.8)
+
 Version 1.7.81 (built with libpng-1.6.15 and zlib-1.2.8)
-  Fixed off-by-one error in calculation of plte_len. Bug report by Ivan Kuchin.
+  Fixed off-by-one error in calculation of plte_len. Bug reports by
+    Ivan Kuchin and Frederic Kayser.
 
 Version 1.7.80 (built with libpng-1.6.14 and zlib-1.2.8)
   Added "-reduce_palette" and "-noreduce_palette" options.  Enable
@@ -1709,8 +1712,13 @@ static png_uint_32 pngcrush_best_byte_count=0xffffffff;
 static int verbose = 1;
 static int salvage = 0;
 static int bail = 0; /* if 0, bail out of trials early */
+
+
 static int blacken = 0; /* if 0, or 2 after the first trial,
                            do not blacken color samples */
+
+/* Delete these in pngcrush-1.8.0 */
+#if 1
 static int make_gray = 0; /* if 0, 2, or 3 after the first trial,
                            do not change color_type to gray */
 static int make_opaque = 0; /* if 0, 2, or 3 after the first trial,
@@ -1718,8 +1726,29 @@ static int make_opaque = 0; /* if 0, 2, or 3 after the first trial,
 static int make_8_bit = 0; /* if 0, 2, or 3 after the first trial,
                            do not reduce bit_depth from 16 */
 static int reduce_palette = 0;
+#endif
+
+/* Activate these in pngcrush-1.8.0 */
+#if 0
+static int make_gray = 1; /* if 0, 2, or 3 after the first trial,
+                           do not change color_type to gray */
+static int make_opaque = 1; /* if 0, 2, or 3 after the first trial,
+                           do not change color_type to opaque */
+static int make_8_bit = 1; /* if 0, 2, or 3 after the first trial,
+                           do not reduce bit_depth from 16 */
+static int reduce_palette = 1;
+#endif
+
+/* TO DO: do this another way.  "things_have_changed" is an attempt
+ * to preserve the IDAT from the original file (by preserving the
+ * entire input file) when it is smaller than that achieved by any
+ * of the pngcrush trials.  Better would be to handle the editing
+ * functions separately from the compression, i.e., just preserve
+ * the IDAT from the original file if it is smaller than any trial.
+ */
 static int things_have_changed = 0;
 static int global_things_have_changed = 0;
+
 static int compression_window;
 static int default_compression_window = 15;
 static int force_compression_window = 0;
@@ -2120,7 +2149,7 @@ pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
 #if 0
    if (salvage)
    {
-     found_IDAT == 1)
+     if (found_IDAT == 1)
      {
         /* replace first two bytes */
         printf("  Input CMF = 0x%x,0x%x\n",buf[0],buf[1]);
@@ -2552,8 +2581,9 @@ int keep_chunk(png_const_charp name, char *argv[])
                 allb++;         /* all ancillaries but gamma... */
                 if (!strncmp(argv[i], "alla", 4))
                     alla++;     /* ...no, all ancillaries, period */
-            } else if (!strncmp(argv[i], "text", 4))
+            } else if (!strncmp(argv[i], "text", 4)) {
                 allt++;         /* all forms of text chunk */
+            }
             if (!strncmp(argv[i], name, 4)  /* exact chunk-name match in args
                 * ...or exact match for one of known set, plus args included
                 * either "alla", "allb", or all-lowercase form of "name": */
@@ -2604,7 +2634,7 @@ int keep_chunk(png_const_charp name, char *argv[])
                 || (!strncmp(name, "zTXt", 4)
                     && (!strncmp(argv[i], "ztxt", 4) || allt)) )
             {
-                things_have_changed = 1;
+                global_things_have_changed = 1;
                 /* (caller actually does the removal--by failing to create
                  * copy) */
                 if (verbose > 0 && last_trial)
@@ -4317,22 +4347,6 @@ int main(int argc, char *argv[])
         }
         output_color_type = force_output_color_type;
 
-#if 0
-        /* TO DO: have we got the right plte_len now? */
-        if (plte_len > 0 && output_color_type == 3 &&
-            force_output_bit_depth == 0)
-          {
-            if (plte_len <= 2)
-              force_output_bit_depth = 1;
-            else if (plte_len <= 4)
-              force_output_bit_depth = 2;
-            else if (plte_len <= 16)
-              force_output_bit_depth = 4;
-            else
-              force_output_bit_depth = 8;
-          }
-#endif /* 0 */
-
         output_bit_depth = force_output_bit_depth;
 
         if (!methods_specified || try10 != 0)
@@ -4340,21 +4354,15 @@ int main(int argc, char *argv[])
             for (i = 0; i <= DEFAULT_METHODS; i++)
                 try_method[i] = 0;
 
-            /*
-            Uncomment these in pngcrush-1.8.0
-            make_gray = 1;
-            make_opaque = 1;
-            make_8_bit = 1;
-            */
             try_method[6] = try10;
         }
 
         best_of_three = 1;
         pngcrush_best_byte_count=0xffffffff;
 
-        if (blacken)
+        if (blacken == 1 || make_gray == 1 || make_opaque == 1 ||
+            reduce_palette == 1)
         {
-           blacken = 1;
            try_method[0] = 0;
         }
 
@@ -4384,7 +4392,7 @@ int main(int argc, char *argv[])
                (found_sBIT_different_RGB_bits &&
                keep_unknown_chunk("sBIT", argv)))
            {
-              fprintf(STDERR, "Cannot change colortype to gray when iCCP,"
+              P1 ("Cannot change colortype to gray when iCCP,"
                   " acTL, bKGD with color, or sBIT chunk is present\n");
               make_gray = 0;
            }
@@ -4399,7 +4407,7 @@ int main(int argc, char *argv[])
         {
            if (found_tRNS || found_acTL_chunk == 1)
            {
-             fprintf(STDERR, "Cannot remove the alpha channel when tRNS"
+             P1("Cannot remove the alpha channel when tRNS"
                   " or acTL chunk is present\n");
              make_opaque = 0;
            }
@@ -4416,7 +4424,7 @@ int main(int argc, char *argv[])
               found_acTL_chunk == 1 ||
               (found_sBIT_max > 8 && keep_unknown_chunk("sBIT", argv)))
            {
-              fprintf(STDERR, "Cannot reduce bit depth to 8 when bKGD,"
+              P1 ("Cannot reduce bit depth to 8 when bKGD,"
                   " sBIT or acTL chunk is present\n");
               make_8_bit = 0;
            }
@@ -4432,7 +4440,7 @@ int main(int argc, char *argv[])
            if ((found_hIST && keep_unknown_chunk("hIST", argv)) ||
               found_acTL_chunk == 1)
            {
-             fprintf(STDERR, "Cannot reduce palette length when hIST"
+             P1("Cannot reduce palette length when hIST"
                  " or acTL chunk is present\n");
              reduce_palette = 0;
              plte_len = -1;
@@ -5152,268 +5160,286 @@ int main(int argc, char *argv[])
                P1("  new plte_len = %d\n",plte_len);
             }
 
-                /* { GRR added for quick %-navigation (1) */
+            /* { GRR added for quick %-navigation (1) */
 
-                /* Start of chunk-copying/removal code, in order:
-                 *  - IHDR
-                 *  - bKGD
-                 *  - cHRM
-                 *  - gAMA
-                 *  - sRGB
-                 *  - iCCP
-                 *  - oFFs
-                 *  - pCAL
-                 *  - pHYs
-                 *  - hIST
-                 *  - tRNS
-                 *  - PLTE
-                 *  - sBIT
-                 *  - sCAL
-                 *  - sPLT
-                 *  - sTER
-                 *  - tEXt/zTXt/iTXt
-                 *  - tIME
-                 *  - unknown chunks
-                 */
+            /* Start of chunk-copying/removal code, in order:
+             *  - IHDR
+             *  - bKGD
+             *  - cHRM
+             *  - gAMA
+             *  - sRGB
+             *  - iCCP
+             *  - oFFs
+             *  - pCAL
+             *  - pHYs
+             *  - hIST
+             *  - tRNS
+             *  - PLTE
+             *  - sBIT
+             *  - sCAL
+             *  - sPLT
+             *  - sTER
+             *  - tEXt/zTXt/iTXt
+             *  - tIME
+             *  - unknown chunks
+             */
+            {
+                int compression_method,
+                    filter_method;
+
+                P1( "Transferring info struct\n");
+
+                if (png_get_IHDR(read_ptr, read_info_ptr, &width, &height,
+                     &bit_depth, &color_type, &interlace_method,
+                     &compression_method, &filter_method))
                 {
-                    int compression_method,
-                        filter_method;
+                    int need_expand = 0;
+                    input_color_type = color_type;
+                    input_bit_depth = bit_depth;
 
-                    P1( "Transferring info struct\n");
-
-                    if (png_get_IHDR(read_ptr, read_info_ptr, &width, &height,
-                         &bit_depth, &color_type, &interlace_method,
-                         &compression_method, &filter_method))
+                    if (output_color_type > 7)
                     {
-                        int need_expand = 0;
-                        input_color_type = color_type;
-                        input_bit_depth = bit_depth;
+                        output_color_type = input_color_type;
+                    }
 
-                        if (output_color_type > 7)
-                        {
-                            output_color_type = input_color_type;
-                        }
-
-                        /* if (verbose > 1 && last_trial) */
-                        if (verbose > 1 && trial == 0)
-                        {
-                            fprintf(STDERR, "   IHDR chunk data:\n");
+                    /* if (verbose > 1 && last_trial) */
+                    if (verbose > 1 && trial == 0)
+                    {
+                        fprintf(STDERR, "   IHDR chunk data:\n");
+                        fprintf(STDERR,
+                                "      Width=%lu, height=%lu\n",
+                                (unsigned long)width,
+                                (unsigned long)height);
+                        fprintf(STDERR, "      Bit depth =%d\n",
+                                bit_depth);
+                        fprintf(STDERR, "      Color type=%d\n",
+                                color_type);
+                        if (output_color_type != color_type)
                             fprintf(STDERR,
-                                    "      Width=%lu, height=%lu\n",
-                                    (unsigned long)width,
-                                    (unsigned long)height);
-                            fprintf(STDERR, "      Bit depth =%d\n",
-                                    bit_depth);
-                            fprintf(STDERR, "      Color type=%d\n",
-                                    color_type);
-                            if (output_color_type != color_type)
-                                fprintf(STDERR,
-                                        "      Output color type=%d\n",
-                                        output_color_type);
-                            fprintf(STDERR, "      Interlace =%d\n",
-                                    interlace_method);
-                        }
+                                    "      Output color type=%d\n",
+                                    output_color_type);
+                        fprintf(STDERR, "      Interlace =%d\n",
+                                interlace_method);
+                    }
 
+                    output_bit_depth = input_bit_depth;
 
-                        output_bit_depth = input_bit_depth;
-
-                        if ((output_color_type != 3 || output_bit_depth > 8)
-                           && output_bit_depth >= 8
-                           && output_bit_depth > input_bit_depth)
-                          need_expand = 1;
+                    if ((output_color_type != 3 || output_bit_depth > 8)
+                       && output_bit_depth >= 8
+                       && output_bit_depth > input_bit_depth)
+                      need_expand = 1;
 
 #ifdef PNG_READ_RGB_TO_GRAY_SUPPORTED
-                        if ((color_type == 2 ||
-                             color_type == 6 ||
-                             color_type == 3) &&
-                             (output_color_type == 0 ||
-                             output_color_type == 4))
+                    if ((color_type == 2 ||
+                         color_type == 6 ||
+                         color_type == 3) &&
+                         (output_color_type == 0 ||
+                         output_color_type == 4))
+                    {
+                        if (verbose > 0 && last_trial)
                         {
-                            if (verbose > 0 && last_trial)
-                            {
-                                    fprintf(STDERR, "   Reducing truecolor "
-                                      "image to grayscale.\n");
-                            }
-#ifdef PNG_FIXED_POINT_SUPPORTED
-                            png_set_rgb_to_gray_fixed(read_ptr, 1,
-                               21260, 71520);
-#else
-                            png_set_rgb_to_gray(read_ptr, 1,
-                               0.21260, 0.71520);
-#endif
-                            if (output_bit_depth < 8)
-                                output_bit_depth = 8;
-                            if (color_type == 3)
-                                need_expand = 1;
+                                fprintf(STDERR, "   Reducing truecolor "
+                                  "image to grayscale.\n");
                         }
+#ifdef PNG_FIXED_POINT_SUPPORTED
+                        png_set_rgb_to_gray_fixed(read_ptr, 1,
+                           21260, 71520);
+#else
+                        png_set_rgb_to_gray(read_ptr, 1,
+                           0.21260, 0.71520);
+#endif
+                        if (output_bit_depth < 8)
+                            output_bit_depth = 8;
+                        if (color_type == 3)
+                            need_expand = 1;
+                    }
 #endif /* PNG_READ_RGB_TO_GRAY_SUPPORTED */
 
-                        if (color_type != 3 && output_color_type == 3)
-                        {
-                            fprintf(STDERR,"  Cannot change to indexed color "
-                              "(color_type 3)\n");
-                            output_color_type = input_color_type;
-                        }
+                    if (color_type != 3 && output_color_type == 3)
+                    {
+                        fprintf(STDERR,"  Cannot change to indexed color "
+                          "(color_type 3)\n");
+                        output_color_type = input_color_type;
+                    }
 
-                        if ((color_type == 0 || color_type == 4) &&
-                            (output_color_type == 2
-                             || output_color_type == 6))
-                        {
-                            png_set_gray_to_rgb(read_ptr);
-                        }
+                    if ((color_type == 0 || color_type == 4) &&
+                        (output_color_type == 2
+                         || output_color_type == 6))
+                    {
+                        png_set_gray_to_rgb(read_ptr);
+                    }
 
-                        if ((color_type == 4 || color_type == 6) &&
-                            (output_color_type != 4
-                             && output_color_type != 6))
+                    if ((color_type == 4 || color_type == 6) &&
+                        (output_color_type != 4
+                         && output_color_type != 6))
+                    {
+                        if (verbose > 0 && last_trial)
                         {
-                            if (verbose > 0 && last_trial)
-                            {
-                                fprintf(STDERR,
-                                  "   Stripping existing alpha channel.\n");
-                            }
+                            fprintf(STDERR,
+                              "   Stripping existing alpha channel.\n");
+                        }
 #ifdef PNG_READ_STRIP_ALPHA_SUPPORTED
-                            png_set_strip_alpha(read_ptr);
+                        png_set_strip_alpha(read_ptr);
 #endif
-                        }
+                    }
 
-                        if ((output_color_type == 4
-                             || output_color_type == 6) && (color_type != 4
-                                                            && color_type
-                                                            != 6))
-                        {
-                            if (verbose > 0 && last_trial)
-                                fprintf(STDERR,
-                                  "   Adding an opaque alpha channel.\n");
+                    if ((output_color_type == 4
+                         || output_color_type == 6) && (color_type != 4
+                                                        && color_type != 6))
+                    {
+                        if (verbose > 0 && last_trial)
+                            fprintf(STDERR,
+                              "   Adding an opaque alpha channel.\n");
 #ifdef PNG_READ_FILLER_SUPPORTED
-                            png_set_filler(read_ptr, (png_uint_32) 65535L,
-                                           PNG_FILLER_AFTER);
+                        png_set_filler(read_ptr, (png_uint_32) 65535L,
+                                       PNG_FILLER_AFTER);
 #endif
-                            need_expand = 1;
-                        }
+                        need_expand = 1;
+                    }
 
-                        if (output_color_type != 0 &&
-                            output_color_type != 3 &&
-                            output_bit_depth < 8)
-                           output_bit_depth = 8;
+                    if (output_color_type != 0 && output_color_type != 3 &&
+                        output_bit_depth < 8)
+                       output_bit_depth = 8;
 
-                        if ((output_color_type == 2
-                             || output_color_type == 6)
-                            && color_type == 3)
-                        {
-                            if (verbose > 0 && last_trial)
-                                fprintf(STDERR,
-                                  "   Expanding indexed color file.\n");
-                            need_expand = 1;
-                        }
+                    if ((output_color_type == 2
+                         || output_color_type == 6)
+                        && color_type == 3)
+                    {
+                        if (verbose > 0 && last_trial)
+                            fprintf(STDERR,
+                              "   Expanding indexed color file.\n");
+                        need_expand = 1;
+                    }
 #ifdef PNG_READ_EXPAND_SUPPORTED
-                        if (need_expand == 1)
-                            png_set_expand(read_ptr);
+                    if (need_expand == 1)
+                        png_set_expand(read_ptr);
 #endif
 
 #ifdef PNG_READ_PACK_SUPPORTED
-                        if (input_bit_depth < 8)
-                        {
-                            png_set_packing(read_ptr);
-                        }
+                    if (input_bit_depth < 8)
+                    {
+                        png_set_packing(read_ptr);
+                    }
 
-                        if (output_color_type == 0 && output_bit_depth < 8)
-                        {
-                            png_color_8 true_bits;
-                            true_bits.gray = (png_byte) (output_bit_depth);
-                            png_set_shift(read_ptr, &true_bits);
-                        }
+                    if (output_color_type == 0 && output_bit_depth < 8)
+                    {
+                        png_color_8 true_bits;
+                        true_bits.gray = (png_byte) (output_bit_depth);
+                        png_set_shift(read_ptr, &true_bits);
+                    }
 #endif
+ 
+                    if (trial > 0)
+                    {
+#if 1
+                    /* TO DO: have we got the right plte_len now? */
+                      if (plte_len > 0 && output_color_type == 3 &&
+                          force_output_bit_depth == 0)
+                      {
+                        if (plte_len <= 2)
+                          force_output_bit_depth = 1;
+                        else if (plte_len <= 4)
+                          force_output_bit_depth = 2;
+                        else if (plte_len <= 16)
+                          force_output_bit_depth = 4;
+                        else
+                          force_output_bit_depth = 8;
+                      }
+#endif /* 1 */
 
-                        if (trial > 0 && make_8_bit == 1)
-                        {
+                    if (make_8_bit == 1)
+                    {
 #if defined(PNG_READ_SCALE_16_TO_8_SUPPORTED) || \
-    defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
-                           output_bit_depth = 8;
-                           force_output_bit_depth = 8;
-                           if (verbose > 0 && last_trial)
-                             fprintf(STDERR,
-                             "   Stripping 16-bit depth to 8, trial = %d\n",
-                             trial);
+defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
+                       output_bit_depth = 8;
+                       force_output_bit_depth = 8;
+                       if (verbose > 0 && last_trial)
+                         fprintf(STDERR,
+                         "   Stripping 16-bit depth to 8, trial = %d\n",
+                         trial);
 
 #ifdef PNG_READ_STRIP_16_TO_8_SUPPORTED
-                           png_set_strip_16(read_ptr);
+                       png_set_strip_16(read_ptr);
 #else
 #ifdef PNG_READ_SCALE_16_TO_8_SUPPORTED
-                           png_set_scale_16(read_ptr);
+                       png_set_scale_16(read_ptr);
 #else
-                           fprintf(STDERR,
-                           "   PNG_READ_STRIP_16_TO_8 NOT SUPPORTED\n");
+                       fprintf(STDERR,
+                       "   PNG_READ_STRIP_16_TO_8 NOT SUPPORTED\n");
 #endif
 #endif
 #endif
-                        }
+                    }
+                      P1("force_output_bit_depth=%d\n",force_output_bit_depth);
+                    }
 
-                        if (last_trial == 1)
-                        {
-                        if (save_apng_chunks == 1 || found_acTL_chunk == 1)
-                        {
-                           if (save_apng_chunks == 0)
-                           {
-                              if (verbose > 0) fprintf(STDERR,
-                              "   pngcrush will only save APNG chunks in an\n");
-                              if (verbose > 0) fprintf(STDERR,
-                              "   output file with the \".apng\" extension\n");
-                           }
-                           if (input_color_type != output_color_type)
-                           {
-                              if (verbose > 0) fprintf(STDERR,
-                              "   Cannot save APNG chunks with a color_type\n");
-                              if (verbose > 0) fprintf(STDERR,
-                              "   different from that of the main image.\n");
-                              save_apng_chunks = 2;
-                           }
-                           if (input_bit_depth != output_bit_depth)
-                           {
-                              if (verbose > 0) fprintf(STDERR,
-                              "   Cannot save APNG chunks with a bit_depth\n");
-                              if (verbose > 0) fprintf(STDERR,
-                              "   different from that of the main image.\n");
-                              save_apng_chunks = 2;
-                           }
-                           if (save_apng_chunks != 1 && found_acTL_chunk == 1)
-                              found_acTL_chunk = 2;
-                        }
-                        }
 
-                        if (verbose > 1)
-                            fprintf(STDERR, "   Setting IHDR\n");
+                    if (last_trial == 1)
+                    {
+                    if (save_apng_chunks == 1 || found_acTL_chunk == 1)
+                    {
+                       if (save_apng_chunks == 0)
+                       {
+                          if (verbose > 0) fprintf(STDERR,
+                          "   pngcrush will only save APNG chunks in an\n");
+                          if (verbose > 0) fprintf(STDERR,
+                          "   output file with the \".apng\" extension\n");
+                       }
+                       if (input_color_type != output_color_type)
+                       {
+                          if (verbose > 0) fprintf(STDERR,
+                          "   Cannot save APNG chunks with a color_type\n");
+                          if (verbose > 0) fprintf(STDERR,
+                          "   different from that of the main image.\n");
+                          save_apng_chunks = 2;
+                       }
+                       if (input_bit_depth != output_bit_depth)
+                       {
+                          if (verbose > 0) fprintf(STDERR,
+                          "   Cannot save APNG chunks with a bit_depth\n");
+                          if (verbose > 0) fprintf(STDERR,
+                          "   different from that of the main image.\n");
+                          save_apng_chunks = 2;
+                       }
+                       if (save_apng_chunks != 1 && found_acTL_chunk == 1)
+                          found_acTL_chunk = 2;
+                    }
+                    }
+
+                    if (verbose > 1)
+                        fprintf(STDERR, "   Setting IHDR\n");
 
 #ifdef PNGCRUSH_LOCO
-                        output_format = 0;
-                        if (do_loco)
+                    output_format = 0;
+                    if (do_loco)
+                    {
+                        if (output_color_type == 2
+                            || output_color_type == 6)
                         {
-                            if (output_color_type == 2
-                                || output_color_type == 6)
-                            {
-                                output_format = 1;
-                                filter_method = 64;
-                                if (nosave == 0 && last_trial == 1)
-                                   png_permit_mng_features(write_ptr,
-                                       PNG_FLAG_MNG_FILTER_64);
+                            output_format = 1;
+                            filter_method = 64;
+                            if (nosave == 0 && last_trial == 1)
+                               png_permit_mng_features(write_ptr,
+                                   PNG_FLAG_MNG_FILTER_64);
 
-                            }
-                        } else
-                            filter_method = 0;
-                        if (input_format != output_format)
-                            things_have_changed = 1;
+                        }
+                    } else
+                        filter_method = 0;
+                    if (input_format != output_format)
+                        things_have_changed = 1;
 #endif
 
-                        png_set_IHDR(write_ptr, write_info_ptr, width,
-                                     height, output_bit_depth,
-                                     output_color_type, interlace_method,
-                                     compression_method, filter_method);
+                    png_set_IHDR(write_ptr, write_info_ptr, width,
+                                 height, output_bit_depth,
+                                 output_color_type, interlace_method,
+                                 compression_method, filter_method);
 
-                        if (output_color_type != input_color_type ||
-                            output_bit_depth != input_bit_depth)
-                           things_have_changed = 1;
+                    if (output_color_type != input_color_type ||
+                        output_bit_depth != input_bit_depth)
+                       things_have_changed = 1;
 
-                    } /* IHDR */
-                }
+                } /* IHDR */
+            }
 
             if (premultiply == 1 || premultiply == 2)
             {
@@ -7990,8 +8016,8 @@ struct options_help pngcrush_options[] = {
 
     {0, FAKE_PAUSE_STRING},
 
-    {0, "          -fix (salvage PNG with  otherwise fatal conditions such"},
-    {2, "               as bad CRCs and adaptive filter bytes)"},
+    {0, "          -fix (salvage PNG with otherwise fatal conditions"},
+    {2, "               such as bad CRCs and adaptive filter bytes)"},
     {2, ""},
 
     {0, "        -force (write a new output file even if larger than input)"},
