@@ -1,6 +1,6 @@
 /*
  * pngcrush.c - recompresses png files
- * Copyright (C) 1998-2002, 2006-2014 Glenn Randers-Pehrson
+ * Copyright (C) 1998-2002, 2006-2015 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
  * Portions copyright (C) 2005       Greg Roelofs
  *
@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.82"
+#define PNGCRUSH_VERSION "1.7.83"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -101,7 +101,7 @@
  *
  * COPYRIGHT:
  *
- * Copyright (C) 1998-2002, 2006-2014 Glenn Randers-Pehrson
+ * Copyright (C) 1998-2002, 2006-2015 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
  * Portions copyright (C) 2005       Greg Roelofs
  *
@@ -307,6 +307,9 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.83 (built with libpng-1.6.16 and zlib-1.2.8)
+  Cleaned up some Coverity-scan warnings.
 
 Version 1.7.82 (built with libpng-1.6.16 and zlib-1.2.8)
 
@@ -1884,14 +1887,14 @@ static void pngcrush_cexcept_error(png_structp png_ptr,
 static void pngcrush_warning(png_structp png_ptr,
   png_const_charp message);
 
-void PNGAPI pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
+void PNGCBAPI pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
   png_size_t length);
 
 #ifdef PNGCRUSH_H
 void png_read_transform_info(png_structp png_ptr, png_infop info_ptr);
 #endif
 
-void PNGAPI pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
+void PNGCBAPI pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
   png_size_t length);
 
 void pngcrush_write_png(png_structp write_pointer, png_bytep data,
@@ -2082,7 +2085,7 @@ pngcrush_crc_finish(png_structp png_ptr, png_uint_32 skip)
  * than changing the library.
  */
 #ifndef USE_FAR_KEYWORD
-void PNGAPI
+void PNGCBAPI
 pngcrush_default_read_data(png_structp png_ptr, png_bytep data, png_size_t length)
 {
    png_size_t check;
@@ -2172,7 +2175,7 @@ pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
  * than changing the library.
  */
 #ifndef USE_FAR_KEYWORD
-void PNGAPI
+void PNGCBAPI
 pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
    png_size_t length)
 {
@@ -2195,7 +2198,7 @@ pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
 #define NEAR_BUF_SIZE 1024
 #define MIN(a,b) (a <= b ? a : b)
 
-void PNGAPI
+void PNGCBAPI
 pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
    png_size_t length)
 {
@@ -2410,23 +2413,22 @@ void pngcrush_pause(void)
 
 void png_skip_chunk(png_structp png_ptr)
 {
-  png_byte buff[4];
-  int i;
+  png_byte buff[4] = { 0, 0, 0, 0 };
+  int ib;
   unsigned long length;
 
   /* read the length field */
   pngcrush_default_read_data(png_ptr, buff, 4);
-  length=buff[3]+(buff[2]<<8)+(buff[1]<<16)+(buff[0]<<24);
+  length=(unsigned long) buff[3]+(unsigned long) (buff[2]<<8)+
+         (unsigned long) (buff[1]<<16)+(unsigned long)(buff[0]<<24);
   /* read the chunk name */
   pngcrush_default_read_data(png_ptr, buff, 4);
   if (verbose > 0)
     printf("Skipping %c%c%c%c chunk.\n",buff[0],buff[1],
       buff[2],buff[3]);
-  /* skip the data */
-  for (i=0; i<length; i++)
+  /* skip the data and CRC */
+  for (ib=0; ib<length+4; ib++)
      pngcrush_default_read_data(png_ptr, buff, 1);
-  /* skip the CRC */
-  pngcrush_default_read_data(png_ptr, buff, 4);
 }
 
 #ifndef __riscos
@@ -3091,7 +3093,7 @@ int main(int argc, char *argv[])
     P2(" row_buf = %p\n",row_buf);
     number_of_open_files = 0;
     do_color_count = 0;
-    do_color_count = do_color_count;    /* silence compiler warning */
+    PNGCRUSH_UNUSED(do_color_count) /* silence compiler warning */
 
     strncpy(prog_string, argv[0], STR_BUF_SIZE);
     prog_string[STR_BUF_SIZE-1] = '\0';
@@ -3437,7 +3439,8 @@ int main(int argc, char *argv[])
             pngcrush_check_long;
             names += 3;
             BUMP_I;
-            strcpy(iccp_name, argv[i]);
+            strncpy(iccp_name, argv[i], 80);
+            iccp_name[79] = '\0';
             BUMP_I;
             iccp_file = argv[i];
             if ((iccp_fn = FOPEN(iccp_file, "rb")) == NULL) {
@@ -3636,7 +3639,8 @@ int main(int argc, char *argv[])
             names++;
             do_pplt++;
             BUMP_I;
-            strcpy(pplt_string, argv[i]);
+            strncpy(pplt_string, argv[i], STR_BUF_SIZE);
+            pplt_string[STR_BUF_SIZE-1] = '\0';
             global_things_have_changed = 1;
         }
 
@@ -3846,7 +3850,9 @@ int main(int argc, char *argv[])
                     text_where[text_inputs] = 1;
                 if (!strncmp(argv[i], "a", 1))
                     text_where[text_inputs] = 2;
-                strcpy(&text_keyword[text_inputs * 80], argv[++i]);
+                strncpy(&text_keyword[text_inputs * 80], argv[++i],
+                    80);
+                text_keyword[text_inputs * 80 + 79] = '\0';
 #ifdef PNG_iTXt_SUPPORTED
                 if (text_compression[text_inputs] <= 0)
                 {
@@ -3859,12 +3865,18 @@ int main(int argc, char *argv[])
                     BUMP_I;
                     i -= 3;
                     names += 2;
-                    strcpy(&text_lang[text_inputs * 80], argv[++i]);
+                    strncpy(&text_lang[text_inputs * 80], argv[++i],
+                        STR_BUF_SIZE);
+                    text_lang[text_inputs * 80 + 79] = '\0';
                     /* libpng-1.0.5j and later */
-                    strcpy(&text_lang_key[text_inputs * 80], argv[++i]);
+                    strncpy(&text_lang_key[text_inputs * 80], argv[++i],
+                        STR_BUF_SIZE);
+                    text_lang_key[text_inputs * 80 + 79] = '\0';
                 }
 #endif
-                strcpy(&text_text[text_inputs * 2048], argv[++i]);
+                strncpy(&text_text[text_inputs * 2048], argv[++i],
+                    STR_BUF_SIZE);
+                text_text[text_inputs * 2048 + 2047] = '\0';
                 text_inputs++;
             } else {
                 if (text_inputs > 9)
@@ -4039,7 +4051,7 @@ int main(int argc, char *argv[])
         else if (overwrite)
         {
                 inname = argv[names];
-                outname = outname;
+                PNGCRUSH_UNUSED(outname)
         }
 
         else
@@ -4183,9 +4195,9 @@ int main(int argc, char *argv[])
             ip = in_string;
             in_string[0] = '\0';
             if (pngcrush_mode == EXTENSION_MODE)
-                strcat(in_string, inname);
+                strncat(in_string, inname, STR_BUF_SIZE-1);
             else
-                strcat(in_string, outname);
+                strncat(in_string, outname, STR_BUF_SIZE-1);
             ip = in_string;
             op = dot = out_string;
             while (*ip != '\0')
@@ -4207,10 +4219,10 @@ int main(int argc, char *argv[])
             in_extension[0] = '\0';
             if (dot != out_string)
             {
-                strcat(in_extension, ++dot);
+                strncat(in_extension, ++dot, STR_BUF_SIZE - 1);
             }
 
-            strcat(out_string, extension);
+            strncat(out_string, extension, STR_BUF_SIZE - 1);
             outname = out_string;
         }
 
@@ -5932,13 +5944,13 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                     if (verbose > 1 && last_trial)
                     {
                         int last = -1;
-                        for (i = 0; ia < num_palette; ia++)
+                        for (ia = 0; ia < num_palette; ia++)
                             if (trns_array[ia] != 255)
                                 last = ia;
                         if (last >= 0) {
                             fprintf(STDERR, "   Transparency:\n");
                             if (output_color_type == 3)
-                                for (i = 0; ia < num_palette; ia++)
+                                for (ia = 0; ia < num_palette; ia++)
                                     fprintf(STDERR, "      %4d %4d\n", ia,
                                             trns_array[ia]);
                             else if (output_color_type == 0)
@@ -7302,7 +7314,7 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
 
 png_uint_32 measure_idats(FILE * fp_in)
 {
-    /* Copyright (C) 1999-2002, 2006-2014 Glenn Randers-Pehrson
+    /* Copyright (C) 1999-2002, 2006-2015 Glenn Randers-Pehrson
        (glennrp at users.sf.net).  See notice in pngcrush.c for conditions of
        use and distribution */
     P2("\nmeasure_idats:\n");
@@ -7346,7 +7358,7 @@ png_uint_32 measure_idats(FILE * fp_in)
 
 png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
 {
-    /* Copyright (C) 1999-2002, 2006-2014 Glenn Randers-Pehrson
+    /* Copyright (C) 1999-2002, 2006-2015 Glenn Randers-Pehrson
        (glennrp at users.sf.net)
        See notice in pngcrush.c for conditions of use and distribution */
 
@@ -7370,19 +7382,29 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
         {
             const png_byte png_MHDR[5] = { 77, 72, 68, 82, '\0' };
 
-            int b;
-            png_byte buff[40];
+            int ib;
+            png_byte buff[28] = { 0, 0, 0, 0, 0,  0, 0, 0, 0, 0,
+                                  0, 0, 0, 0, 0,  0, 0, 0, 0, 0,
+                                  0, 0, 0, 0, 0,  0, 0, 0 };
             unsigned long length;
             /* read the MHDR */
-            pngcrush_default_read_data(read_ptr, buff, 4);
-            length=buff[3]+(buff[2]<<8)+(buff[1]<<16)+(buff[0]<<24);
-            pngcrush_default_read_data(read_ptr, buff, 4);
+            pngcrush_default_read_data(png_ptr, buff, 4);
+            length=(unsigned long) buff[3]+(unsigned long) (buff[2]<<8)+
+                   (unsigned long) (buff[1]<<16)+(unsigned long)(buff[0]<<24);
+            if (length > 28)
+              png_error(png_ptr, "MHDR length too long");
+
+            pngcrush_default_read_data(png_ptr, buff, 4);
             if (verbose > 0)
-              printf("Reading %c%c%c%c chunk.\n",buff[0],buff[1],
-                buff[2],buff[3]);
-            for (b=0; b<40; b++)
-              buff[b]='\0';
-            pngcrush_default_read_data(read_ptr, buff, length);
+              printf("Reading %c%c%c%c chunk.\n",buff[0],buff[1],buff[2],
+                buff[3]);
+
+            pngcrush_default_read_data(png_ptr, buff, length);
+
+            if (length < 28)
+              for (ib=27; ib >= length; ib--) 
+                 buff[ib] = 0;
+
             if (verbose > 0) {
             printf("  width=%lu\n",(unsigned long)(buff[3]+(buff[2]<<8)
                       +(buff[1]<<16)+(buff[0]<<24)));
@@ -7411,7 +7433,7 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
                             buff, (png_size_t) 28);
             }
 
-            pngcrush_default_read_data(read_ptr, buff, 4);
+            pngcrush_default_read_data(png_ptr, buff, 4);
             input_format = 1;
 
         }
@@ -7842,7 +7864,7 @@ void print_version_info(void)
       " | pngcrush %s\n"
       /* If you have modified this source, you may insert additional notices
        * immediately after this sentence: */
-      " |    Copyright (C) 1998-2002, 2006-2014 Glenn Randers-Pehrson\n"
+      " |    Copyright (C) 1998-2002, 2006-2015 Glenn Randers-Pehrson\n"
       " |    Portions copyright (C) 2005       Greg Roelofs\n"
       " | This is a free, open-source program.  Permission is irrevocably\n"
       " | granted to everyone to use this version of pngcrush without\n"
@@ -7850,7 +7872,7 @@ void print_version_info(void)
       " | Executable name is %s\n"
       " | It was built with libpng version %s, and is\n"
       " | running with %s"
-      " |    Copyright (C) 1998-2004, 2006-2014 Glenn Randers-Pehrson,\n"
+      " |    Copyright (C) 1998-2004, 2006-2015 Glenn Randers-Pehrson,\n"
       " |    Copyright (C) 1996, 1997 Andreas Dilger,\n"
       " |    Copyright (C) 1995, Guy Eric Schalnat, Group 42 Inc.,\n"
       " | and zlib version %s, Copyright (C) 1995%s,\n"
@@ -7888,7 +7910,7 @@ static const char *pngcrush_legal[] = {
     "",
     "If you have modified this source, you may insert additional notices",
     "immediately after this sentence.",
-    "Copyright (C) 1998-2002, 2006-2014 Glenn Randers-Pehrson",
+    "Copyright (C) 1998-2002, 2006-2015 Glenn Randers-Pehrson",
     "Portions copyright (C) 2005       Greg Roelofs",
     "",
     "DISCLAIMER: The pngcrush computer program is supplied \"AS IS\".",
@@ -7923,6 +7945,7 @@ static const char *pngcrush_usage[] = {
     "\nusage: %s [options] infile.png outfile.png\n",
     "       %s -e ext [other options] file.png ...\n",
     "       %s -d dir/ [other options] file.png ...\n",
+    "       %s -ow [other options] file.png [tempfile.png]\n",
     "       %s -n -v file.png ...\n"
 };
 
