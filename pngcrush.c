@@ -2419,8 +2419,7 @@ void png_skip_chunk(png_structp png_ptr)
 
   /* read the length field */
   pngcrush_default_read_data(png_ptr, buff, 4);
-  length=(unsigned long) buff[3]+(unsigned long) (buff[2]<<8)+
-         (unsigned long) (buff[1]<<16)+(unsigned long)(buff[0]<<24);
+  length = png_get_uint_31(png_ptr,buff);
   /* read the chunk name */
   pngcrush_default_read_data(png_ptr, buff, 4);
   if (verbose > 0)
@@ -2428,7 +2427,10 @@ void png_skip_chunk(png_structp png_ptr)
       buff[2],buff[3]);
   /* skip the data and CRC */
   for (ib=0; ib<length+4; ib++)
-     pngcrush_default_read_data(png_ptr, buff, 1);
+  {
+     png_byte junk[1] = { 0 };
+     pngcrush_default_read_data(png_ptr, junk, 1);
+  }
 }
 
 #ifndef __riscos
@@ -7389,8 +7391,7 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
             unsigned long length;
             /* read the MHDR */
             pngcrush_default_read_data(png_ptr, buff, 4);
-            length=(unsigned long) buff[3]+(unsigned long) (buff[2]<<8)+
-                   (unsigned long) (buff[1]<<16)+(unsigned long)(buff[0]<<24);
+            length = png_get_uint_31(png_ptr,buff);
             if (length > 28)
               png_error(png_ptr, "MHDR length too long");
 
