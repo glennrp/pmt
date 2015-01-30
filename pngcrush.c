@@ -308,9 +308,7 @@
 
 Change log:
 
-Version 1.7.84beta (built with libpng-1.6.16 and zlib-1.2.8)
-  Ensure that PNGCBAPI is defined, in case pngcrush is built with
-    libpng-1.4.x or earlier.
+Version 1.7.84beta (built with libpng-1.7.0beta47 and zlib-1.2.8)
 
 Version 1.7.83 (built with libpng-1.6.16 and zlib-1.2.8)
   Cleaned up some Coverity-scan warnings.
@@ -1215,7 +1213,7 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 
 #include "png.h"
 
-#ifndef PNGCBAPI
+#ifndef PNGCBAPI  /* Needed when building with libpng-1.4.x and earlier */
 # define PNGCBAPI PNGAPI
 #endif
 
@@ -2040,17 +2038,11 @@ pngcrush_crc_error(png_structp png_ptr)
 {
    png_byte crc_bytes[4];
    png_uint_32 crc;
-   int need_crc = 1;
 
    pngcrush_default_read_data(png_ptr, crc_bytes, 4);
 
-   if (need_crc)
-   {
-      crc = png_get_uint_32(crc_bytes);
-      return ((int)(crc != pngcrush_crc));
-   }
-   else
-      return (0);
+   crc = png_get_uint_32(crc_bytes);
+   return ((int)(crc != pngcrush_crc));
 }
 
 /*
