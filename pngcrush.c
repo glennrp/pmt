@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.83"
+#define PNGCRUSH_VERSION "1.7.84"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -307,6 +307,10 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.84beta (built with libpng-1.6.16 and zlib-1.2.8)
+  Ensure that PNGCBAPI is defined, in case pngcrush is built with
+    libpng-1.4.x or earlier.
 
 Version 1.7.83 (built with libpng-1.6.16 and zlib-1.2.8)
   Cleaned up some Coverity-scan warnings.
@@ -1211,6 +1215,10 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 
 #include "png.h"
 
+#ifndef PNGCBAPI
+# define PNGCBAPI PNGAPI
+#endif
+
 /* internal libpng macros */
 
 #ifdef PNG_LIBPNG_VER
@@ -1887,14 +1895,16 @@ static void pngcrush_cexcept_error(png_structp png_ptr,
 static void pngcrush_warning(png_structp png_ptr,
   png_const_charp message);
 
-void PNGCBAPI pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
+void PNGCBAPI
+pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
   png_size_t length);
 
 #ifdef PNGCRUSH_H
 void png_read_transform_info(png_structp png_ptr, png_infop info_ptr);
 #endif
 
-void PNGCBAPI pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
+void PNGCBAPI
+pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
   png_size_t length);
 
 void pngcrush_write_png(png_structp write_pointer, png_bytep data,
@@ -7492,6 +7502,7 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
 
         png_reset_crc(png_ptr);
         png_crc_read(png_ptr, chunk_name, 4);
+        chunk_name[4]='\0';
 
         if (new_mng)
         {
@@ -7517,20 +7528,23 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
                    chunk_name[0],
                    chunk_name[1],chunk_name[2],chunk_name[3],
                    (unsigned long)length);
-              if (length > malloced_length)
+              if (length+1 > malloced_length)
               {
                   png_free(mng_ptr,bb);
                   if (verbose > 0)
                     printf ("  png_malloc %lu bytes.\n",(unsigned long)length);
-                  bb=(png_byte*)png_malloc(mng_ptr, length);
-                  malloced_length=length;
+                  bb=(png_byte*)png_malloc(mng_ptr, length+1);
+                  malloced_length=length+1;
               }
               png_crc_read(png_ptr, bb, length);
+              bb[length]='\0';
               png_write_chunk(mng_ptr, chunk_name,
                             bb, (png_size_t) length);
 
               if (verbose > 1 && !png_memcmp(chunk_name, png_DHDR, 4))
               {
+                  if (length > 19)
+                  {
                   printf("  objid=%lu\n",(unsigned long)(bb[1]+(bb[0]<<8)));
                   printf("  itype=%lu\n",(unsigned long)(bb[2]));
                   printf("  dtype=%lu\n",(unsigned long)(bb[3]));
@@ -7542,20 +7556,24 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
                             +(bb[13]<<16)+(bb[12]<<24)));
                   printf("  yloc=%lu\n",(unsigned long)(bb[19]+(bb[18]<<8)
                             +(bb[17]<<16)+(bb[16]<<24)));
+                  }
               }
 
               if (verbose > 1 && !png_memcmp(chunk_name, png_DEFI, 4))
               {
+                  if (length > 3)
+                  {
                   printf("  objid=%lu\n",(unsigned long)(bb[1]+(bb[0]<<8)));
                   printf("  do_not_show=%lu\n",(unsigned long)(bb[2]));
                   printf("  concrete=%lu\n",(unsigned long)(bb[3]));
-                  if (length > 4)
+                  }
+                  if (length > 19)
                   {
                       printf("  xloc=%lu\n",(unsigned long)(bb[15]+(bb[14]<<8)
                             +(bb[13]<<16)+(bb[12]<<24)));
                       printf("  yloc=%lu\n",(unsigned long)(bb[19]+(bb[18]<<8)
                             +(bb[17]<<16)+(bb[16]<<24)));
-                      if (length > 12)
+                      if (length > 24)
                       {
                           printf("  l_cb=%lu\n",
                             (unsigned long)(bb[20]+(bb[19]<<8)
@@ -7573,6 +7591,7 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
                   {
                       int ib;
                       printf("  name = ");
+                      bb[length]='\0';
                       for (ib=0; bb[ib]; ib++)
                       {
                         printf ("%c", bb[ib]);
