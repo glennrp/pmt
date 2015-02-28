@@ -10,7 +10,6 @@
 #ifndef PNGCRUSH_H
 #define PNGCRUSH_H
 
-
 /* Do not build stuff we will not use */
 #undef PNG_BUILD_GRAYSCALE_PALETTE_SUPPORTED
 #undef PNG_CONVERT_tIME_SUPPORTED
@@ -49,18 +48,5 @@
 #undef PNG_SIMPLIFIED_WRITE_AFIRST_SUPPORTED
 #undef PNG_SIMPLIFIED_WRITE_BGR_SUPPORTED
 #undef PNG_SIMPLIFIED_WRITE_SUPPORTED
-
-#if PNG_LIBPNG_VER < 10400
-/* This allows png_default_error() to return, when it is called after our
- * own exception handling, which only returns after "Too many IDAT's",
- * or anything else that we might want to handle as a warning instead of
- * an error.  Doesn't work in libpng-1.4.0 and later; there we use
- * png_benign_error() instead.
- */
-#  undef PNG_ABORT()
-#  define PNG_ABORT()
-   /* Suppress pedantic warnings in libpng-1.4.x */
-#  define PNG_NORETURN /* This function does not return */
-#endif
 
 #endif /* !PNGCRUSH_H */
