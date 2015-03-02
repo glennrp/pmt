@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.85"
+#define PNGCRUSH_VERSION "1.7.84"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -308,11 +308,7 @@
 
 Change log:
 
-Version 1.7.85 (built with libpng-1.6.16 and zlib-1.2.8)
-  Improved reporting of invalid chunk names. Does not try to put
-    non-printable characters in STDERR; display hex numbers instead.
-
-Version 1.7.84(built with libpng-1.6.16 and zlib-1.2.8)
+Version 1.7.84beta (built with libpng-1.6.16 and zlib-1.2.8)
   Cleaned up more Coverity-scan warnings.
 
 Version 1.7.83 (built with libpng-1.6.16 and zlib-1.2.8)
@@ -7433,10 +7429,8 @@ png_uint_32 measure_idats(FILE * fp_in)
 }
 
 
-#define PNGCRUSH_a  97
-#define PNGCRUSH_z 122
-#define PNGCRUSH_A  65
-#define PNGCRUSH_Z  90 
+
+
 
 png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
 {
@@ -7469,51 +7463,16 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
                                   0, 0, 0, 0, 0,  0, 0, 0, 0, 0,
                                   0, 0, 0, 0, 0,  0, 0, 0 };
             unsigned long length;
-
             /* read the MHDR */
             pngcrush_default_read_data(png_ptr, buff, 4);
             length = pngcrush_get_uint_31(png_ptr,buff);
-
-            pngcrush_default_read_data(png_ptr, buff, 4);
-
-/* Check for valid chunk name [A-Za-z][A-Za-z][A-Z][A-Za-z] */
-            if (!(((buff[0] >= PNGCRUSH_a && buff[0] <= PNGCRUSH_z)  ||
-                   (buff[0] >= PNGCRUSH_A && buff[0] <= PNGCRUSH_Z)) &&
-                  ((buff[1] >= PNGCRUSH_a && buff[1] <= PNGCRUSH_z)  ||
-                   (buff[2] >= PNGCRUSH_A && buff[1] <= PNGCRUSH_Z)) &&
-                  ((buff[2] >= PNGCRUSH_A && buff[1] <= PNGCRUSH_Z)) &&
-                  ((buff[3] >= PNGCRUSH_a && buff[1] <= PNGCRUSH_z)  ||
-                   (buff[3] >= PNGCRUSH_A && buff[1] <= PNGCRUSH_Z))))
-            {
-               int i;
-               fprintf (STDERR,"Invalid chunk name: \"");
-               for (i=0; i<4; i++)
-               {
-                 if ((buff[i] >= PNGCRUSH_a && buff[i] <= PNGCRUSH_z) ||
-                     (buff[i] >= PNGCRUSH_A && buff[i] <= PNGCRUSH_Z) ||
-                     (buff[i] >= '0' && buff[i] <= '9'))
-                    fprintf(STDERR,"%c",buff[i]);
-                 else
-                    fprintf(STDERR,"?");
-               }
-               fprintf(STDERR,"\" (0x%2x 0x%2x 0x%2x 0x%2x)\n",
-                  buff[0],buff[1],buff[2],buff[3]);
-            }
-            else
-            {
-               if (verbose > 0)
-                 printf("Reading %c%c%c%c chunk.\n",buff[0],buff[1],buff[2],
-                   buff[3]);
-
-#ifdef PNG_UINT_MHDR
-            if (pngcrush_get_uint_32(buff) != PNG_UINT_MHDR)
-#else
-            if (!png_memcmp(buff, png_MHDR, 4))
-#endif
-              png_error(png_ptr, "Expected MHDR chunk");
-
             if (length > 28)
               png_error(png_ptr, "MHDR length too long");
+
+            pngcrush_default_read_data(png_ptr, buff, 4);
+            if (verbose > 0)
+              printf("Reading %c%c%c%c chunk.\n",buff[0],buff[1],buff[2],
+                buff[3]);
 
             pngcrush_default_read_data(png_ptr, buff, length);
 
@@ -7539,20 +7498,19 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
             }
 
             if (new_mng)
-              {
-                  /* write the MNG 8-byte signature */
-                  pngcrush_write_png(mng_ptr, &mng_signature[0],
-                                    (png_size_t) 8);
+            {
+                /* write the MNG 8-byte signature */
+                pngcrush_write_png(mng_ptr, &mng_signature[0],
+                                  (png_size_t) 8);
 
-                  /* Write a MHDR chunk */
-                  png_write_chunk(mng_ptr, (png_bytep) png_MHDR,
-                              buff, (png_size_t) 28);
-              }
+                /* Write a MHDR chunk */
+                png_write_chunk(mng_ptr, (png_bytep) png_MHDR,
+                            buff, (png_size_t) 28);
+            }
 
             pngcrush_default_read_data(png_ptr, buff, 4);
             input_format = 1;
 
-            }
         }
         else
 #endif
@@ -7610,130 +7568,102 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
         png_crc_read(png_ptr, chunk_name, 4);
         chunk_name[4]='\0';
 
-/* Check for valid chunk name [A-Za-z][A-Za-z][A-Z][A-Za-z] */
-        if (!(((chunk_name[0] >= PNGCRUSH_a && chunk_name[0] <= PNGCRUSH_z)  ||
-               (chunk_name[0] >= PNGCRUSH_A && chunk_name[0] <= PNGCRUSH_Z)) &&
-              ((chunk_name[1] >= PNGCRUSH_a && chunk_name[1] <= PNGCRUSH_z)  ||
-               (chunk_name[2] >= PNGCRUSH_A && chunk_name[1] <= PNGCRUSH_Z)) &&
-              ((chunk_name[2] >= PNGCRUSH_A && chunk_name[1] <= PNGCRUSH_Z)) &&
-              ((chunk_name[3] >= PNGCRUSH_a && chunk_name[1] <= PNGCRUSH_z)  ||
-               (chunk_name[3] >= PNGCRUSH_A && chunk_name[1] <= PNGCRUSH_Z))))
+        if (new_mng)
         {
-           int i;
+          const png_byte png_DHDR[5] = {  68, 72, 68, 82, '\0' };
+          const png_byte png_DEFI[5] = {  68, 69, 70, 73, '\0' };
+          const png_byte png_FRAM[5] = {  70, 82, 65, 77, '\0' };
+          const png_byte png_nEED[5] = { 110, 69, 69, 68, '\0' };
 
-           fprintf (STDERR,"Invalid chunk name: \"");
-               for (i=0; i<4; i++)
-               {
-                 if ((chunk_name[i] >= PNGCRUSH_a &&
-                      chunk_name[i] <= PNGCRUSH_z) ||
-                     (chunk_name[i] >= PNGCRUSH_A &&
-                      chunk_name[i] <= PNGCRUSH_Z)||
-                     (chunk_name[i] >= '0' &&
-                      chunk_name[i] <= '9'))
-                    fprintf(STDERR,"%c",chunk_name[i]);
-                 else
-                    fprintf(STDERR,"?");
-               }
-               fprintf(STDERR,"\" (0x%2x 0x%2x 0x%2x 0x%2x)\n",
-                  chunk_name[0],chunk_name[1],chunk_name[2],chunk_name[3]);
-        }
-        else
-        {
-          if (new_mng)
+          if (!png_memcmp(chunk_name, png_nEED, 4))
           {
-            const png_byte png_DHDR[5] = {  68, 72, 68, 82, '\0' };
-            const png_byte png_DEFI[5] = {  68, 69, 70, 73, '\0' };
-            const png_byte png_FRAM[5] = {  70, 82, 65, 77, '\0' };
-            const png_byte png_nEED[5] = { 110, 69, 69, 68, '\0' };
-
-            if (!png_memcmp(chunk_name, png_nEED, 4))
-            {
-                /* Skip the nEED chunk */
-                if (verbose > 0)
-                  printf ("  skipping MNG %c%c%c%c chunk, %lu bytes\n",
-                    chunk_name[0],
-                    chunk_name[1],chunk_name[2],chunk_name[3],
-                    (unsigned long)length);
-            }
-            else
-            {
-               /* copy the chunk. */
-               if (verbose > 0)
-                 printf ("  reading MNG %c%c%c%c chunk, %lu bytes\n",
-                    chunk_name[0],chunk_name[1],chunk_name[2],chunk_name[3],
-                    (unsigned long)length);
-               if (length+1 > malloced_length)
-               {
-                   png_free(mng_ptr,bb);
-                   if (verbose > 0)
-                     printf ("  png_malloc %lu bytes.\n",(unsigned long)length);
-                   bb=(png_byte*)png_malloc(mng_ptr, length+1);
-                   malloced_length=length+1;
-               }
-               png_crc_read(png_ptr, bb, length);
-               bb[length]='\0';
-               png_write_chunk(mng_ptr, chunk_name,
-                             bb, (png_size_t) length);
-
-               if (verbose > 1 && !png_memcmp(chunk_name, png_DHDR, 4))
-               {
-                   if (length > 19)
-                   {
-                     printf("  objid=%lu\n",(unsigned long)(bb[1]+(bb[0]<<8)));
-                     printf("  itype=%lu\n",(unsigned long)(bb[2]));
-                     printf("  dtype=%lu\n",(unsigned long)(bb[3]));
-                     printf("  width=%lu\n",
-                       (unsigned long) pngcrush_get_uint_31(png_ptr,&bb[4]));
-                     printf("  height=%lu\n",
-                       (unsigned long) pngcrush_get_uint_31(png_ptr,&bb[8]));
-                     printf("  xloc=%lu\n",
-                       (unsigned long) pngcrush_get_uint_31(png_ptr,&bb[12]));
-                     printf("  yloc=%lu\n",
-                       (unsigned long) pngcrush_get_uint_31(png_ptr,&bb[16]));
-                   }
-               }
-
-               if (verbose > 1 && !png_memcmp(chunk_name, png_DEFI, 4))
-               {
-                   if (length > 3)
-                   {
-                     printf("  objid=%lu\n",(unsigned long)(bb[1]+(bb[0]<<8)));
-                     printf("  do_not_show=%lu\n",(unsigned long)(bb[2]));
-                     printf("  concrete=%lu\n",(unsigned long)(bb[3]));
-                   }
-                   if (length > 19)
-                   {
-                       printf("  xloc=%lu\n",
-                         (unsigned long) pngcrush_get_uint_31(png_ptr,&bb[12]));
-                       printf("  yloc=%lu\n",
-                         (unsigned long) pngcrush_get_uint_31(png_ptr,&bb[16]));
-                     if (length > 28)
-                     {
-                       printf("  l_cb=%lu\n",
-                         (unsigned long) pngcrush_get_uint_31(png_ptr,&bb[20]));
-                       printf("  r_cb=%lu\n",
-                         (unsigned long) pngcrush_get_uint_31(png_ptr,&bb[24]));
-                     }
-                   }
-               }
-               if (verbose > 1 && !png_memcmp(chunk_name, png_FRAM, 4))
-               {
-                   printf("  mode=%lu\n",(unsigned long)bb[0]);
-                   if (length > 1)
-                   {
-                       int ib;
-                       printf("  name = ");
-                       bb[length]='\0';
-                       for (ib=0; bb[ib]; ib++)
-                       {
-                         printf ("%c", bb[ib]);
-                       }
-                       printf ("\n");
-                   }
-                   length=0;
-               }
-            }
+              /* Skip the nEED chunk */
+              if (verbose > 0)
+                printf ("  skipping MNG %c%c%c%c chunk, %lu bytes\n",
+                  chunk_name[0],
+                  chunk_name[1],chunk_name[2],chunk_name[3],
+                  (unsigned long)length);
           }
+          else
+          {
+              /* copy the chunk. */
+              if (verbose > 0)
+                printf ("  reading MNG %c%c%c%c chunk, %lu bytes\n",
+                   chunk_name[0],
+                   chunk_name[1],chunk_name[2],chunk_name[3],
+                   (unsigned long)length);
+              if (length+1 > malloced_length)
+              {
+                  png_free(mng_ptr,bb);
+                  if (verbose > 0)
+                    printf ("  png_malloc %lu bytes.\n",(unsigned long)length);
+                  bb=(png_byte*)png_malloc(mng_ptr, length+1);
+                  malloced_length=length+1;
+              }
+              png_crc_read(png_ptr, bb, length);
+              bb[length]='\0';
+              png_write_chunk(mng_ptr, chunk_name,
+                            bb, (png_size_t) length);
+
+              if (verbose > 1 && !png_memcmp(chunk_name, png_DHDR, 4))
+              {
+                  if (length > 19)
+                  {
+                    printf("  objid=%lu\n",(unsigned long)(bb[1]+(bb[0]<<8)));
+                    printf("  itype=%lu\n",(unsigned long)(bb[2]));
+                    printf("  dtype=%lu\n",(unsigned long)(bb[3]));
+                    printf("  width=%lu\n",
+                      (unsigned long) pngcrush_get_uint_31(png_ptr,&bb[4]));
+                    printf("  height=%lu\n",
+                      (unsigned long) pngcrush_get_uint_31(png_ptr,&bb[8]));
+                    printf("  xloc=%lu\n",
+                      (unsigned long) pngcrush_get_uint_31(png_ptr,&bb[12]));
+                    printf("  yloc=%lu\n",
+                      (unsigned long) pngcrush_get_uint_31(png_ptr,&bb[16]));
+                  }
+              }
+
+              if (verbose > 1 && !png_memcmp(chunk_name, png_DEFI, 4))
+              {
+                  if (length > 3)
+                  {
+                    printf("  objid=%lu\n",(unsigned long)(bb[1]+(bb[0]<<8)));
+                    printf("  do_not_show=%lu\n",(unsigned long)(bb[2]));
+                    printf("  concrete=%lu\n",(unsigned long)(bb[3]));
+                  }
+                  if (length > 19)
+                  {
+                      printf("  xloc=%lu\n",
+                        (unsigned long) pngcrush_get_uint_31(png_ptr,&bb[12]));
+                      printf("  yloc=%lu\n",
+                        (unsigned long) pngcrush_get_uint_31(png_ptr,&bb[16]));
+                    if (length > 28)
+                    {
+                      printf("  l_cb=%lu\n",
+                        (unsigned long) pngcrush_get_uint_31(png_ptr,&bb[20]));
+                      printf("  r_cb=%lu\n",
+                        (unsigned long) pngcrush_get_uint_31(png_ptr,&bb[24]));
+                    }
+                  }
+              }
+              if (verbose > 1 && !png_memcmp(chunk_name, png_FRAM, 4))
+              {
+                  printf("  mode=%lu\n",(unsigned long)bb[0]);
+                  if (length > 1)
+                  {
+                      int ib;
+                      printf("  name = ");
+                      bb[length]='\0';
+                      for (ib=0; bb[ib]; ib++)
+                      {
+                        printf ("%c", bb[ib]);
+                      }
+                      printf ("\n");
+                  }
+                  length=0;
+              }
+          }
+        }
 
 #ifdef PNG_UINT_acTL
         else if (pngcrush_get_uint_32(chunk_name) == PNG_UINT_acTL)
@@ -7806,9 +7736,7 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
                 }
             }
             else
-            {
                 found_any_chunk=1;
-            }
 
 #ifdef PNG_gAMA_SUPPORTED
 #ifdef PNG_UINT_gAMA
@@ -7976,9 +7904,6 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
                     return sum_idat_length;
             }
         }
-        }
-        /* Unrecognized chunk */
-        png_crc_finish(png_ptr, length);
     }
 }
 
