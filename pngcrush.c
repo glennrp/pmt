@@ -1254,14 +1254,6 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 #  define PNG_ABORT abort();
 #endif
 
-#if 0
-#if (PNG_LIBPNG_VER < 10500)
-/* Suppress pedantic warnings in libpng-1.4.x */
-#undef PNG_NORETURN
-#define PNG_NORETURN /* This function does not return */
-#endif
-#endif
-
 #if (PNG_LIBPNG_VER < 10500)
 /* Two macros to return the first row and first column of the original,
  * full, image which appears in a given pass.  'pass' is in the range 0
@@ -2229,20 +2221,6 @@ pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
    }
    if ((png_uint_32)check != (png_uint_32)length)
       png_error(png_ptr, "read Error");
-#if 0
-   if (salvage)
-   {
-     if (found_IDAT == 1)
-     {
-        /* replace first two bytes */
-        printf("  Input CMF = 0x%x,0x%x\n",buf[0],buf[1]);
-        found_IDAT++;
-     }
-     if (length==4)
-        if (buf[0] == 'I' && buf[1] == 'D' && buf[2] == 'A' && buf[3] == 'T')
-          found_IDAT++;
-   }
-#endif
 }
 #endif /* USE_FAR_KEYWORD */
 #endif /* PNG_STDIO_SUPPORTED */
@@ -7633,8 +7611,8 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
         }
         else
            if (verbose > 0)
-              printf("Reading %c%c%c%c chunk.\n",buff[0],buff[1],buff[2],
-                buff[3]);
+              printf("Reading %c%c%c%c chunk.\n",
+                  chunk_name[0],chunk_name[1],chunk_name[2],chunk_name[3]);
 
         if (new_mng)
         {
