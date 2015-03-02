@@ -80,7 +80,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.84"
+#define PNGCRUSH_VERSION "1.7.85"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -308,7 +308,11 @@
 
 Change log:
 
-Version 1.7.84beta (built with libpng-1.6.16 and zlib-1.2.8)
+Version 1.7.85 (built with libpng-1.6.16 and zlib-1.2.8)
+  Improved reporting of invalid chunk names. Does not try to put
+    non-printable characters in STDERR; displays hex numbers instead.
+
+Version 1.7.84 (built with libpng-1.6.16 and zlib-1.2.8)
   Cleaned up more Coverity-scan warnings.
 
 Version 1.7.83 (built with libpng-1.6.16 and zlib-1.2.8)
@@ -5128,6 +5132,7 @@ int main(int argc, char *argv[])
 #endif /* PNG_WRITE_UNKNOWN_CHUNKS_SUPPORTED */
             } /* last trial */
 
+/* TO DO: Remove this? We already did this in measure_idats */
             P1( "Reading signature bytes\n");
             {
 #ifdef PNGCRUSH_LOCO
@@ -7431,6 +7436,10 @@ png_uint_32 measure_idats(FILE * fp_in)
 
 
 
+#define PNGCRUSH_a  97
+#define PNGCRUSH_z 122
+#define PNGCRUSH_A  65
+#define PNGCRUSH_Z  90 
 
 png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
 {
@@ -7465,14 +7474,41 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
             unsigned long length;
             /* read the MHDR */
             pngcrush_default_read_data(png_ptr, buff, 4);
+
             length = pngcrush_get_uint_31(png_ptr,buff);
             if (length > 28)
               png_error(png_ptr, "MHDR length too long");
 
             pngcrush_default_read_data(png_ptr, buff, 4);
-            if (verbose > 0)
-              printf("Reading %c%c%c%c chunk.\n",buff[0],buff[1],buff[2],
-                buff[3]);
+
+            /* TO DO: combine with checking for valid PNG chunk_name, below */
+            /* Check for valid chunk name [A-Za-z][A-Za-z][A-Z][A-Za-z] */
+            if (!(((buff[0] >= PNGCRUSH_a && buff[0] <= PNGCRUSH_z)  ||
+                   (buff[0] >= PNGCRUSH_A && buff[0] <= PNGCRUSH_Z)) &&
+                  ((buff[1] >= PNGCRUSH_a && buff[1] <= PNGCRUSH_z)  ||
+                   (buff[1] >= PNGCRUSH_A && buff[1] <= PNGCRUSH_Z)) &&
+                  ((buff[2] >= PNGCRUSH_A && buff[2] <= PNGCRUSH_Z)) &&
+                  ((buff[3] >= PNGCRUSH_a && buff[3] <= PNGCRUSH_z)  ||
+                   (buff[3] >= PNGCRUSH_A && buff[3] <= PNGCRUSH_Z))))
+            {
+               int i;
+               fprintf (STDERR,"Invalid MNG chunk name: \"");
+               for (i=0; i<4; i++)
+               {
+                 if ((buff[i] >= PNGCRUSH_a && buff[i] <= PNGCRUSH_z) ||
+                     (buff[i] >= PNGCRUSH_A && buff[i] <= PNGCRUSH_Z) ||
+                     (buff[i] >= '0' && buff[i] <= '9'))
+                    fprintf(STDERR,"%c",buff[i]);
+                 else
+                    fprintf(STDERR,"?");
+               }
+               fprintf(STDERR,"\" (0x%2x 0x%2x 0x%2x 0x%2x)\n",
+                  buff[0],buff[1],buff[2],buff[3]);
+            }
+            else
+               if (verbose > 0)
+                 printf("Reading %c%c%c%c chunk.\n",buff[0],buff[1],buff[2],
+                   buff[3]);
 
             pngcrush_default_read_data(png_ptr, buff, length);
 
@@ -7567,6 +7603,38 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
         png_reset_crc(png_ptr);
         png_crc_read(png_ptr, chunk_name, 4);
         chunk_name[4]='\0';
+
+/* Check for valid chunk name [A-Za-z][A-Za-z][A-Z][A-Za-z] */
+        if (!(((chunk_name[0] >= PNGCRUSH_a && chunk_name[0] <= PNGCRUSH_z)  ||
+               (chunk_name[0] >= PNGCRUSH_A && chunk_name[0] <= PNGCRUSH_Z)) &&
+              ((chunk_name[1] >= PNGCRUSH_a && chunk_name[1] <= PNGCRUSH_z)  ||
+               (chunk_name[2] >= PNGCRUSH_A && chunk_name[2] <= PNGCRUSH_Z)) &&
+              ((chunk_name[2] >= PNGCRUSH_A && chunk_name[2] <= PNGCRUSH_Z)) &&
+              ((chunk_name[3] >= PNGCRUSH_a && chunk_name[3] <= PNGCRUSH_z)  ||
+               (chunk_name[3] >= PNGCRUSH_A && chunk_name[3] <= PNGCRUSH_Z))))
+        {
+           int i;
+
+           fprintf (STDERR,"Invalid chunk name: \"");
+               for (i=0; i<4; i++)
+               {
+                 if ((chunk_name[i] >= PNGCRUSH_a &&
+                      chunk_name[i] <= PNGCRUSH_z) ||
+                     (chunk_name[i] >= PNGCRUSH_A &&
+                      chunk_name[i] <= PNGCRUSH_Z)||
+                     (chunk_name[i] >= '0' &&
+                      chunk_name[i] <= '9'))
+                    fprintf(STDERR,"%c",chunk_name[i]);
+                 else
+                    fprintf(STDERR,"?");
+               }
+               fprintf(STDERR,"\" (0x%2x 0x%2x 0x%2x 0x%2x)\n",
+                  chunk_name[0],chunk_name[1],chunk_name[2],chunk_name[3]);
+        }
+        else
+           if (verbose > 0)
+              printf("Reading %c%c%c%c chunk.\n",buff[0],buff[1],buff[2],
+                buff[3]);
 
         if (new_mng)
         {
