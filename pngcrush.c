@@ -313,7 +313,8 @@ Version 1.7.85 (built with libpng-1.6.16 and zlib-1.2.8)
     non-printable characters in STDERR; displays hex numbers instead.
 
 Version 1.7.84 (built with libpng-1.6.16 and zlib-1.2.8)
-  Cleaned up more Coverity-scan warnings.
+  Cleaned up more Coverity-scan warnings. Fixing those also fixed
+  CVE-2015-2158.
 
 Version 1.7.83 (built with libpng-1.6.16 and zlib-1.2.8)
   Cleaned up some Coverity-scan warnings.
@@ -4373,7 +4374,7 @@ int main(int argc, char *argv[])
 
                 fprintf(STDERR, "   Recompressing IDAT chunks in %s\n", inname);
                 fprintf(STDERR,
-                  "   Total length of data found in critical chunks         "
+                  "   Total length of data found in critical chunks        "
                   "   =%10lu\n", (unsigned long)idat_length[0]);
                 fflush(STDERR);
             }
