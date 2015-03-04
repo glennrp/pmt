@@ -214,10 +214,11 @@
  *      This seems to be the only method that would work with zopfli
  *      compression which always writes "7" (i.e., a 32k window) in CINFO.
  *
- *      d. The simplest way might be to simply try all window sizes
- *      for all methods, just as the "pc" script above does.  This of
- *      course involves a lot more trial compressions, but it will catch
- *      those instances where a smaller file will result.  Expensive.
+ *      d. The simplest is to use pngfix, which comes with libpng16 and
+ *      later, as a final step:
+ *
+ *           pngcrush input.png temp.png
+ *           pngfix --optimize --out=output.png temp.png
  *
  *   2. Check for the possiblity of using the tRNS chunk instead of
  *      the full alpha channel.  If all of the transparent pixels are
@@ -314,7 +315,7 @@ Version 1.7.85 (built with libpng-1.6.16 and zlib-1.2.8)
 
 Version 1.7.84 (built with libpng-1.6.16 and zlib-1.2.8)
   Cleaned up more Coverity-scan warnings. Fixing those also fixed
-  CVE-2015-2158.
+    CVE-2015-2158.
 
 Version 1.7.83 (built with libpng-1.6.16 and zlib-1.2.8)
   Cleaned up some Coverity-scan warnings.
@@ -2119,21 +2120,16 @@ void PNGCBAPI pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
    png_size_t length)
 {
    png_FILE_p io_ptr;
-#ifdef __COVERITY__
-   png_size_t i;
-#endif
 
    io_ptr = png_get_io_ptr(png_ptr);
 
    if (length == 0)
       png_error(png_ptr, "Read Error: invalid length requested");
 
-#if 1
    clearerr(io_ptr);
 
    if (fileno(io_ptr) == -1)
       png_error(png_ptr, "Read Error: invalid io_ptr");
-#endif
 
    /*
     * fread() returns 0 on error, so it is OK to store this in a png_size_t
@@ -2151,7 +2147,6 @@ void PNGCBAPI pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
 #endif
    }
 
-#if 1
    if (ferror(io_ptr))
    {
       clearerr(io_ptr);
@@ -2165,15 +2160,6 @@ void PNGCBAPI pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
    }
 
    clearerr(io_ptr);
-#endif
-
-#ifdef __COVERITY__
-   /* Attempt to get Coverity to accept data */
-   for (i = 0; i < length; i++)
-   {
-      data[i] &= 0xff;
-   }
-#endif
 }
 #else /* USE_FAR_KEYWORD */
 /*
@@ -4093,6 +4079,8 @@ int main(int argc, char *argv[])
     /* Use of compression window size 256 is not recommended. */
     else if (default_compression_window == 256)
         default_compression_window = 8;
+    else if (default_compression_window == 0)
+        /* do nothing */;
     else if (default_compression_window != 15) {
         fprintf(STDERR, "Invalid window size (%d); using window size=4\n",
                 default_compression_window);
@@ -5403,7 +5391,6 @@ int main(int argc, char *argv[])
  
                     if (trial > 0)
                     {
-#if 1
                     /* TO DO: have we got the right plte_len now? */
                       if (plte_len > 0 && output_color_type == 3 &&
                           force_output_bit_depth == 0)
@@ -5417,7 +5404,6 @@ int main(int argc, char *argv[])
                         else
                           force_output_bit_depth = 8;
                       }
-#endif /* 1 */
 
                     if (make_8_bit == 1)
                     {
