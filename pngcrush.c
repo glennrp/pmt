@@ -1555,7 +1555,11 @@ png_uint_32 pngcrush_crc;
 #ifndef __riscos
 #  include <sys/types.h>
 #  include <sys/stat.h>
-#  include <utime.h>
+#  ifndef _MSC_VER
+#    include <utime.h>
+#  else
+#    include <sys/utime.h>
+#  endif
 #endif
 
 #include <stdio.h>
