@@ -312,6 +312,7 @@ Change log:
 Version 1.7.85 (built with libpng-1.6.16 and zlib-1.2.8)
   Improved reporting of invalid chunk names. Does not try to put
     non-printable characters in STDERR; displays hex numbers instead.
+  Fixed include path for utime.h on MSVC (Louis McLaughlin).
 
 Version 1.7.84 (built with libpng-1.6.16 and zlib-1.2.8)
   Cleaned up more Coverity-scan warnings. Fixing those also fixed
