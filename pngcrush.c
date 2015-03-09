@@ -319,7 +319,8 @@ Version 1.7.84 (built with libpng-1.6.16 and zlib-1.2.8)
     CVE-2015-2158.
 
 Version 1.7.83 (built with libpng-1.6.16 and zlib-1.2.8)
-  Cleaned up some Coverity-scan warnings.
+  Cleaned up some Coverity-scan warnings.  Unfortunately one of these
+    changes introduced the vulnerability reported in CVE-2015-2158.
 
 Version 1.7.82 (built with libpng-1.6.16 and zlib-1.2.8)
 
