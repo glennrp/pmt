@@ -3,8 +3,29 @@
 
 Change log:
 
+Version 1.7.86 (built with libpng-1.6.17 and zlib-1.2.8)
+
+Version 1.7.85 (built with libpng-1.6.16 and zlib-1.2.8)
+  Improved reporting of invalid chunk names. Does not try to put
+    non-printable characters in STDERR; displays hex numbers instead.
+  Fixed include path for utime.h on MSVC (Louis McLaughlin).
+  Eliminated "FAR" memory support (it was removed from libpng at version
+    1.6.0).
+  Disabled the "-already_crushed" option which does not really work well.
+
+Version 1.7.84 (built with libpng-1.6.16 and zlib-1.2.8)
+  Cleaned up more Coverity-scan warnings. Fixing those also fixed
+    CVE-2015-2158.
+
+Version 1.7.83 (built with libpng-1.6.16 and zlib-1.2.8)
+  Cleaned up some Coverity-scan warnings.  Unfortunately one of these
+    changes introduced the vulnerability reported in CVE-2015-2158.
+
+Version 1.7.82 (built with libpng-1.6.16 and zlib-1.2.8)
+
 Version 1.7.81 (built with libpng-1.6.15 and zlib-1.2.8)
-  Fixed off-by-one error in calculation of plte_len. Bug report by Ivan Kuchin.
+  Fixed off-by-one error in calculation of plte_len. Bug reports by
+    Ivan Kuchin and Frederic Kayser.
 
 Version 1.7.80 (built with libpng-1.6.14 and zlib-1.2.8)
   Added "-reduce_palette" and "-noreduce_palette" options.  Enable

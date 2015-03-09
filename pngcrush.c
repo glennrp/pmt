@@ -77,7 +77,7 @@
  *
  */
 
-#define PNGCRUSH_VERSION "1.7.85"
+#define PNGCRUSH_VERSION "1.7.86"
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -310,6 +310,8 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.86 (built with libpng-1.6.17 and zlib-1.2.8)
 
 Version 1.7.85 (built with libpng-1.6.16 and zlib-1.2.8)
   Improved reporting of invalid chunk names. Does not try to put
@@ -6492,15 +6494,8 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                                                             max_possible_size);
                         }
 
-#ifdef WBITS_8_OK
-                        if (required_window <= 256)
-                            compression_window = 8;
-                        else if (required_window <= 512)
-                            compression_window = 9;
-#else
                         if (required_window <= 512)
                             compression_window = 9;
-#endif
                         else if (required_window <= 1024)
                             compression_window = 10;
                         else if (required_window <= 2048)
