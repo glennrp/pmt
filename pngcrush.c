@@ -313,6 +313,8 @@ Version 1.7.85 (built with libpng-1.6.16 and zlib-1.2.8)
   Improved reporting of invalid chunk names. Does not try to put
     non-printable characters in STDERR; displays hex numbers instead.
   Fixed include path for utime.h on MSVC (Louis McLaughlin).
+  Eliminated "FAR" memory support (it was removed from libpng at version
+    1.6.0).
 
 Version 1.7.84 (built with libpng-1.6.16 and zlib-1.2.8)
   Cleaned up more Coverity-scan warnings. Fixing those also fixed
@@ -1308,29 +1310,14 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
    /* The following became unavailable in libpng16 (and were
     * deprecated in libpng14 and 15)
     */
-#  ifdef   USE_FAR_KEYWORD
-     /*   Use this to make far-to-near assignments */
-#    define CHECK   1
-#    define NOCHECK 0
-#    define CVT_PTR(ptr) (png_far_to_near(png_ptr,ptr,CHECK))
-#    define CVT_PTR_NOCHECK(ptr) (png_far_to_near(png_ptr,ptr,NOCHECK))
-#    define png_memcmp  _fmemcmp    /* SJT: added */
-#    define png_memcpy  _fmemcpy
-#    define png_memset  _fmemset
+#  ifdef _WINDOWS_  /* Favor Windows over C runtime fns */
+#    define png_memcmp  memcmp
+#    define png_memcpy  CopyMemory
+#    define png_memset  memset
 #  else
-#    ifdef _WINDOWS_  /* Favor Windows over C runtime fns */
-#      define CVT_PTR(ptr)         (ptr)
-#      define CVT_PTR_NOCHECK(ptr) (ptr)
-#      define png_memcmp  memcmp
-#      define png_memcpy  CopyMemory
-#      define png_memset  memset
-#    else
-#      define CVT_PTR(ptr)         (ptr)
-#      define CVT_PTR_NOCHECK(ptr) (ptr)
-#      define png_memcmp  memcmp      /* SJT: added */
-#      define png_memcpy  memcpy
-#      define png_memset  memset
-#    endif
+#    define png_memcmp  memcmp      /* SJT: added */
+#    define png_memcpy  memcpy
+#    define png_memset  memset
 #  endif
 #endif /* PNGCRUSH_LIBPNG_VER >= 10500 */
 
@@ -2121,18 +2108,15 @@ pngcrush_crc_finish(png_structp png_ptr, png_uint_32 skip)
  * read_data function and use it at run time with png_set_read_fn(), rather
  * than changing the library.
  */
-#ifndef USE_FAR_KEYWORD
 void PNGCBAPI pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
    png_size_t length)
 {
    png_FILE_p io_ptr;
 
-   io_ptr = png_get_io_ptr(png_ptr);
-
    if (length == 0)
       png_error(png_ptr, "Read Error: invalid length requested");
 
-   clearerr(io_ptr);
+   io_ptr = png_get_io_ptr(png_ptr);
 
    if (fileno(io_ptr) == -1)
       png_error(png_ptr, "Read Error: invalid io_ptr");
@@ -2144,7 +2128,6 @@ void PNGCBAPI pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
    if ((png_size_t)fread((void *)data, sizeof (png_byte), length,
         io_ptr) != length)
    {
-      clearerr(io_ptr);
       png_error(png_ptr, "Read Error: invalid length returned");
 #if PNG_LIBPNG_VER >= 10700
       PNG_ABORT
@@ -2152,6 +2135,8 @@ void PNGCBAPI pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
       PNG_ABORT();
 #endif
    }
+
+   clearerr(io_ptr);
 
    if (ferror(io_ptr))
    {
@@ -2167,55 +2152,6 @@ void PNGCBAPI pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
 
    clearerr(io_ptr);
 }
-#else /* USE_FAR_KEYWORD */
-/*
- * This is the model-independent version. Since the standard I/O library
- * can't handle far buffers in the medium and small models, we have to copy
- * the data.
- */
-
-#define NEAR_BUF_SIZE 1024
-#define MIN(a,b) (a <= b ? a : b)
-
-static void /* PRIVATE */
-pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
-   png_size_t length)
-{
-   int check;
-   png_byte *n_data;
-   png_FILE_p io_ptr;
-
-   /* Check if data really is near. If so, use usual code. */
-   n_data = (png_byte *)CVT_PTR_NOCHECK(data);
-   io_ptr = (png_FILE_p)CVT_PTR(png_get_io_ptr(png_ptr);
-   if ((png_bytep)n_data == data)
-   {
-      check = fread((void *)n_data, 1, length, io_ptr);
-   }
-   else
-   {
-      png_byte buf[NEAR_BUF_SIZE];
-      png_size_t read, remaining, err;
-      check = 0;
-      remaining = length;
-      do
-      {
-         read = MIN(NEAR_BUF_SIZE, remaining);
-         err = fread((void *)buf, (png_size_t)1, read, io_ptr);
-         png_memcpy(data, buf, read); /* copy far buffer to near buffer */
-         if(err != read)
-            break;
-         else
-            check += err;
-         data += read;
-         remaining -= read;
-      }
-      while (remaining != 0);
-   }
-   if ((png_uint_32)check != (png_uint_32)length)
-      png_error(png_ptr, "read Error");
-}
-#endif /* USE_FAR_KEYWORD */
 #endif /* PNG_STDIO_SUPPORTED */
 
 #ifdef PNG_STDIO_SUPPORTED
@@ -2225,7 +2161,6 @@ pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
  * write_data function and use it at run time with png_set_write_fn(), rather
  * than changing the library.
  */
-#ifndef USE_FAR_KEYWORD
 void PNGCBAPI pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
    png_size_t length)
 {
@@ -2238,55 +2173,6 @@ void PNGCBAPI pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
    if (check != length)
       png_error(png_ptr, "Write Error");
 }
-#else /* USE_FAR_KEYWORD */
-/*
- * This is the model-independent version. Since the standard I/O library
- * can't handle far buffers in the medium and small models, we have to copy
- * the data.
-*/
-
-#define NEAR_BUF_SIZE 1024
-#define MIN(a,b) (a <= b ? a : b)
-
-void PNGCBAPI pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
-   png_size_t length)
-{
-   png_uint_32 check;
-   png_byte *near_data;  /* Needs to be "png_byte *" instead of "png_bytep" */
-   png_FILE_p io_ptr;
-
-   /* Check if data really is near. If so, use usual code. */
-   near_data = (png_byte *)CVT_PTR_NOCHECK(data);
-   io_ptr = (png_FILE_p)CVT_PTR(png_get_io_ptr(io_ptr));
-   if ((png_bytep)near_data == data)
-   {
-      check = fwrite(near_data, 1, length, io_ptr);
-   }
-   else
-   {
-      png_byte buf[NEAR_BUF_SIZE];
-      png_size_t written, remaining, err;
-      check = 0;
-      remaining = length;
-      do
-      {
-         written = MIN(NEAR_BUF_SIZE, remaining);
-         png_memcpy(buf, data, written); /* copy far buffer to near buffer */
-         err = fwrite(buf, 1, written, io_ptr);
-         if (err != written)
-            break;
-         else
-            check += err;
-         data += written;
-         remaining -= written;
-      }
-      while (remaining != 0);
-   }
-   if (check != length)
-      png_error(png_ptr, "Write Error");
-}
-
-#endif /* USE_FAR_KEYWORD */
 #endif /* PNG_STDIO_SUPPORTED */
 
 static void pngcrush_warning(png_structp png_ptr,
@@ -2354,9 +2240,9 @@ static void pngcrush_cexcept_error(png_structp png_ptr,
 typedef struct memory_information {
     png_uint_32 size;
     png_voidp pointer;
-    struct memory_information FAR *next;
+    struct memory_information *next;
 } memory_information;
-typedef memory_information FAR *memory_infop;
+typedef memory_information *memory_infop;
 
 static memory_infop pinformation = NULL;
 static int current_allocation = 0;
@@ -2413,7 +2299,7 @@ void pngcrush_debug_free(png_structp png_ptr, png_voidp ptr)
 
     /* Unlink the element from the list. */
     {
-        memory_infop FAR *ppinfo = &pinformation;
+        memory_infop *ppinfo = &pinformation;
         for (;;) {
             memory_infop pinfo = *ppinfo;
             if (pinfo->pointer == ptr) {
