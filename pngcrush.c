@@ -6492,15 +6492,8 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                                                             max_possible_size);
                         }
 
-#ifdef WBITS_8_OK
-                        if (required_window <= 256)
-                            compression_window = 8;
-                        else if (required_window <= 512)
-                            compression_window = 9;
-#else
                         if (required_window <= 512)
                             compression_window = 9;
-#endif
                         else if (required_window <= 1024)
                             compression_window = 10;
                         else if (required_window <= 2048)
