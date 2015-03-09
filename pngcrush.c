@@ -28,9 +28,6 @@
  * Thanks to Stephan Levavej for some helpful suggestions about gcc compiler
  * options and for a suggestion to increase the Z_MEM_LEVEL from default.
  *
- */
-
-/*
  * CAUTION:
  *
  * There is another version of pngcrush that has been distributed by
@@ -159,7 +156,9 @@
  *   in pngcrush are already available in ImageMagick; you can try a
  *   workflow that makes a first pass over the image with ImageMagick
  *   to select the bit depth, color type, interlacing, etc., and then makes
- *   another pass with pngcrush to optimize the compression.)
+ *   another pass with pngcrush to optimize the compression, and finally
+ *   makes a pass with libpng's "pngfix" app to optimize the zlib CMF
+ *   bytes.)
  *
  *   1. Reset CINFO to reflect decoder's required window size (instead of
  *   libz-1.1.3 encoder's required window size, which is 262 bytes larger).
@@ -172,7 +171,8 @@
  *   CINFO properly is to provide the *decoder* with information that will
  *   allow it to request only the minimum amount of memory required to decode
  *   the image (note that libpng-based decoders don't make use of this
- *   hint until libpng-1.6.0).
+ *   hint, because of the large number of files found in the wild that have
+ *   incorrect CMF bytes).
  *
  *   In the meantime, one can just run
  *
@@ -209,8 +209,8 @@
  *      settings, then attempt to decode the zlib datastream, and choose
  *      the smallest setting whose datastream can still be decoded
  *      successfully.  This is likely to be the simplest and fastest
- *      solution; however, it will only work with libpng-1.6.0 and later,
- *      where the decoder actually uses the CINFO hint.
+ *      solution; however, it will only work with a version of libpng
+ *      in which the decoder actually uses the CINFO hint.
  *      This seems to be the only method that would work with zopfli
  *      compression which always writes "7" (i.e., a 32k window) in CINFO.
  *
@@ -219,6 +219,7 @@
  *
  *           pngcrush input.png temp.png
  *           pngfix --optimize --out=output.png temp.png
+ *           # TO DO: find out if this works with zopfli output
  *
  *   2. Check for the possiblity of using the tRNS chunk instead of
  *      the full alpha channel.  If all of the transparent pixels are
@@ -247,7 +248,8 @@
  *   achieves better compression.  It is Apache-2.0 licensed and available from
  *   a GIT repository at SourceForge (see https://code.google.com/p/zopfli/).
  *   See also the "pngzop" directory under the pmt.sourceforge.net project.
- *   Note paragraph 1.c above; zopfli always writes "7" in CINFO.
+ *   Note paragraph 1.c above; zopfli always writes "7" in CINFO.  See
+ *   my "pmt/pngzop" project at SourceForge.
  *
  *   5. Optionally recognize any sRGB iCCP profile and replace it with the
  *   sRGB chunk.  Turn this option on if the "-reduce" option is on.  Also,
@@ -315,6 +317,7 @@ Version 1.7.85 (built with libpng-1.6.16 and zlib-1.2.8)
   Fixed include path for utime.h on MSVC (Louis McLaughlin).
   Eliminated "FAR" memory support (it was removed from libpng at version
     1.6.0).
+  Disabled the "-already_crushed" option which does not really work well.
 
 Version 1.7.84 (built with libpng-1.6.16 and zlib-1.2.8)
   Cleaned up more Coverity-scan warnings. Fixing those also fixed
@@ -1876,8 +1879,12 @@ static png_bytep png_row_filters = NULL;
 static float t_start, t_stop, t_decode, t_encode, t_misc;
 
 static png_uint_32 max_idat_size = MAX_IDAT_SIZE; /* increases the IDAT size */
+
+#if 0 /* disabled */
 static png_uint_32 crushed_idat_size = 0x3ffffffL;
 static int already_crushed = 0;
+#endif
+
 int ia;
 
 #if defined(PNG_UNKNOWN_CHUNKS_SUPPORTED)
@@ -3161,12 +3168,14 @@ int main(int argc, char *argv[])
             names++;
 
         /* GRR:  start of giant else-if block */
-        if (!strncmp(argv[i], "-already", 8))
+        if (!strncmp(argv[i], "-already", 8)) /* obsolete, now disabled */
         {
             names++;
             BUMP_I;
+#if 0 /* disabled */
             crushed_idat_size = (png_uint_32) pngcrush_get_long;
             pngcrush_check_long;
+#endif
         }
 
         else if (!strncmp(argv[i], "-bail", 5))
@@ -4198,7 +4207,9 @@ int main(int argc, char *argv[])
             }
             number_of_open_files++;
 
+#if 0 /* disabled */
             already_crushed = 0;
+#endif
 
 #ifdef PNGCRUSH_LOCO
             if (new_mng)
@@ -4267,10 +4278,12 @@ int main(int argc, char *argv[])
         else
             idat_length[0] = 1;
 
+#if 0 /* disabled */
         if (already_crushed)
         {
             fprintf(STDERR, "   File %s has already been crushed.\n", inname);
         }
+#endif
 
         if (image_is_immutable)
         {
@@ -4278,7 +4291,11 @@ int main(int argc, char *argv[])
               "   Image %s has a dSIG chunk and is immutable.\n", inname);
         }
 
+#if 0 /* disabled */
         if (!already_crushed && !image_is_immutable)
+#else
+        if (!image_is_immutable)
+#endif
         {
 
         if (do_color_count)
@@ -7187,7 +7204,11 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                   outname);
                 }
 
+#if 0 /* disabled */
                 else if (!already_crushed && !image_is_immutable)
+#else
+                else if (!image_is_immutable)
+#endif
                 {
                 fprintf(STDERR,
                   "   Best pngcrush method        = %3d "
@@ -7613,8 +7634,10 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
 #endif
             {
                 sum_idat_length += (length + 12);
+#if 0 /* disabled */
                 if (length > crushed_idat_size)
                     already_crushed++;
+#endif
             }
 
             if (verbose > 1)
@@ -7957,6 +7980,7 @@ static const char *pngcrush_usage[] = {
 };
 
 struct options_help pngcrush_options[] = {
+#if 0
     {0, "      -already already_crushed_size [e.g., 8192]"},
     {2, ""},   /* blank */
     {2, "               If file has an IDAT greater than this size, it"},
@@ -7964,6 +7988,7 @@ struct options_help pngcrush_options[] = {
     {2, "               not be processed, unless you are making other changes"},
     {2, "               or the \"-force\" option is present."},
     {2, ""},
+#endif
 
     {0, "         -bail (bail out of trial when size exceeds best size found"},
     {2, ""},
