@@ -160,6 +160,10 @@
  *   makes a pass with libpng's "pngfix" app to optimize the zlib CMF
  *   bytes.)
  *
+ *   0. Make pngcrush optionally operate as a filter, writing the crushed PNG
+ *   to standard output, if an output file is not given, and reading
+ *   the source file from standard input if no input file is given.
+ *
  *   1. Reset CINFO to reflect decoder's required window size (instead of
  *   libz-1.1.3 encoder's required window size, which is 262 bytes larger).
  *   See discussion about zlib in png-list archives for April 2001.
@@ -312,6 +316,11 @@
 Change log:
 
 Version 1.7.86 (built with libpng-1.6.17 and zlib-1.2.8)
+  Increased maximum size of a text chunk input from 260 to 2048
+    (STR_BUF_SIZE) bytes, to agree with the help screen (bug report by
+    Tamas Jursonovics).
+  Fixed bug that caused text chunks after IDAT to be written only when
+    the "-save" option is used.
 
 Version 1.7.85 (built with libpng-1.6.16 and zlib-1.2.8)
   Improved reporting of invalid chunk names. Does not try to put
@@ -1580,7 +1589,7 @@ png_uint_32 pngcrush_crc;
 #define STRNGIFY_STAGE1(x) #x
 #define STRNGIFY(x) STRNGIFY_STAGE1(x)
 
-#define STR_BUF_SIZE      260
+#define STR_BUF_SIZE      2048
 #define MAX_IDAT_SIZE     524288L
 #define MAX_METHODS       150
 #define MAX_METHODSP1     (MAX_METHODS+1)
@@ -1690,7 +1699,7 @@ static int do_pplt = 0;
 static png_uint_32 max_rows_at_a_time = 1;
 static png_uint_32 rows_at_a_time;
 #endif
-char pplt_string[1024];
+char pplt_string[STR_BUF_SIZE];
 char *ip, *op, *dot;
 char in_string[STR_BUF_SIZE];
 char prog_string[STR_BUF_SIZE];
@@ -1700,8 +1709,8 @@ static int text_inputs = 0;
 int text_where[10];           /* 0: no text; 1: before PLTE; 2: after PLTE */
 int text_compression[10];     /* -1: uncompressed tEXt; 0: compressed zTXt
                                   1: uncompressed iTXt; 2: compressed iTXt */
-char text_text[10*2048];      /* It would be nice to png_malloc this, but we
-                               * don't have a png_ptr yet when we need it. */
+char text_text[10*STR_BUF_SIZE]; /* It would be nice to png_malloc this, but we
+                                    don't have a png_ptr yet when we need it. */
 char text_keyword[10*80];
 
 /* PNG_iTXt_SUPPORTED */
@@ -3767,7 +3776,8 @@ int main(int argc, char *argv[])
             BUMP_I;
             i -= 3;
             global_things_have_changed = 1;
-            if (strlen(argv[i + 2]) < 80 && strlen(argv[i + 3]) < 2048 &&
+            if (strlen(argv[i + 2]) < 80 &&
+                strlen(argv[i + 3]) < STR_BUF_SIZE &&
                 text_inputs < 10)
             {
 #ifdef PNG_iTXt_SUPPORTED
@@ -3822,9 +3832,9 @@ int main(int argc, char *argv[])
                     text_lang_key[text_inputs * 80 + 79] = '\0';
                 }
 #endif
-                strncpy(&text_text[text_inputs * 2048], argv[++i],
+                strncpy(&text_text[text_inputs * STR_BUF_SIZE], argv[++i],
                     STR_BUF_SIZE);
-                text_text[text_inputs * 2048 + 2047] = '\0';
+                text_text[(text_inputs + 1) * STR_BUF_SIZE - 1] = '\0';
                 text_inputs++;
             } else {
                 if (text_inputs > 9)
@@ -6151,7 +6161,8 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                                 added_text[0].lang_key =
                                     &text_lang_key[ntext * 80];
 #endif
-                                added_text[0].text = &text_text[ntext * 2048];
+                                added_text[0].text = 
+                                    &text_text[ntext * STR_BUF_SIZE];
                                 added_text[0].compression =
                                     text_compression[ntext];
                                 png_set_text(write_ptr, write_info_ptr,
@@ -6807,12 +6818,14 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
 #if (defined(PNG_READ_tEXt_SUPPORTED) && defined(PNG_WRITE_tEXt_SUPPORTED)) \
  || (defined(PNG_READ_iTXt_SUPPORTED) && defined(PNG_WRITE_iTXt_SUPPORTED)) \
  || (defined(PNG_READ_zTXt_SUPPORTED) && defined(PNG_WRITE_zTXt_SUPPORTED))
+
+                P1( "Check for iTXt/tEXt/zTXt chunks after IDAT\n");
                 {
                     png_textp text_ptr;
                     int num_text = 0;
 
-                    if (png_get_text
-                        (read_ptr, end_info_ptr, &text_ptr, &num_text) > 0
+                    if (png_get_text (read_ptr,
+                        end_info_ptr, &text_ptr, &num_text) > 0
                         || text_inputs)
                     {
                         int ntext;
@@ -6847,7 +6860,8 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                                     fprintf(STDERR, "\n");
                             }
                         }
-                        if (nosave)
+
+                        if (last_trial)
                         {
                           if (num_text > 0)
                           {
@@ -6856,7 +6870,7 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                                 int num_to_write = num_text;
                                 for (ntext = 0; ntext < num_text; ntext++)
                                 {
-                                    if (last_trial)
+                                    if (verbose > 1)
                                         P2("Text chunk after IDAT, "
                                           "compression=%d\n",
                                           text_ptr[ntext].compression);
@@ -6898,8 +6912,11 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                                                  text_ptr, num_text);
                             }
                           }
+
+                          P1( "text_inputs=%d\n",text_inputs);
                           for (ntext = 0; ntext < text_inputs; ntext++)
                           {
+                            P1( "  ntext=%d\n",ntext);
                             if (text_where[ntext] == 2)
                             {
                                 png_textp added_text;
@@ -6916,7 +6933,7 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                                     &text_lang_key[ntext * 80];
 #endif
                                 added_text[0].text =
-                                    &text_text[ntext * 2048];
+                                    &text_text[ntext * STR_BUF_SIZE];
                                 added_text[0].compression =
                                     text_compression[ntext];
                                 png_set_text(write_ptr, write_end_info_ptr,
@@ -7967,7 +7984,7 @@ static const char *pngcrush_legal[] = {
 };
 
 static const char *pngcrush_usage[] = {
-    "\nusage: %s [options] infile.png outfile.png\n",
+    "\nusage: %s [options except for -e -d] infile.png outfile.png\n",
     "       %s -e ext [other options] file.png ...\n",
     "       %s -d dir/ [other options] file.png ...\n",
     "       %s -ow [other options] file.png [tempfile.png]\n",
@@ -8054,7 +8071,7 @@ struct options_help pngcrush_options[] = {
     {0, "            -e extension  (used for creating output filename)"},
     {2, ""},
     {2, "               e.g., -ext .new means *.png => *.new"},
-    {2, "               and -e _C.png means *.png => *_C.png"},
+    {2, "               and -e _pc.png means *.png => *_pc.png"},
     {2, ""},
 
     {0, "            -f user_filter [0-5] for specified method"},
