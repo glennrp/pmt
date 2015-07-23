@@ -315,7 +315,7 @@
 
 Change log:
 
-Version 1.7.86 (built with libpng-1.6.17 and zlib-1.2.8)
+Version 1.7.86 (built with libpng-1.6.18 and zlib-1.2.8)
   Increased maximum size of a text chunk input from 260 to 2048
     (STR_BUF_SIZE) bytes, to agree with the help screen (bug report by
     Tamas Jursonovics).
