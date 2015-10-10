@@ -3144,7 +3144,7 @@ png_ascii_from_fixed(png_const_structrp png_ptr, png_charp ascii,
 
       /* Avoid overflow here on the minimum integer. */
       if (fp < 0)
-         *ascii++ = 45, --size, num = -fp;
+         *ascii++ = 45, num = -fp;
       else
          num = fp;
 
