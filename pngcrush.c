@@ -1,10 +1,13 @@
-/*
- * pngcrush.c - recompresses png files
+
+/* pngcrush.c - recompresses png files
  * Copyright (C) 1998-2002, 2006-2015 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
  * Portions copyright (C) 2005       Greg Roelofs
- *
- * This software is released under a license derived from the libpng
+ */
+
+#define PNGCRUSH_VERSION "1.7.87"
+
+/* This software is released under a license derived from the libpng
  * license (see LICENSE, below).
  *
  * The most recent version of pngcrush can be found at SourceForge in
@@ -22,11 +25,91 @@
  *
  * Uses libpng and zlib.  This program was based upon libpng's pngtest.c.
  *
+ * NOTICES:
+ *
+ * If you have modified this source, you may insert additional notices
+ * immediately after this sentence.
+ *
+ * COPYRIGHT:
+ *
+ * Copyright (C) 1998-2002, 2006-2015 Glenn Randers-Pehrson
+ *                                   (glennrp at users.sf.net)
+ * Portions copyright (C) 2005       Greg Roelofs
+ *
+ * LICENSE:
+ *
+ * Permission is hereby irrevocably granted to everyone to use, copy, modify,
+ * and distribute this source code, or portions hereof, or executable programs
+ * compiled from it, for any purpose, without payment of any fee, subject to
+ * the following restrictions:
+ *
+ * 1. The origin of this source code must not be misrepresented.
+ *
+ * 2. Altered versions must be plainly marked as such and must not be
+ *    misrepresented as being the original source.
+ *
+ * 3. This Copyright notice, disclaimers, and license may not be removed
+ *    or altered from any source or altered source distribution.
+ *
+ * DISCLAIMERS:
+ *
+ * The pngcrush computer program is supplied "AS IS".  The Author disclaims all
+ * warranties, expressed or implied, including, without limitation, the
+ * warranties of merchantability and of fitness for any purpose.  The
+ * Author assumes no liability for direct, indirect, incidental, special,
+ * exemplary, or consequential damages, which may result from the use of
+ * the computer program, even if advised of the possibility of such damage.
+ * There is no warranty against interference with your enjoyment of the
+ * computer program or against infringement.  There is no warranty that my
+ * efforts or the computer program will fulfill any of your particular purposes
+ * or needs.  This computer program is provided with all faults, and the entire
+ * risk of satisfactory quality, performance, accuracy, and effort is with
+ * the user.
+ *
+ * EXPORT CONTROL
+ *
+ * I am not a lawyer, but I believe that the Export Control Classification
+ * Number (ECCN) for pngcrush is EAR99, which means not subject to export
+ * controls or International Traffic in Arms Regulations (ITAR) because it
+ * and libpng and zlib which may be bundled with pngcrush are all open source,
+ * publicly available software, that do not contain any encryption software.
+ * See the EAR, paragraphs 734.3(b)(3) and 734.7(b).
+ *
+ * TRADEMARK:
+ *
+ * The name "pngcrush" has not been registered by the Copyright owner
+ * as a trademark in any jurisdiction.  However, because pngcrush has
+ * been distributed and maintained world-wide, continually since 1998,
+ * the Copyright owner claims "common-law trademark protection" in any
+ * jurisdiction where common-law trademark is recognized.
+ *
+ * CEXCEPT COPYRIGHT, DISCLAIMER, and LICENSE:
+ *
+ * The cexcept.h header file which is bundled with this software
+ * is conveyed under the license and disclaimer described in lines 10
+ * through 18 of cexcept.h.
+ *
+ * LIBPNG COPYRIGHT, DISCLAIMER, and LICENSE:
+ *
+ * If libpng is bundled with this software, it is conveyed under the
+ * libpng license (see COPYRIGHT NOTICE, DISCLAIMER, and LICENSE, in png.h)
+ *
+ * ZLIB COPYRIGHT, DISCLAIMER, and LICENSE:
+ *
+ * If zlib is bundled with this software, it is conveyed under the
+ * zlib license (see the copyright notice, disclaimer, and license
+ * appearing in zlib.h)
+ *
+ * ACKNOWLEDGMENTS:
+ *
  * Thanks to Greg Roelofs for various bug fixes, suggestions, and
  * occasionally creating Linux executables.
  *
  * Thanks to Stephan Levavej for some helpful suggestions about gcc compiler
  * options and for a suggestion to increase the Z_MEM_LEVEL from default.
+ *
+ * Thanks to others who have made bug reports and suggestions mentioned
+ * in the change log.
  *
  * CAUTION:
  *
@@ -64,7 +147,7 @@
  *
  * It is said that the Xcode pngcrush does have a command to undo the
  * premultiplied alpha.  It's not theoretically possible, however, to recover
- * the original file without loss.  The underlying color data must either be
+ * the original file without loss.  The underlying color data will either be
  * reduced in precision, or, in the case of fully-transparent pixels,
  * completely lost.
  *
@@ -74,80 +157,6 @@
  * application <http://www.freepatentsonline.com/y2008/0177769.html>.  Anyone
  * who does have access to the revised pngcrush code cannot show it to me
  * anyhow because of their Non-Disclosure Agreement with Apple.
- *
- */
-
-#define PNGCRUSH_VERSION "1.7.86"
-
-/* Experimental: define these if you wish, but, good luck.
-#define PNGCRUSH_COUNT_COLORS
-#define PNGCRUSH_MULTIPLE_ROWS
-*/
-#define PNGCRUSH_LARGE
-
-#define PNGCRUSH_ROWBYTES(pixel_bits, width) \
-    ((pixel_bits) >= 8 ? \
-    ((png_size_t)(width) * (((png_size_t)(pixel_bits)) >> 3)) : \
-    (( ((png_size_t)(width) * ((png_size_t)(pixel_bits))) + 7) >> 3) )
-
-/*
- * NOTICES
- *
- * If you have modified this source, you may insert additional notices
- * immediately after this sentence.
- *
- * COPYRIGHT:
- *
- * Copyright (C) 1998-2002, 2006-2015 Glenn Randers-Pehrson
- *                                   (glennrp at users.sf.net)
- * Portions copyright (C) 2005       Greg Roelofs
- *
- * DISCLAIMERS:
- *
- * The pngcrush computer program is supplied "AS IS".  The Author disclaims all
- * warranties, expressed or implied, including, without limitation, the
- * warranties of merchantability and of fitness for any purpose.  The
- * Author assumes no liability for direct, indirect, incidental, special,
- * exemplary, or consequential damages, which may result from the use of
- * the computer program, even if advised of the possibility of such damage.
- * There is no warranty against interference with your enjoyment of the
- * computer program or against infringement.  There is no warranty that my
- * efforts or the computer program will fulfill any of your particular purposes
- * or needs.  This computer program is provided with all faults, and the entire
- * risk of satisfactory quality, performance, accuracy, and effort is with
- * the user.
- *
- * LICENSE:
- *
- * Permission is hereby irrevocably granted to everyone to use, copy, modify,
- * and distribute this source code, or portions hereof, or executable programs
- * compiled from it, for any purpose, without payment of any fee, subject to
- * the following restrictions:
- *
- * 1. The origin of this source code must not be misrepresented.
- *
- * 2. Altered versions must be plainly marked as such and must not be
- *    misrepresented as being the original source.
- *
- * 3. This Copyright notice, disclaimer, and license may not be removed
- *    or altered from any source or altered source distribution.
- *
- * CEXCEPT COPYRIGHT, DISCLAIMER, and LICENSE:
- *
- * The cexcept.h header file which is bundled with this software
- * is released under the license and disclaimer described in lines 10
- * through 18 of cexcept.h.
- *
- * LIBPNG COPYRIGHT, DISCLAIMER, and LICENSE:
- *
- * If libpng is bundled with this software, it is released under the
- * libpng license (see COPYRIGHT NOTICE, DISCLAIMER, and LICENSE, in png.h)
- *
- * ZLIB COPYRIGHT, DISCLAIMER, and LICENSE:
- *
- * If zlib is bundled with this software, it is released under the
- * zlib license (see the copyright notice, disclaimer, and license
- * appearing in lines 4 through 24 of zlib.h)
  */
 
 /* To do:
@@ -314,6 +323,13 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.87 (built with libpng-1.6.18 and zlib-1.2.8)
+  Fixed a double-free bug. There was a "free" of the sPLT chunk structure
+    in pngcrush and then again in png.c (Bug report by Brian Carpenter).
+  Added common-law trademark notice and export control information.
+  Rearranged some paragraphs in the comments at the beginning of pngcrush.c
+  Increased some buffer sizes in an attempt  to prevent possible overflows.
 
 Version 1.7.86 (built with libpng-1.6.18 and zlib-1.2.8)
   Increased maximum size of a text chunk input from 260 to 2048
@@ -1231,6 +1247,18 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 
 #endif /* end of changelog */
 
+/* Experimental: define these if you wish, but, good luck.
+#define PNGCRUSH_COUNT_COLORS
+#define PNGCRUSH_MULTIPLE_ROWS
+*/
+
+#define PNGCRUSH_LARGE
+
+#define PNGCRUSH_ROWBYTES(pixel_bits, width) \
+    ((pixel_bits) >= 8 ? \
+    ((png_size_t)(width) * (((png_size_t)(pixel_bits)) >> 3)) : \
+    (( ((png_size_t)(width) * ((png_size_t)(pixel_bits))) + 7) >> 3) )
+
 /* Suppress libpng pedantic warnings */
 #if 0
 #define PNG_DEPSTRUCT   /* Access to this struct member is deprecated */
@@ -1709,13 +1737,13 @@ static int text_inputs = 0;
 int text_where[10];           /* 0: no text; 1: before PLTE; 2: after PLTE */
 int text_compression[10];     /* -1: uncompressed tEXt; 0: compressed zTXt
                                   1: uncompressed iTXt; 2: compressed iTXt */
-char text_text[10*STR_BUF_SIZE]; /* It would be nice to png_malloc this, but we
+char text_text[11*STR_BUF_SIZE+1]; /* It would be nice to png_malloc this but we
                                     don't have a png_ptr yet when we need it. */
-char text_keyword[10*80];
+char text_keyword[11*80+1];
 
 /* PNG_iTXt_SUPPORTED */
-char text_lang[800];
-char text_lang_key[800];
+char text_lang[881];
+char text_lang_key[881];
 
 /* PNG_iCCP_SUPPORTED */
 int iccp_length = 0;
@@ -6058,8 +6086,6 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                         if (keep_chunk("sPLT", argv))
                             png_set_sPLT(write_ptr, write_info_ptr,
                                          entries, num_entries);
-                        png_free_data(read_ptr, read_info_ptr,
-                                      PNG_FREE_SPLT, num_entries);
                     }
                 }
 #endif
@@ -8083,8 +8109,11 @@ struct options_help pngcrush_options[] = {
 
     {0, FAKE_PAUSE_STRING},
 
-    {0, "          -fix (salvage PNG with otherwise fatal conditions"},
-    {2, "               such as bad CRCs and adaptive filter bytes)"},
+    {0, "          -fix (salvage PNG with otherwise fatal conditions)"},
+    {2, ""},
+    {2, "               Fixes bad CRCs, bad adaptive filter bytes,"},
+    {2, "               or bad CMF bytes in the IDAT chunk that cause"},
+    {2, "               the \"Too far back\" error"},
     {2, ""},
 
     {0, "        -force (write a new output file even if larger than input)"},
@@ -8170,7 +8199,7 @@ struct options_help pngcrush_options[] = {
     {2, ""},
     {2, FAKE_PAUSE_STRING},
 
-    {0, "          -max maximum_IDAT_size [default "STRNGIFY(PNG_ZBUF_SIZE)"]"},
+    {0, "          -max maximum_IDAT_size [default "STRNGIFY(MAX_IDAT_SIZE)"]"},
     {2, ""},
 
 #ifdef PNGCRUSH_LOCO
