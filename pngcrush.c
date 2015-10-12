@@ -5,7 +5,7 @@
  * Portions copyright (C) 2005       Greg Roelofs
  */
 
-#define PNGCRUSH_VERSION "1.7.87"
+#define PNGCRUSH_VERSION "1.7.88"
 
 /* This software is released under a license derived from the libpng
  * license (see LICENSE, below).
@@ -324,12 +324,15 @@
 
 Change log:
 
+Version 1.7.88 (built with libpng-1.6.18 and zlib-1.2.8)
+
 Version 1.7.87 (built with libpng-1.6.18 and zlib-1.2.8)
-  Fixed a double-free bug. There was a "free" of the sPLT chunk structure
-    in pngcrush and then again in png.c (Bug report by Brian Carpenter).
+  Fixed a double-free bug (CVE-2015-7700). There was a "free" of the
+    sPLT chunk structure in pngcrush and then again in png.c (Bug report
+    by Brian Carpenter).
   Added common-law trademark notice and export control information.
   Rearranged some paragraphs in the comments at the beginning of pngcrush.c
-  Increased some buffer sizes in an attempt  to prevent possible overflows.
+  Increased some buffer sizes in an attempt to prevent possible overflows.
 
 Version 1.7.86 (built with libpng-1.6.18 and zlib-1.2.8)
   Increased maximum size of a text chunk input from 260 to 2048
