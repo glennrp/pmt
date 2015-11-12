@@ -324,7 +324,9 @@
 
 Change log:
 
-Version 1.7.88 (built with libpng-1.6.18 and zlib-1.2.8)
+Version 1.7.88 (built with libpng-1.6.19 and zlib-1.2.8)
+  Eliminated a potential overflow while adding iTXt chunk (over-length
+    text_lang or text_lang_key), reported by Coverity.
 
 Version 1.7.87 (built with libpng-1.6.18 and zlib-1.2.8)
   Fixed a double-free bug (CVE-2015-7700). There was a "free" of the
@@ -3854,12 +3856,10 @@ int main(int argc, char *argv[])
                     BUMP_I;
                     i -= 3;
                     names += 2;
-                    strncpy(&text_lang[text_inputs * 80], argv[++i],
-                        STR_BUF_SIZE);
+                    strncpy(&text_lang[text_inputs * 80], argv[++i], 80);
                     text_lang[text_inputs * 80 + 79] = '\0';
                     /* libpng-1.0.5j and later */
-                    strncpy(&text_lang_key[text_inputs * 80], argv[++i],
-                        STR_BUF_SIZE);
+                    strncpy(&text_lang_key[text_inputs * 80], argv[++i], 80);
                     text_lang_key[text_inputs * 80 + 79] = '\0';
                 }
 #endif
