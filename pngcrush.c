@@ -5,7 +5,7 @@
  * Portions copyright (C) 2005       Greg Roelofs
  */
 
-#define PNGCRUSH_VERSION "1.7.88"
+#define PNGCRUSH_VERSION "1.7.89"
 
 /* This software is released under a license derived from the libpng
  * license (see LICENSE, below).
@@ -323,6 +323,8 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.89 (built with libpng-1.6.20 and zlib-1.2.8)
 
 Version 1.7.88 (built with libpng-1.6.19 and zlib-1.2.8)
   Eliminated a potential overflow while adding iTXt chunk (over-length
@@ -6342,6 +6344,7 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                  */
 #ifdef PNGCRUSH_H
                 png_read_transform_info(read_ptr, read_info_ptr);
+                png_read_update_info(read_ptr, read_info_ptr);
 #else
                 /* Some pngcrush capabilities are lacking when the system
                  * libpng is used instead of the one bundled with pngcrush
@@ -6464,6 +6467,10 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                         png_uint_32 rowbytes;
                         png_uint_32 h = height;
 
+                        /* FIX THIS, does not work with libpng-1.7.0
+                         * because info_ptr->bit_depth has not been
+                         * updated yet.
+                         */
                         rowbytes = png_get_rowbytes(read_ptr, read_info_ptr);
 #ifndef PNGCRUSH_H
                         /* We must do this because we could not call
