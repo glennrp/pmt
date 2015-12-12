@@ -5,7 +5,7 @@
  * Portions copyright (C) 2005       Greg Roelofs
  */
 
-#define PNGCRUSH_VERSION "1.7.89"
+#define PNGCRUSH_VERSION "1.7.90"
 
 /* This software is released under a license derived from the libpng
  * license (see LICENSE, below).
@@ -323,6 +323,12 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.7.90 (built with libpng-1.6.20 and zlib-1.2.8)
+  Suppress warning about "damaged LZ stream" when bailing out and building
+    with libpng-1.7.0beta.
+  Added a LICENSE file to the distribution. It points to the actual
+    license appearing in the NOTICES section near the top of pngcrush.c
 
 Version 1.7.89 (built with libpng-1.6.20 and zlib-1.2.8)
 
@@ -2231,6 +2237,12 @@ void PNGCBAPI pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
 static void pngcrush_warning(png_structp png_ptr,
    png_const_charp warning_msg)
 {
+#if (PNG_LIBPNG_VER >= 10700)
+   /* don't warn about damaged LZ stream due to bailing */
+   if (bail == 0 && !strcmp(warning_msg, "damaged LZ stream"))
+      return;
+#endif
+
    if (verbose >= 0)
       fprintf(stderr, "pngcrush: %s\n", warning_msg);
    return;
@@ -3643,6 +3655,7 @@ int main(int argc, char *argv[])
 
         else if (!strncmp(argv[i], "-q", 3) || !strncmp(argv[i], "-qui", 4))
         {
+            /* quiet, does not suppress warnings */
             verbose = 0;
         }
 
@@ -3788,6 +3801,7 @@ int main(int argc, char *argv[])
 
         else if (!strncmp(argv[i], "-s", 3) || !strncmp(argv[i], "-sil", 4))
         {
+            /* silent, suppresses warnings */
             verbose = -1;
         }
 
@@ -4727,7 +4741,8 @@ int main(int argc, char *argv[])
 #ifdef PNG_USER_MEM_SUPPORTED
                 if (verbose > 0)
                    read_ptr = png_create_read_struct_2(PNG_LIBPNG_VER_STRING,
-                     (png_voidp) NULL, (png_error_ptr) pngcrush_cexcept_error,
+                     (png_voidp) NULL,
+                     (png_error_ptr) pngcrush_cexcept_error,
                      (png_error_ptr) pngcrush_warning,
                      (png_voidp) NULL,
                      (png_malloc_ptr) pngcrush_debug_malloc,
@@ -4735,7 +4750,8 @@ int main(int argc, char *argv[])
                 else
 #endif /* PNG_USER_MEM_SUPPORTED */
                    read_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING,
-                     (png_voidp) NULL, (png_error_ptr) pngcrush_cexcept_error,
+                     (png_voidp) NULL,
+                     (png_error_ptr) pngcrush_cexcept_error,
                      (png_error_ptr) pngcrush_warning);
                 if (read_ptr == NULL)
                     Throw "pngcrush could not create read_ptr";
@@ -4808,8 +4824,9 @@ int main(int argc, char *argv[])
                        write_ptr = png_create_write_struct_2(
                          PNG_LIBPNG_VER_STRING,
                          (png_voidp) NULL,
-                            (png_error_ptr) pngcrush_cexcept_error,
-                         (png_error_ptr) NULL, (png_voidp) NULL,
+                         (png_error_ptr) pngcrush_cexcept_error,
+                         (png_error_ptr) pngcrush_warning,
+                         (png_voidp) NULL,
                          (png_malloc_ptr) pngcrush_debug_malloc,
                          (png_free_ptr) pngcrush_debug_free);
                     else
@@ -6748,7 +6765,10 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                         if (bail == 0 && trial != MAX_METHODS &&
                             pngcrush_write_byte_count >
                             pngcrush_best_byte_count)
+                        {
+                           png_write_flush(write_ptr);
                            break;
+                        }
                     }
                     P2( "End interlace pass %d\n\n", pass);
                     if (bail == 0 && trial != MAX_METHODS &&
@@ -7939,7 +7959,7 @@ void print_version_info(void)
 
     fprintf(STDERR,
       "\n"
-      " | pngcrush %s\n"
+      " | pngcrush-%s\n"
       /* If you have modified this source, you may insert additional notices
        * immediately after this sentence: */
       " |    Copyright (C) 1998-2002, 2006-2015 Glenn Randers-Pehrson\n"
@@ -7948,15 +7968,15 @@ void print_version_info(void)
       " | granted to everyone to use this version of pngcrush without\n"
       " | payment of any fee.\n"
       " | Executable name is %s\n"
-      " | It was built with libpng version %s, and is\n"
-      " | running with %s"
+      " | It was built with   libpng-%s\n"
+      " | and is running with libpng-%s\n"
       " |    Copyright (C) 1998-2004, 2006-2015 Glenn Randers-Pehrson,\n"
       " |    Copyright (C) 1996, 1997 Andreas Dilger,\n"
       " |    Copyright (C) 1995, Guy Eric Schalnat, Group 42 Inc.,\n"
-      " | and zlib version %s, Copyright (C) 1995%s,\n"
+      " | and zlib-%s, Copyright (C) 1995%s,\n"
       " |    Jean-loup Gailly and Mark Adler.\n",
       PNGCRUSH_VERSION, progname, PNG_LIBPNG_VER_STRING,
-      png_get_header_version(NULL), ZLIB_VERSION,zlib_copyright);
+      png_get_header_ver(NULL), ZLIB_VERSION,zlib_copyright);
 
 #if defined(__GNUC__)
     fprintf(STDERR,
@@ -8271,7 +8291,7 @@ struct options_help pngcrush_options[] = {
     {0, "   -plte_len n (obsolete; any \"n\" enables palette reduction)"},
     {2, ""},
 
-    {0, "            -q (quiet) suppresses console output except for warnings"},
+    {0, "            -q (quiet) suppresses console output including  warnings"},
     {2, ""},
 
     {0, "       -reduce (do lossless color-type or bit-depth reduction)"},
