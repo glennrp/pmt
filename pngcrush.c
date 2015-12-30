@@ -329,6 +329,8 @@ Version 1.7.90 (built with libpng-1.6.20 and zlib-1.2.8)
     with libpng-1.7.0beta.
   Added a LICENSE file to the distribution. It points to the actual
     license appearing in the NOTICES section near the top of pngcrush.c
+  Show if pngcrush is built with bundled or system libpng and zlib.
+  Fixed segfault while writing a -loco MNG (bug report by Brian Carpenter).
 
 Version 1.7.89 (built with libpng-1.6.20 and zlib-1.2.8)
 
@@ -6412,9 +6414,8 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                         if (outname[strlen(outname) - 3] == 'p')
                             pngcrush_warning(read_ptr,
                               "  Writing a MNG file with a .png extension");
-                        pngcrush_default_write_data(write_ptr,
-                                       &mng_signature[0],
-                                       (png_size_t) 8);
+                        pngcrush_write_png(write_ptr, &mng_signature[0],
+                                  (png_size_t) 8);
                         png_set_sig_bytes(write_ptr, 8);
 
                         /* Write a MHDR chunk */
@@ -7957,6 +7958,12 @@ void print_version_info(void)
     }
 #endif
 
+#ifdef PNGCRUSH_H
+#  define BUNDLED_LIB "bundled"
+#else
+#  define BUNDLED_LIB "system"
+#endif
+
     fprintf(STDERR,
       "\n"
       " | pngcrush-%s\n"
@@ -7968,15 +7975,18 @@ void print_version_info(void)
       " | granted to everyone to use this version of pngcrush without\n"
       " | payment of any fee.\n"
       " | Executable name is %s\n"
-      " | It was built with   libpng-%s\n"
-      " | and is running with libpng-%s\n"
+      " | It was built with   %s libpng-%s\n"
+      " | and is running with %s libpng-%s\n"
       " |    Copyright (C) 1998-2004, 2006-2015 Glenn Randers-Pehrson,\n"
       " |    Copyright (C) 1996, 1997 Andreas Dilger,\n"
       " |    Copyright (C) 1995, Guy Eric Schalnat, Group 42 Inc.,\n"
-      " | and zlib-%s, Copyright (C) 1995%s,\n"
+      " | and %s zlib-%s, Copyright (C) 1995%s,\n"
       " |    Jean-loup Gailly and Mark Adler.\n",
-      PNGCRUSH_VERSION, progname, PNG_LIBPNG_VER_STRING,
-      png_get_header_ver(NULL), ZLIB_VERSION,zlib_copyright);
+      PNGCRUSH_VERSION, progname,
+      BUNDLED_LIB,PNG_LIBPNG_VER_STRING,
+      BUNDLED_LIB,png_get_header_ver(NULL),
+      BUNDLED_LIB,ZLIB_VERSION,
+      zlib_copyright);
 
 #if defined(__GNUC__)
     fprintf(STDERR,
@@ -8291,7 +8301,7 @@ struct options_help pngcrush_options[] = {
     {0, "   -plte_len n (obsolete; any \"n\" enables palette reduction)"},
     {2, ""},
 
-    {0, "            -q (quiet) suppresses console output including  warnings"},
+    {0, "            -q (quiet) suppresses console output except for warnings"},
     {2, ""},
 
     {0, "       -reduce (do lossless color-type or bit-depth reduction)"},
