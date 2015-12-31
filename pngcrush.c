@@ -262,7 +262,7 @@
  *   a GIT repository at SourceForge (see https://code.google.com/p/zopfli/).
  *   See also the "pngzop" directory under the pmt.sourceforge.net project.
  *   Note paragraph 1.c above; zopfli always writes "7" in CINFO.  See
- *   my "pmt/pngzop" project at SourceForge.
+ *   my "pmt/pngzop" project at SourceForge and GitHub.
  *
  *   5. Optionally recognize any sRGB iCCP profile and replace it with the
  *   sRGB chunk.  Turn this option on if the "-reduce" option is on.  Also,
@@ -318,6 +318,9 @@
  *   according to args table.  Could start with static table of 16 or 32 slots,
  *   then double size & copy if run out of room:  still O(n) algorithm.
  *
+ *   16. With libpng17, png_write throws an "affirm()" with tc.format=256
+ *   when attempting to write a sub-8-bit grayscale image.
+ *
  */
 
 #if 0 /* changelog */
@@ -330,7 +333,8 @@ Version 1.7.90 (built with libpng-1.6.20 and zlib-1.2.8)
   Added a LICENSE file to the distribution. It points to the actual
     license appearing in the NOTICES section near the top of pngcrush.c
   Show if pngcrush is built with bundled or system libpng and zlib.
-  Fixed segfault while writing a -loco MNG (bug report by Brian Carpenter).
+  Fixed segfault while writing a -loco MNG (bug found with AFL, reported
+    by Brian Carpenter).
 
 Version 1.7.89 (built with libpng-1.6.20 and zlib-1.2.8)
 
@@ -479,7 +483,7 @@ Version 1.7.59 (built with libpng-1.5.16 and zlib-1.2.8)
     Moved a closing bracket inside the PNGCRUSH_LOCO block.
     Moved the declaration of "new_mng" outside a PNGCRUSH_LOCO block.
     Put reference to "input_format" inside a PNGCRUSH_LOCO block.
-    Moved declarations of mng_out and mngname inside a PNGCRUSH_LOGO block.
+    Moved declarations of mng_out and mngname inside a PNGCRUSH_LOCO block.
 
 Version 1.7.58 (built with libpng-1.5.15 and zlib-1.2.7-1)
   Do not enable reduce_palette by default for "-reduce", "-new", or "-old".
@@ -1303,7 +1307,7 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 #define pngcrush_save_uint_32 png_save_uint_32
 
 #undef PNG_ABORT
-#if (PNG_LIBPNG_VER < 10400)
+#if (PNGCRUSH_LIBPNG_VER < 10400)
 /* This allows png_default_error() to return, when it is called after our
  * own exception handling, which only returns after "Too many IDAT's",
  * or anything else that we might want to handle as a warning instead of
@@ -1311,13 +1315,13 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
  * png_benign_error() instead.
  */
 #  define PNG_ABORT() (void)0
-#elif (PNG_LIBPNG_VER < 10700)
+#elif (PNGCRUSH_LIBPNG_VER < 10700)
 #  define PNG_ABORT() abort()
 #else
 #  define PNG_ABORT abort();
 #endif
 
-#if (PNG_LIBPNG_VER < 10500)
+#if (PNGCRUSH_LIBPNG_VER < 10500)
 /* Two macros to return the first row and first column of the original,
  * full, image which appears in a given pass.  'pass' is in the range 0
  * to 6 and the result is in the range 0 to 7.
@@ -1349,7 +1353,7 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
    -1)-PNG_PASS_START_ROW(pass)))>>PNG_PASS_ROW_SHIFT(pass))
 #define PNG_PASS_COLS(width, pass) (((width)+(((1<<PNG_PASS_COL_SHIFT(pass))\
    -1)-PNG_PASS_START_COL(pass)))>>PNG_PASS_COL_SHIFT(pass))
-#endif /* PNG_LIBPNG_VER < 10500 */
+#endif /* PNGCRUSH_LIBPNG_VER < 10500 */
 
 #if PNGCRUSH_LIBPNG_VER >= 10500
    /* "#include <zlib.h>" is not provided by libpng15 */
@@ -1542,10 +1546,6 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 #  define STDERR stderr
 #endif
 
-#ifndef PNGCRUSH_LIBPNG_VER
-#  define PNGCRUSH_LIBPNG_VER PNG_LIBPNG_VER
-#endif
-
 #ifdef PNG_MNG_FEATURES_SUPPORTED
 # define PNGCRUSH_LOCO
 #endif
@@ -1710,7 +1710,7 @@ static int found_tRNS = 0;
 static int premultiply = 0;
 static int printed_version_info = 0;
 static int interlace_method = 0;
-#if (PNG_LIBPNG_VER < 10400)
+#if (PNGCRUSH_LIBPNG_VER < 10400)
 png_size_t max_bytes;
 #else
 png_alloc_size_t max_bytes;
@@ -2041,7 +2041,7 @@ void print_usage(int retval);
  */
 
 
-#  if (PNG_LIBPNG_VER >= 10209)
+#  if (PNGCRUSH_LIBPNG_VER >= 10209)
 #    ifndef PNG_READ_BIG_ENDIAN_SUPPORTED
 #undef pngcrush_get_uint_32
 png_uint_32 pngcrush_get_uint_32(png_bytep buf);
@@ -2082,7 +2082,7 @@ pngcrush_save_uint_32(png_bytep buf, png_uint_32 i)
    buf[2] = (png_byte)((i >> 8) & 0xff);
    buf[3] = (png_byte)(i & 0xff);
 }
-#  endif  /* PNG_LIBPNG_VER < 10209 */
+#  endif  /* PNGCRUSH_LIBPNG_VER < 10209 */
 
 /*
  * Reset the CRC variable to 32 bits of 1's.  Care must be taken
@@ -2190,7 +2190,7 @@ void PNGCBAPI pngcrush_default_read_data(png_structp png_ptr, png_bytep data,
         io_ptr) != length)
    {
       png_error(png_ptr, "Read Error: invalid length returned");
-#if PNG_LIBPNG_VER >= 10700
+#if PNGCRUSH_LIBPNG_VER >= 10700
       PNG_ABORT
 #else
       PNG_ABORT();
@@ -2239,7 +2239,7 @@ void PNGCBAPI pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
 static void pngcrush_warning(png_structp png_ptr,
    png_const_charp warning_msg)
 {
-#if (PNG_LIBPNG_VER >= 10700)
+#if (PNGCRUSH_LIBPNG_VER >= 10700)
    /* don't warn about damaged LZ stream due to bailing */
    if (bail == 0 && !strcmp(warning_msg, "damaged LZ stream"))
       return;
@@ -2267,7 +2267,7 @@ static void pngcrush_cexcept_error(png_structp png_ptr,
      return;
     }
 
-#if PNG_LIBPNG_VER < 10400
+#if PNGCRUSH_LIBPNG_VER < 10400
 /* Handle "Too many IDAT's found" error.  In libpng-1.4.x this became
  * a benign error, "Too many IDATs found".  This scheme will not work
  * in libpng-1.5.0 and later.
@@ -2282,7 +2282,7 @@ static void pngcrush_cexcept_error(png_structp png_ptr,
      return;
     }
 #  endif /* PNGCRUSH_H */
-#endif /* PNG_LIBPNG_VER */
+#endif /* PNGCRUSH_LIBPNG_VER */
 #endif /* 0 */
 
     {
@@ -3071,7 +3071,6 @@ int main(int argc, char *argv[])
     int lv[MAX_METHODSP1];
     int zs[MAX_METHODSP1];
     int lev, strat, filt;
-
 
 #ifdef PNG_gAMA_SUPPORTED
 #  ifdef PNG_FIXED_POINT_SUPPORTED
@@ -4759,7 +4758,7 @@ int main(int argc, char *argv[])
                     Throw "pngcrush could not create read_ptr";
 
 #ifdef PNG_BENIGN_ERRORS_SUPPORTED
-# if PNG_LIBPNG_VER >= 10400
+# if PNGCRUSH_LIBPNG_VER >= 10400
                 /* Allow certain errors in the input file to be handled
                  * as warnings.
                  */
@@ -4770,11 +4769,11 @@ int main(int argc, char *argv[])
 #ifdef PNG_SET_USER_LIMITS_SUPPORTED
                 if (no_limits == 0)
                 {
-# if PNG_LIBPNG_VER >= 10400
+# if PNGCRUSH_LIBPNG_VER >= 10400
                    png_set_user_limits(read_ptr, 500000L, 500000L);
                    png_set_chunk_cache_max(read_ptr, 500);
 # endif
-# if PNG_LIBPNG_VER >= 10401
+# if PNGCRUSH_LIBPNG_VER >= 10401
                    png_set_chunk_malloc_max(read_ptr, 2000000L);
 # endif
                 }
@@ -6510,7 +6509,7 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                                  */
                                 png_uint_32 w = width;
                                 unsigned int pd = channels * output_bit_depth;
-#if (PNG_LIBPNG_VER < 10400)
+#if (PNGCRUSH_LIBPNG_VER < 10400)
                                 png_size_t cb_base;
 #else
                                 png_alloc_size_t cb_base;
