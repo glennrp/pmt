@@ -5,7 +5,7 @@
  * Portions copyright (C) 2005       Greg Roelofs
  */
 
-#define PNGCRUSH_VERSION "1.7.90"
+#define PNGCRUSH_VERSION "1.7.91"
 
 /* This software is released under a license derived from the libpng
  * license (see LICENSE, below).
@@ -327,7 +327,7 @@
 
 Change log:
 
-Version 1.7.90 (built with libpng-1.6.20 and zlib-1.2.8)
+Version 1.7.91 (built with libpng-1.6.20 and zlib-1.2.8)
   Suppress warning about "damaged LZ stream" when bailing out and building
     with libpng-1.7.0beta.
   Added a LICENSE file to the distribution. It points to the actual
@@ -335,8 +335,6 @@ Version 1.7.90 (built with libpng-1.6.20 and zlib-1.2.8)
   Show if pngcrush is built with bundled or system libpng and zlib.
   Fixed segfault while writing a -loco MNG (bug found with AFL, reported
     by Brian Carpenter).
-
-Version 1.7.89 (built with libpng-1.6.20 and zlib-1.2.8)
 
 Version 1.7.88 (built with libpng-1.6.19 and zlib-1.2.8)
   Eliminated a potential overflow while adding iTXt chunk (over-length
