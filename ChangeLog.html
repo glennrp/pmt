@@ -3,7 +3,20 @@
 
 Change log:
 
-Version 1.7.88 (built with libpng-1.6.18 and zlib-1.2.8)
+Version 1.7.90 (built with libpng-1.6.20 and zlib-1.2.8)
+  Suppress warning about "damaged LZ stream" when bailing out and building
+    with libpng-1.7.0beta.
+  Added a LICENSE file to the distribution. It points to the actual
+    license appearing in the NOTICES section near the top of pngcrush.c
+  Show if pngcrush is built with bundled or system libpng and zlib.
+  Fixed segfault while writing a -loco MNG (bug found with AFL, reported
+    by Brian Carpenter).
+
+Version 1.7.89 (built with libpng-1.6.20 and zlib-1.2.8)
+
+Version 1.7.88 (built with libpng-1.6.19 and zlib-1.2.8)
+  Eliminated a potential overflow while adding iTXt chunk (over-length
+    text_lang or text_lang_key), reported by Coverity.
 
 Version 1.7.87 (built with libpng-1.6.18 and zlib-1.2.8)
   Fixed a double-free bug (CVE-2015-7700). There was a "free" of the
