@@ -1,11 +1,11 @@
 
 /* pngcrush.c - recompresses png files
- * Copyright (C) 1998-2002, 2006-2015 Glenn Randers-Pehrson
+ * Copyright (C) 1998-2002, 2006-2016 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
  * Portions copyright (C) 2005       Greg Roelofs
  */
 
-#define PNGCRUSH_VERSION "1.7.91"
+#define PNGCRUSH_VERSION "1.7.92"
 
 /* This software is released under a license derived from the libpng
  * license (see LICENSE, below).
@@ -32,7 +32,7 @@
  *
  * COPYRIGHT:
  *
- * Copyright (C) 1998-2002, 2006-2015 Glenn Randers-Pehrson
+ * Copyright (C) 1998-2002, 2006-2016 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
  * Portions copyright (C) 2005       Greg Roelofs
  *
@@ -327,6 +327,8 @@
 
 Change log:
 
+Version 1.7.92 (built with libpng-1.6.20 and zlib-1.2.8)
+
 Version 1.7.91 (built with libpng-1.6.20 and zlib-1.2.8)
   Suppress warning about "damaged LZ stream" when bailing out and building
     with libpng-1.7.0beta.
@@ -334,7 +336,7 @@ Version 1.7.91 (built with libpng-1.6.20 and zlib-1.2.8)
     license appearing in the NOTICES section near the top of pngcrush.c
   Show if pngcrush is built with bundled or system libpng and zlib.
   Fixed segfault while writing a -loco MNG (bug found with AFL, reported
-    by Brian Carpenter).
+    by Brian Carpenter). Bug was introduced in pngcrush-1.7.35.
 
 Version 1.7.88 (built with libpng-1.6.19 and zlib-1.2.8)
   Eliminated a potential overflow while adding iTXt chunk (over-length
@@ -4056,8 +4058,8 @@ int main(int argc, char *argv[])
 
         else if (overwrite)
         {
-                inname = argv[names];
-                PNGCRUSH_UNUSED(outname)
+             inname = argv[names];
+             PNGCRUSH_UNUSED(outname);
         }
 
         else
@@ -7966,7 +7968,7 @@ void print_version_info(void)
       " | pngcrush-%s\n"
       /* If you have modified this source, you may insert additional notices
        * immediately after this sentence: */
-      " |    Copyright (C) 1998-2002, 2006-2015 Glenn Randers-Pehrson\n"
+      " |    Copyright (C) 1998-2002, 2006-2016 Glenn Randers-Pehrson\n"
       " |    Portions copyright (C) 2005       Greg Roelofs\n"
       " | This is a free, open-source program.  Permission is irrevocably\n"
       " | granted to everyone to use this version of pngcrush without\n"
@@ -7974,7 +7976,7 @@ void print_version_info(void)
       " | Executable name is %s\n"
       " | It was built with   %s libpng-%s\n"
       " | and is running with %s libpng-%s\n"
-      " |    Copyright (C) 1998-2004, 2006-2015 Glenn Randers-Pehrson,\n"
+      " |    Copyright (C) 1998-2004, 2006-2016 Glenn Randers-Pehrson,\n"
       " |    Copyright (C) 1996, 1997 Andreas Dilger,\n"
       " |    Copyright (C) 1995, Guy Eric Schalnat, Group 42 Inc.,\n"
       " | and %s zlib-%s, Copyright (C) 1995%s,\n"
@@ -8015,7 +8017,7 @@ static const char *pngcrush_legal[] = {
     "",
     "If you have modified this source, you may insert additional notices",
     "immediately after this sentence.",
-    "Copyright (C) 1998-2002, 2006-2015 Glenn Randers-Pehrson",
+    "Copyright (C) 1998-2002, 2006-2016 Glenn Randers-Pehrson",
     "Portions copyright (C) 2005       Greg Roelofs",
     "",
     "DISCLAIMER: The pngcrush computer program is supplied \"AS IS\".",
@@ -8292,7 +8294,11 @@ struct options_help pngcrush_options[] = {
     {2, "               Overwrite the input file.  The input file is "},
     {2, "               removed and the output file (default \"pngout.png\")"},
     {2, "               is renamed to the input file after recompression"},
-    {2, "               and therefore they must reside on the same filesystem"},
+    {2, "               and therefore they must reside on the same"},
+    {2, "               filesystem. If you are running multiple instances"},
+    {2, "               of pngcrush in parallel, you must specify a"},
+    {2, "               different temporary filename for each instance,"},
+    {2, "               to avoid collisions."},
     {2, ""},
 
     {0, "   -plte_len n (obsolete; any \"n\" enables palette reduction)"},

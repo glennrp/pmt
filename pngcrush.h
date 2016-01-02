@@ -1,11 +1,11 @@
 /* pngcrush.h */
 
-/*
- * This software is released under a license derived from the libpng
- * license (see LICENSE, in pngcrush.c).
+/* Copyright (C) 1998-2002, 2006-2016 Glenn Randers-Pehrson
+ * This software is released under a license derived from the
+ * libpng license (see LICENSE, in pngcrush.c).
  */
 
-/* Special defines for pngcrush version 1.7.91 */
+/* Special defines for pngcrush version 1.7.92 */
 
 #ifndef PNGCRUSH_H
 #define PNGCRUSH_H
