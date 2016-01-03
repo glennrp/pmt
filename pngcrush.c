@@ -328,6 +328,8 @@
 Change log:
 
 Version 1.7.92 (built with libpng-1.6.20 and zlib-1.2.8)
+  Deleted png_read_update_info() statement that was recently
+    mistakenly added to version 1.7.89.
 
 Version 1.7.91 (built with libpng-1.6.20 and zlib-1.2.8)
   Suppress warning about "damaged LZ stream" when bailing out and building
@@ -6362,7 +6364,6 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                  */
 #ifdef PNGCRUSH_H
                 png_read_transform_info(read_ptr, read_info_ptr);
-                png_read_update_info(read_ptr, read_info_ptr);
 #else
                 /* Some pngcrush capabilities are lacking when the system
                  * libpng is used instead of the one bundled with pngcrush
