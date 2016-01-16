@@ -5,7 +5,7 @@
  * Portions copyright (C) 2005       Greg Roelofs
  */
 
-#define PNGCRUSH_VERSION "1.7.92"
+#define PNGCRUSH_VERSION "1.8.0"
 
 /* This software is released under a license derived from the libpng
  * license (see LICENSE, below).
@@ -327,9 +327,14 @@
 
 Change log:
 
+Version 1.8.0 (built with libpng-1.6.20 and zlib-1.2.8)
+  Made "-reduce" and "-force" the default behavior.  Removed obsolete
+    options "-plte_len", "-cc", "-nocc", "-double_gamma", "-already_crushed",
+    and "-bit_depth". Removed "things_have_changed" code.
+
 Version 1.7.92 (built with libpng-1.6.20 and zlib-1.2.8)
-  Deleted png_read_update_info() statement that was recently
-    mistakenly added to version 1.7.89.
+  Deleted png_read_update_info() statement that was mistakenly added to
+    version 1.7.89. It caused "bad adaptive filter value" errors.
 
 Version 1.7.91 (built with libpng-1.6.20 and zlib-1.2.8)
   Suppress warning about "damaged LZ stream" when bailing out and building
@@ -492,10 +497,10 @@ Version 1.7.58 (built with libpng-1.5.15 and zlib-1.2.7-1)
     It still is failing for some files.
 
 Version 1.7.57 (built with libpng-1.5.15 and zlib-1.2.7-1)
-  Added "-new" option that turns on "-reduce" and "-force" which will be
-    the default settings for version 1.8.0 and beyond.
-  Added "-old" option that turns off "-reduce" and "-force" which are the
-    current default settings.
+  Added "-new" option that turns on "-reduce" which will be
+    the default setting for version 1.8.0 and beyond.
+  Added "-old" option that turns off "-reduce" which is the
+    current default setting.
   Updated copyright year for zlib-1.2.7-1.
   Reverted to libpng-1.5.15 to be able to read old PNG files with TOO FAR
     errors.  This will of course only work with the embedded libpng.
@@ -1804,7 +1809,7 @@ static int blacken = 0; /* if 0, or 2 after the first trial,
                            do not blacken color samples */
 
 /* Delete these in pngcrush-1.8.0 */
-#if 1
+#if 0
 static int make_gray = 0; /* if 0, 2, or 3 after the first trial,
                            do not change color_type to gray */
 static int make_opaque = 0; /* if 0, 2, or 3 after the first trial,
@@ -1815,7 +1820,7 @@ static int reduce_palette = 0;
 #endif
 
 /* Activate these in pngcrush-1.8.0 */
-#if 0
+#if 1
 static int make_gray = 1; /* if 0, 2, or 3 after the first trial,
                            do not change color_type to gray */
 static int make_opaque = 1; /* if 0, 2, or 3 after the first trial,
@@ -1824,16 +1829,6 @@ static int make_8_bit = 1; /* if 0, 2, or 3 after the first trial,
                            do not reduce bit_depth from 16 */
 static int reduce_palette = 1;
 #endif
-
-/* TO DO: do this another way.  "things_have_changed" is an attempt
- * to preserve the IDAT from the original file (by preserving the
- * entire input file) when it is smaller than that achieved by any
- * of the pngcrush trials.  Better would be to handle the editing
- * functions separately from the compression, i.e., just preserve
- * the IDAT from the original file if it is smaller than any trial.
- */
-static int things_have_changed = 0;
-static int global_things_have_changed = 0;
 
 static int compression_window;
 static int default_compression_window = 15;
@@ -2642,7 +2637,6 @@ int keep_chunk(png_const_charp name, char *argv[])
                 || (!strncmp(name, "zTXt", 4)
                     && (!strncmp(argv[i], "ztxt", 4) || allt)) )
             {
-                global_things_have_changed = 1;
                 /* (caller actually does the removal--by failing to create
                  * copy) */
                 if (verbose > 0 && last_trial)
@@ -3111,8 +3105,6 @@ int main(int argc, char *argv[])
 #else
         if (*cp == '\\' || *cp == '/')
             progname = ++cp;
-        if (*cp == '.')
-            *cp = '\0';
 #endif
     }
 
@@ -3229,17 +3221,8 @@ int main(int argc, char *argv[])
             names++;
 
         /* GRR:  start of giant else-if block */
-        if (!strncmp(argv[i], "-already", 8)) /* obsolete, now disabled */
-        {
-            names++;
-            BUMP_I;
-#if 0 /* disabled */
-            crushed_idat_size = (png_uint_32) pngcrush_get_long;
-            pngcrush_check_long;
-#endif
-        }
 
-        else if (!strncmp(argv[i], "-bail", 5))
+        if (!strncmp(argv[i], "-bail", 5))
             bail=0;
 
         else if (!strncmp(argv[i], "-bkgd", 5) ||
@@ -3257,7 +3240,6 @@ int main(int argc, char *argv[])
             bkgd_blue = (png_uint_16) pngcrush_get_long;
             pngcrush_check_long;
             bkgd_index = 0;
-            global_things_have_changed = 1;
         }
 
         else if (!strncmp(argv[i], "-blacken", 8))
@@ -3281,23 +3263,6 @@ int main(int argc, char *argv[])
                     brute_force_strategies[strat] = 0;
         }
 
-        else if (!strncmp(argv[i], "-bit_depth", 10))
-        {
-            names++;
-            BUMP_I;
-            /* Reducing bit_depth does not work */
-            { 
-               fprintf(STDERR,
-                  "pngcrush: the -bit_depth N option is longer functional.\n");
-               exit(1);
-            }
-        }
-
-        else if (!strncmp(argv[i], "-cc", 3))
-        {
-            do_color_count = 1;
-        }
-
         else if (!strncmp(argv[i], "-c", 3) || !strncmp(argv[i], "-col", 4))
         {
             names++;
@@ -3305,15 +3270,6 @@ int main(int argc, char *argv[])
             force_output_color_type = pngcrush_get_long;
             pngcrush_check_long;
         }
-
-#ifdef PNG_gAMA_SUPPORTED
-        else if (!strncmp(argv[i], "-dou", 4))
-        {
-            double_gamma++;
-            found_gAMA=1;
-            global_things_have_changed = 1;
-        }
-#endif
 
         else if (!strncmp(argv[i], "-d", 3) || !strncmp(argv[i], "-dir", 4))
         {
@@ -3350,7 +3306,7 @@ int main(int argc, char *argv[])
 
         else if (!strncmp(argv[i], "-force", 6))
         {
-            global_things_have_changed = 1;
+            /* this option no longer does anything */;
         }
 
         else if (!strncmp(argv[i], "-fix", 4))
@@ -3564,7 +3520,6 @@ int main(int argc, char *argv[])
 
         else if (!strncmp(argv[i], "-new", 4))
         {
-            global_things_have_changed = 1;  /* -force  */
             make_opaque = 1;                 /* -reduce */
             make_gray = 1;                   /* -reduce */
             make_8_bit = 1;                  /* -reduce */
@@ -3573,11 +3528,6 @@ int main(int argc, char *argv[])
 
         else if (!strncmp(argv[i], "-nobail", 7))
             bail=1;
-
-        else if (!strncmp(argv[i], "-no_cc", 6))
-        {
-            do_color_count = 0;
-        }
 
         else if (!strncmp(argv[i], "-nofilecheck", 5))
         {
@@ -3617,7 +3567,6 @@ int main(int argc, char *argv[])
 
         else if (!strncmp(argv[i], "-old", 4))
         {
-            global_things_have_changed = 0;  /* no -force  */
             make_opaque = 0;                 /* no -reduce */
             make_gray = 0;                   /* no -reduce */
             make_8_bit = 0;                  /* no -reduce */
@@ -3634,21 +3583,13 @@ int main(int argc, char *argv[])
             premultiply=2;
         }
 
-        else if (!strncmp(argv[i], "-plte_len", 9))
-        {
-            names++;
-            BUMP_I; /* Ignore old plte_len argument */
-            reduce_palette = 1;
-        }
         else if (!strncmp(argv[i], "-pplt", 3))
-
         {
             names++;
             do_pplt++;
             BUMP_I;
             strncpy(pplt_string, argv[i], STR_BUF_SIZE);
             pplt_string[STR_BUF_SIZE-1] = '\0';
-            global_things_have_changed = 1;
         }
 
         else if (!strncmp(argv[i], "-p", 3) || !strncmp(argv[i], "-pau", 4))
@@ -3709,7 +3650,6 @@ int main(int argc, char *argv[])
 #endif
                 pngcrush_check_long;
             }
-            global_things_have_changed = 1;
         }
 #endif /* PNG_gAMA_SUPPORTED */
 
@@ -3720,7 +3660,6 @@ int main(int argc, char *argv[])
             BUMP_I;
             resolution = pngcrush_get_long;
             pngcrush_check_long;
-            global_things_have_changed = 1;
         }
 #endif
 
@@ -3780,7 +3719,6 @@ int main(int argc, char *argv[])
                 names++;
                 specified_intent = (int) pngcrush_get_long;
                 pngcrush_check_long;
-                global_things_have_changed = 1;
             } else
                 i--;
         }
@@ -3796,7 +3734,6 @@ int main(int argc, char *argv[])
                 names++;
                 ster_mode = (int) pngcrush_get_long;
                 pngcrush_check_long;
-                global_things_have_changed = 1;
             }
             else
                 i--;
@@ -3827,7 +3764,6 @@ int main(int argc, char *argv[])
             i += 2;
             BUMP_I;
             i -= 3;
-            global_things_have_changed = 1;
             if (strlen(argv[i + 2]) < 80 &&
                 strlen(argv[i + 3]) < STR_BUF_SIZE &&
                 text_inputs < 10)
@@ -4060,8 +3996,8 @@ int main(int argc, char *argv[])
 
         else if (overwrite)
         {
-             inname = argv[names];
-             PNGCRUSH_UNUSED(outname);
+            inname = argv[names];
+            PNGCRUSH_UNUSED(outname)
         }
 
         else
@@ -4083,8 +4019,6 @@ int main(int argc, char *argv[])
     for (;;)  /* loop on input files */
     {
         last_trial = 0;
-
-        things_have_changed = global_things_have_changed;
 
         if (png_row_filters != NULL)
         {
@@ -4269,10 +4203,6 @@ int main(int argc, char *argv[])
             }
             number_of_open_files++;
 
-#if 0 /* disabled */
-            already_crushed = 0;
-#endif
-
 #ifdef PNGCRUSH_LOCO
             if (new_mng)
             {
@@ -4340,29 +4270,14 @@ int main(int argc, char *argv[])
         else
             idat_length[0] = 1;
 
-#if 0 /* disabled */
-        if (already_crushed)
-        {
-            fprintf(STDERR, "   File %s has already been crushed.\n", inname);
-        }
-#endif
-
         if (image_is_immutable)
         {
             fprintf(STDERR,
               "   Image %s has a dSIG chunk and is immutable.\n", inname);
         }
 
-#if 0 /* disabled */
-        if (!already_crushed && !image_is_immutable)
-#else
         if (!image_is_immutable)
-#endif
         {
-
-        if (do_color_count)
-            fprintf(STDERR,
-               "   The -cc option is not supported.\n");
 
         if (force_output_color_type != 8 &&
             force_output_color_type != 0 &&
@@ -4549,7 +4464,7 @@ int main(int argc, char *argv[])
                 /* check lengths */
                 best = 0;  /* i.e., input file */
                 best_length = (png_uint_32) 0xffffffff;
-                for (j = things_have_changed; j < MAX_METHODS; j++)
+                for (j = 0; j < MAX_METHODS; j++)
                 {
                     if (best == 0 && best_length == idat_length[j])
                     {
@@ -4564,8 +4479,7 @@ int main(int argc, char *argv[])
                 }
 
                 if (image_is_immutable ||
-                     (idat_length[best] == idat_length[0] &&
-                     things_have_changed == 0 && nosave == 0))
+                     (idat_length[best] == idat_length[0] && nosave == 0))
                 {
                     /* just copy input to output */
 
@@ -4590,8 +4504,7 @@ int main(int argc, char *argv[])
                     }
 
                     number_of_open_files++;
-                    P2("copying input to output... tc=%d ...",
-                       things_have_changed);
+                    P2("copying input to output...");
 
                     for (;;)
                     {
@@ -5074,7 +4987,7 @@ int main(int argc, char *argv[])
             } /* last trial */
 
 /* TO DO: Remove this? We already did this in measure_idats */
-            P1( "Reading signature bytes\n");
+            P1("   Reading signature bytes\n");
             {
 #ifdef PNGCRUSH_LOCO
               png_byte mng_signature[8] =
@@ -5131,7 +5044,7 @@ int main(int argc, char *argv[])
                  png_error(read_ptr, "Premultiplied alpha is not supported");
 #endif
 
-            P1( "Reading info struct\n");
+            P1( "   Reading info struct\n");
             png_read_info(read_ptr, read_info_ptr);
 
             if (trial != 0)
@@ -5457,18 +5370,12 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                         }
                     } else
                         filter_method = 0;
-                    if (input_format != output_format)
-                        things_have_changed = 1;
 #endif
 
                     png_set_IHDR(write_ptr, write_info_ptr, width,
                                  height, output_bit_depth,
                                  output_color_type, interlace_method,
                                  compression_method, filter_method);
-
-                    if (output_color_type != input_color_type ||
-                        output_bit_depth != input_bit_depth)
-                       things_have_changed = 1;
 
                 } /* IHDR */
             }
@@ -5581,7 +5488,6 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                     {
                         if (last_trial)
                         {
-                            things_have_changed = 1;
                             if (verbose > 0)
                                 fprintf(STDERR, "   Inserting gAMA chunk with "
 #ifdef PNG_FIXED_POINT_SUPPORTED
@@ -5637,7 +5543,6 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                     {
                         if (last_trial)
                         {
-                            things_have_changed = 1;
                             if (verbose > 0)
                                 fprintf(STDERR, "   Inserting gAMA chunk with "
 #ifdef PNG_FIXED_POINT_SUPPORTED
@@ -5683,7 +5588,6 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                         if (file_gamma >= 0.45000 && file_gamma <= 0.46000)
 #  endif
                         {
-                            things_have_changed = 1;
                             if (verbose > 0 && last_trial)
                                 fprintf(STDERR,
                                   "   Inserting sRGB chunk with intent=%d\n",
@@ -5953,8 +5857,6 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                         P0("  Adding a tRNS chunk\n");
                         png_set_tRNS(write_ptr, write_info_ptr, trns_array,
                                      num_trans, trans_values);
-
-                        things_have_changed = 1;
                     }
                     else
                     {
@@ -6866,7 +6768,7 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                     pngcrush_write_byte_count >
                     pngcrush_best_byte_count))
                 {
-                   P1( "Reading and writing end_info data\n");
+                   P1("   Reading and writing end_info data\n");
                    png_read_end(read_ptr, end_info_ptr);
 
             /* Handle ancillary chunks */
@@ -7454,7 +7356,7 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
             }
             else
                if (verbose > 0)
-                 printf("Reading %c%c%c%c chunk.\n",buff[0],buff[1],buff[2],
+                 printf("   Reading %c%c%c%c chunk.\n",buff[0],buff[1],buff[2],
                    buff[3]);
 
             pngcrush_default_read_data(png_ptr, buff, length);
@@ -7580,7 +7482,7 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
         }
         else
            if (verbose > 0)
-              printf("Reading %c%c%c%c chunk.\n",
+              printf("   Reading %c%c%c%c chunk.\n",
                   chunk_name[0],chunk_name[1],chunk_name[2],chunk_name[3]);
 
         if (new_mng)
@@ -7712,8 +7614,8 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
             if (verbose > 1)
             {
                 chunk_name[4] = '\0';
-                fprintf(STDERR, "Reading %s chunk, length = %lu.\n", chunk_name,
-                       (unsigned long)length);
+                fprintf(STDERR, "   Reading %s chunk, length = %lu.\n",
+                  chunk_name, (unsigned long)length);
             }
 
             if (pngcrush_get_uint_32(chunk_name) == PNG_UINT_CgBI)
@@ -8058,15 +7960,6 @@ static const char *pngcrush_usage[] = {
 };
 
 struct options_help pngcrush_options[] = {
-#if 0
-    {0, "      -already already_crushed_size [e.g., 8192]"},
-    {2, ""},   /* blank */
-    {2, "               If file has an IDAT greater than this size, it"},
-    {2, "               will be considered to be already crushed and will"},
-    {2, "               not be processed, unless you are making other changes"},
-    {2, "               or the \"-force\" option is present."},
-    {2, ""},
-#endif
 
     {0, "         -bail (bail out of trial when size exceeds best size found"},
     {2, ""},
@@ -8074,11 +7967,6 @@ struct options_help pngcrush_options[] = {
     {2, "               filesize for the trial would be greater than the"},
     {2, "               best filesize achieved so far.  Use the \"-nobail\""},
     {2, "               option to prevent that."},
-    {2, ""},
-
-    {0, "    -bit_depth depth (deprecated)"},
-    {2, ""},
-    {2, "               This option no longer does anything."},
     {2, ""},
 
     {0, "      -blacken (zero samples underlying fully-transparent pixels)"},
@@ -8128,12 +8016,6 @@ struct options_help pngcrush_options[] = {
 
     {0, FAKE_PAUSE_STRING},
 
-    {0, " -double_gamma (used for fixing gamma in PhotoShop 5.0/5.02 files)"},
-    {2, ""},
-    {2, "               It has been claimed that the PS5 bug is actually"},
-    {2, "               more complex than that, in some unspecified way."},
-    {2, ""},
-
     {0, "            -e extension  (used for creating output filename)"},
     {2, ""},
     {2, "               e.g., -ext .new means *.png => *.new"},
@@ -8156,11 +8038,7 @@ struct options_help pngcrush_options[] = {
     {2, "               the \"Too far back\" error"},
     {2, ""},
 
-    {0, "        -force (write a new output file even if larger than input)"},
-    {2, ""},
-    {2, "               Otherwise the input file will be copied to output"},
-    {2, "               if it is smaller than any generated file and no chunk"},
-    {2, "               additions, removals, or changes were requested."},
+    {0, "        -force (obsolete as of pngcrush-1.8.0; does nothing)"},
     {2, ""},
 
 #ifdef PNG_FIXED_POINT_SUPPORTED
@@ -8252,7 +8130,7 @@ struct options_help pngcrush_options[] = {
     {2, "               Useful in conjunction with -v option to get info."},
     {2, ""},
 
-    {0, "          -new (Use new default settings (-force and -reduce))"},
+    {0, "          -new (Use new default settings (-reduce))"},
     {2, ""},
 
     {0, " -newtimestamp (Reset file modification time [default])"},
@@ -8284,7 +8162,7 @@ struct options_help pngcrush_options[] = {
     {0, "-noreduce_palette (turns off \"-reduce_palette\" operation)"},
     {2, ""},
 
-    {0, "          -old (Use old default settings (no -force and no -reduce))"},
+    {0, "          -old (Use old default settings (no -reduce))"},
     {2, ""},
 
     {0, " -oldtimestamp (Do not reset file modification time)"},
@@ -8292,17 +8170,16 @@ struct options_help pngcrush_options[] = {
 
     {0, "           -ow (Overwrite)"},
     {2, ""},
-    {2, "               Overwrite the input file.  The input file is "},
-    {2, "               removed and the output file (default \"pngout.png\")"},
+    {2, "               Overwrite the input file.  The input file is removed"},
+    {2, "               and the temporary file (default \"pngout.png\")"},
     {2, "               is renamed to the input file after recompression"},
     {2, "               and therefore they must reside on the same"},
-    {2, "               filesystem. If you are running multiple instances"},
+    {2, "               filesystem."},
+    {2, ""},
+    {2, "               CAUTION: If you are running multiple instances"},
     {2, "               of pngcrush in parallel, you must specify a"},
     {2, "               different temporary filename for each instance,"},
     {2, "               to avoid collisions."},
-    {2, ""},
-
-    {0, "   -plte_len n (obsolete; any \"n\" enables palette reduction)"},
     {2, ""},
 
     {0, "            -q (quiet) suppresses console output except for warnings"},
