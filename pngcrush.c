@@ -2,10 +2,10 @@
 /* pngcrush.c - recompresses png files
  * Copyright (C) 1998-2002, 2006-2016 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
- * Portions copyright (C) 2005       Greg Roelofs
+ * Portions Copyright (C) 2005 Greg Roelofs
  */
 
-#define PNGCRUSH_VERSION "1.8.0"
+#define PNGCRUSH_VERSION "1.8.1"
 
 /* This software is released under a license derived from the libpng
  * license (see LICENSE, below).
@@ -34,7 +34,7 @@
  *
  * Copyright (C) 1998-2002, 2006-2016 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
- * Portions copyright (C) 2005       Greg Roelofs
+ * Portions Copyright (C) 2005 Greg Roelofs
  *
  * LICENSE:
  *
@@ -71,9 +71,9 @@
  * I am not a lawyer, but I believe that the Export Control Classification
  * Number (ECCN) for pngcrush is EAR99, which means not subject to export
  * controls or International Traffic in Arms Regulations (ITAR) because it
- * and libpng and zlib which may be bundled with pngcrush are all open source,
- * publicly available software, that do not contain any encryption software.
- * See the EAR, paragraphs 734.3(b)(3) and 734.7(b).
+ * and cexcept.c, libpng, and zlib, which may be bundled with pngcrush, are
+ * all open source, publicly available software, that do not contain any
+ * encryption software. See the EAR, paragraphs 734.3(b)(3) and 734.7(b).
  *
  * TRADEMARK:
  *
@@ -92,13 +92,13 @@
  * LIBPNG COPYRIGHT, DISCLAIMER, and LICENSE:
  *
  * If libpng is bundled with this software, it is conveyed under the
- * libpng license (see COPYRIGHT NOTICE, DISCLAIMER, and LICENSE, in png.h)
+ * libpng license (see COPYRIGHT NOTICE, DISCLAIMER, and LICENSE, in png.h).
  *
  * ZLIB COPYRIGHT, DISCLAIMER, and LICENSE:
  *
  * If zlib is bundled with this software, it is conveyed under the
  * zlib license (see the copyright notice, disclaimer, and license
- * appearing in zlib.h)
+ * appearing in zlib.h).
  *
  * ACKNOWLEDGMENTS:
  *
@@ -123,13 +123,13 @@
  * It writes files that have the PNG 8-byte signature but are not valid PNG
  * files (instead they are "IOS-optimized PNG files"), due to at least
  *
- *   o the presence of the CgBI chunk ahead of the IHDR chunk,
- *   o nonstandard deflate compression in IDAT, iCCP, and perhaps zTXt chunks;
- *     I believe this only amounts to the omission of the zlib header from
- *     the IDAT and perhaps other compressed chunks.
- *   o Omission of the CRC bytes from the IDAT chunk and perhaps other chunks.
- *   o the use of premultiplied alpha in color_type 6 files, and
- *   o the sample order, which is ARGB instead of RGBA in color_type 6 files.
+ *  1. the presence of the CgBI chunk ahead of the IHDR chunk;
+ *  2. nonstandard deflate compression in IDAT, iCCP, and perhaps zTXt chunks
+ *     (I believe this only amounts to the omission of the zlib header from
+ *     the IDAT and perhaps other compressed chunks);
+ *  3. Omission of the CRC bytes from the IDAT chunk and perhaps other chunks;
+ *  4. the use of premultiplied alpha in color_type 6 files; and
+ *  5. the sample order, which is ARGB instead of RGBA in color_type 6 files.
  *
  * See http://iphonedevwiki.net/index.php/CgBI_file_format for more info.
  *
@@ -327,7 +327,18 @@
 
 Change log:
 
-Version 1.8.0 (built with libpng-1.6.20 and zlib-1.2.8)
+Version 1.8.1 (built with libpng-1.6.21 and zlib-1.2.8)
+  Added the LICENSE file to the tar and zip distributions.
+  Made "-force" force output even when the IDAT is larger, and added
+    "-noforce" option; "-noforce" is now the default behavior (Bug
+    report #68 at SourceForge by "wintakeall")
+  Use right filename in filesize reduction report (overwrite?inname:outname)
+    (bug report #69 by "wintakeall").
+  Removed some superfluous spaces from the Copyright statement.
+  Added "-speed" option; it avoids using the AVG or PAETH filters which
+    are slower to decode.
+
+Version 1.8.0 (built with libpng-1.6.21 and zlib-1.2.8)
   Made "-reduce" and "-force" the default behavior.  Removed obsolete
     options "-plte_len", "-cc", "-nocc", "-double_gamma", "-already_crushed",
     and "-bit_depth". Removed "things_have_changed" code.
@@ -1802,7 +1813,8 @@ static png_uint_32 pngcrush_best_byte_count=0xffffffff;
 
 static int verbose = 1;
 static int salvage = 0;
-static int bail = 0; /* if 0, bail out of trials early */
+static int bail = 0;  /* if 0, bail out of trials early */
+static int force = 1; /* if 1, force output even if IDAT is larger */
 
 
 static int blacken = 0; /* if 0, or 2 after the first trial,
@@ -1846,11 +1858,12 @@ static int brute_force_strategies[NUM_STRATEGIES] = { 1, 1, 1, 1 };
 #else
 static int brute_force_strategies[NUM_STRATEGIES] = { 1, 1, 1 };
 #endif
+static int speed = 0;
 static int method = 10;
 static int pauses = 0;
-static int nosave = 0;
-static int overwrite = 0; /* overwrite the input file instead of creating
-                           a new output file */
+static int nosave = 0;    /* 0: save; 1: do not save */
+static int overwrite = 0; /* 1: overwrite the input file instead of
+                                creating a new output file */
 static int nofilecheck = 0;
 static int no_limits = 0;
 static int new_mng = 0;
@@ -1927,7 +1940,12 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr);
 static png_uint_32 idat_length[MAX_METHODSP1];
 static int filter_type, zlib_level;
 static png_bytep png_row_filters = NULL;
-static float t_start, t_stop, t_decode, t_encode, t_misc;
+
+static float t_start = 0;
+static float t_stop = 0;
+static float t_decode = 0;
+static float t_encode = 0;
+static float t_misc = 0;
 
 static png_uint_32 max_idat_size = MAX_IDAT_SIZE; /* increases the IDAT size */
 
@@ -2679,13 +2697,13 @@ void show_result(void)
             t_misc += PNG_UINT_31_MAX;
     }
     t_start = t_stop;
-    fprintf(STDERR, "   CPU time decoding %.3f,",
+    fprintf(STDERR, "   CPU time decode %.4f,",
             t_decode / (float) CLOCKS_PER_SEC);
-    fprintf(STDERR, " encoding %.3f,",
+    fprintf(STDERR, " encode %.4f,",
             t_encode / (float) CLOCKS_PER_SEC);
-    fprintf(STDERR, " other %.3f,",
+    fprintf(STDERR, " other %.4f,",
             t_misc / (float) CLOCKS_PER_SEC);
-    fprintf(STDERR, " total %.3f sec.\n\n",
+    fprintf(STDERR, " total %.4f sec\n",
             (t_misc + t_decode + t_encode) / (float) CLOCKS_PER_SEC);
 #ifdef PNG_USER_MEM_SUPPORTED
     if (current_allocation) {
@@ -3306,7 +3324,7 @@ int main(int argc, char *argv[])
 
         else if (!strncmp(argv[i], "-force", 6))
         {
-            /* this option no longer does anything */;
+            force = 1;
         }
 
         else if (!strncmp(argv[i], "-fix", 4))
@@ -3441,8 +3459,8 @@ int main(int argc, char *argv[])
         {
             names++;
             BUMP_I;
-            if (!strncmp(argv[i], "dSIG", 4)
-                    && (!strncmp(argv[i], "dsig", 4) ))
+            if (!strncmp(argv[i], "-dSIG", 5)
+                    && (!strncmp(argv[i], "-dsig", 5) ))
               found_any_chunk=1;
         }
 
@@ -3533,6 +3551,11 @@ int main(int argc, char *argv[])
         {
             nofilecheck++;
         }
+        else if (!strncmp(argv[i], "-noforce", 6))
+        {
+            force = 0;
+        }
+
 
         else if (!strncmp(argv[i], "-nolimits", 5))
         {
@@ -3690,14 +3713,19 @@ int main(int argc, char *argv[])
             remove_chunks = i;
             names++;
             BUMP_I;
-            if (!strncmp(argv[i], "dSIG", 4)
-                 && (!strncmp(argv[i], "dsig", 4)))
+            if (!strncmp(argv[i], "-dSIG", 5)
+                 && (!strncmp(argv[i], "-dsig", 5)))
                image_is_immutable=0;
         }
 
         else if (!strncmp(argv[i], "-save", 5))
         {
             all_chunks_are_safe++;
+        }
+
+        else if (!strncmp(argv[i], "-speed", 6))
+        {
+            speed = 1;
         }
 
         else if (!strncmp(argv[i], "-srgb", 5) ||
@@ -3956,7 +3984,6 @@ int main(int argc, char *argv[])
                     argv[i]);
         } /* GRR:  end of giant if-else block */
     } /* end of loop over args ============================================ */
-
 
     if (verbose > 0 && printed_version_info == 0)
         print_version_info();
@@ -4258,7 +4285,7 @@ int main(int argc, char *argv[])
                 fprintf(STDERR, "   Recompressing IDAT chunks in %s\n", inname);
                 fprintf(STDERR,
                   "   Total length of data found in critical chunks        "
-                  "   =%10lu\n", (unsigned long)idat_length[0]);
+                  "    =%10lu\n", (unsigned long)idat_length[0]);
                 fflush(STDERR);
             }
 
@@ -4400,34 +4427,47 @@ int main(int argc, char *argv[])
         /* Handle specified brute_force options */
         if (brute_force_level || brute_force_filter || brute_force_strategy)
         {
-          for (method = 1; method < num_methods; method++)
+           for (method = 1; method < num_methods; method++)
+           {
+             int option;
+
+             try_method[method]=1;
+             if (brute_force_level)
              {
-                int option;
+                for (option = 0; option < 10; option++)
+                   if (option == lv[method])
+                      try_method[method]=brute_force_levels[option];
+             }
 
-                try_method[method]=1;
-                if (brute_force_level)
-                {
-                   for (option = 0; option < 10; option++)
-                      if (option == lv[method])
-                         try_method[method]=brute_force_levels[option];
-                }
+             if ((try_method[method] == 0) && brute_force_filter)
+             {
+                for (option = 0; option < 6; option++)
+                   if (option == fm[method])
+                      try_method[method]=brute_force_filters[option];
+             }
 
-                if ((try_method[method] == 0) && brute_force_filter)
-                {
-                   for (option = 0; option < 6; option++)
-                      if (option == fm[method])
-                         try_method[method]=brute_force_filters[option];
-                }
+             if ((try_method[method] == 0) && brute_force_strategy)
+             {
+                for (option = 0; option < NUM_STRATEGIES; option++)
+                   if (option == zs[method])
+                      try_method[method]=brute_force_strategies[option];
+             }
 
-                if ((try_method[method] == 0) && brute_force_strategy)
-                {
-                   for (option = 0; option < NUM_STRATEGIES; option++)
-                      if (option == zs[method])
-                         try_method[method]=brute_force_strategies[option];
-                }
+             if (method && method < 11)
+                try_method[method] = 1;
+           }
+         }
 
-                if (method && method < 11)
+         if (speed)
+         {
+           for (method = 1; method < num_methods; method++)
+           {
+             if (try_method[method] == 0)
+             {
+                /* Do not try AVG or PAETH */
+                if (fm[method] == 3 || fm[method] == 4)
                    try_method[method] = 1;
+             }
            }
          }
 
@@ -4445,8 +4485,7 @@ int main(int argc, char *argv[])
                last_trial = 1;
 
             if (verbose > 1)
-            fprintf(STDERR,
-               "pngcrush: trial = %d\n",trial);
+            fprintf(STDERR, "pngcrush: trial = %d\n",trial);
 
             pngcrush_write_byte_count=0;
             found_IDAT = 0;
@@ -4471,7 +4510,7 @@ int main(int argc, char *argv[])
                         /* If no change, report the first match */
                         best = j;
                     }
-                    if (best_length > idat_length[j])
+                    if ((force == 0 || j != 0) && best_length > idat_length[j])
                     {
                         best_length = idat_length[j];
                         best = j;
@@ -4479,7 +4518,8 @@ int main(int argc, char *argv[])
                 }
 
                 if (image_is_immutable ||
-                     (idat_length[best] == idat_length[0] && nosave == 0))
+                     (idat_length[best] == idat_length[0] &&
+                     force == 0 && nosave == 0))
                 {
                     /* just copy input to output */
 
@@ -4672,6 +4712,7 @@ int main(int argc, char *argv[])
                 if (read_ptr == NULL)
                     Throw "pngcrush could not create read_ptr";
 
+
 #ifdef PNG_BENIGN_ERRORS_SUPPORTED
 # if PNGCRUSH_LIBPNG_VER >= 10400
                 /* Allow certain errors in the input file to be handled
@@ -4862,6 +4903,7 @@ int main(int argc, char *argv[])
                         png_set_keep_unknown_chunks(write_ptr,
                                                     PNG_HANDLE_CHUNK_ALWAYS,
                                                     (png_bytep) NULL, 0);
+    printf("while saving, all_chunks_are_safe=\n");
                         if (save_apng_chunks == 0)
                         {
                            png_set_keep_unknown_chunks(write_ptr,
@@ -6302,7 +6344,19 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                     else if (filter_type == 4)
                         png_set_filter(write_ptr, 0, PNG_FILTER_PAETH);
                     else if (filter_type == 5)
-                        png_set_filter(write_ptr, 0, PNG_ALL_FILTERS);
+                    {
+                        if (speed)
+                        {
+                            png_set_filter(write_ptr, 0, PNG_FILTER_NONE |
+                               PNG_FILTER_SUB | PNG_FILTER_UP);
+                            P0(" png_set_filter: %d\n", PNG_FILTER_NONE |
+                               PNG_FILTER_SUB | PNG_FILTER_UP);
+                        }
+                        else
+                        {
+                            png_set_filter(write_ptr, 0, PNG_ALL_FILTERS);
+                        }
+                    }
                     else
                         png_set_filter(write_ptr, 0, PNG_FILTER_NONE);
 
@@ -7083,7 +7137,7 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
 
             if (verbose > 0 && trial != MAX_METHODS)
             {
-                if (bail == 0 &&
+                if (force == 0 && bail == 0 &&
                     pngcrush_write_byte_count > pngcrush_best_byte_count)
                    fprintf(STDERR,
                      "   Critical chunk length, method %3d"
@@ -7172,7 +7226,7 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                   fprintf(STDERR,
                   "   Best pngcrush method = 0 (settings undetermined)\n"
                   "     for output to %s\n",
-                  outname);
+                  overwrite ? inname : outname);
                 }
 
 #if 0 /* disabled */
@@ -7185,7 +7239,8 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                   "   Best pngcrush method        = %3d "
                   "(ws %d fm %d zl %d zs %d) =%10lu\n     for output to %s\n",
                   best, compression_window, fm[best], lv[best], zs[best],
-                  (unsigned long)idat_length[best], outname);
+                  (unsigned long)idat_length[best],
+                  overwrite ? inname : outname);
                 }
 
                 if (idat_length[0] == idat_length[best])
@@ -7872,7 +7927,7 @@ void print_version_info(void)
       /* If you have modified this source, you may insert additional notices
        * immediately after this sentence: */
       " |    Copyright (C) 1998-2002, 2006-2016 Glenn Randers-Pehrson\n"
-      " |    Portions copyright (C) 2005       Greg Roelofs\n"
+      " |    Portions Copyright (C) 2005 Greg Roelofs\n"
       " | This is a free, open-source program.  Permission is irrevocably\n"
       " | granted to everyone to use this version of pngcrush without\n"
       " | payment of any fee.\n"
@@ -7921,7 +7976,7 @@ static const char *pngcrush_legal[] = {
     "If you have modified this source, you may insert additional notices",
     "immediately after this sentence.",
     "Copyright (C) 1998-2002, 2006-2016 Glenn Randers-Pehrson",
-    "Portions copyright (C) 2005       Greg Roelofs",
+    "Portions Copyright (C) 2005 Greg Roelofs",
     "",
     "DISCLAIMER: The pngcrush computer program is supplied \"AS IS\".",
     "The Author disclaims all warranties, expressed or implied, including,",
@@ -8038,7 +8093,7 @@ struct options_help pngcrush_options[] = {
     {2, "               the \"Too far back\" error"},
     {2, ""},
 
-    {0, "        -force (obsolete as of pngcrush-1.8.0; does nothing)"},
+    {0, "        -force (write output even if IDAT is larger)"},
     {2, ""},
 
 #ifdef PNG_FIXED_POINT_SUPPORTED
@@ -8149,6 +8204,9 @@ struct options_help pngcrush_options[] = {
     {2, "               To avoid false hits from MSVC-compiled code.  Note"},
     {2, "               that if you use this option, you are responsible for"},
     {2, "               ensuring that the input file is not the output file."},
+    {2, ""},
+
+    {0, "      -noforce (default; do not write output when IDAT is larger)"},
     {2, ""},
 
     {0, "     -nolimits (turns off limits on width, height, cache, malloc)"},
