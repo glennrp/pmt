@@ -8313,6 +8313,15 @@ struct options_help pngcrush_options[] = {
 
     {0, FAKE_PAUSE_STRING},
 
+    {0, "        -speed Avoid the AVG and PAETH filters, for decoding speed"},
+    {2, ""},
+    {2, "               Useful for compressing PNG files that are expected"},
+    {2, "               to be cached or otherwise to exist on the computer"},
+    {2, "               where they will be used rather than being downloaded,"},
+    {2, "               so filesize is therefore less important than CPU"},
+    {2, "               time expended in defiltering."},
+    {2, ""},
+
     {0, "         -srgb [0, 1, 2, or 3]"},
     {2, ""},
     {2, "               Value of 'rendering intent' for sRGB chunk."},
