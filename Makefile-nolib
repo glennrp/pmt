@@ -35,7 +35,7 @@ E =
 PNGCRUSH  = pngcrush
 
 # LIBS = -lm
-LIBS = -L$(PNGLIB) -lpng -lz -lm
+LIBS = -L$(PNGLIB) -L$(ZLIB) -lpng -lz -lm
 # LIBS = -lpng -lz -lm
 #LIBS = ${ZLIB}/libz.a -lm
 

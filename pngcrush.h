@@ -5,10 +5,13 @@
  * libpng license (see LICENSE, in pngcrush.c).
  */
 
-/* Special defines for pngcrush version 1.8.1 */
+/* Special defines for pngcrush version 1.8.3st */
 
 #ifndef PNGCRUSH_H
 #define PNGCRUSH_H
+
+#define PNG_READ_SUPPORTED
+#define PNG_WRITE_SUPPORTED
 
 /* Do not build stuff we will not use */
 #undef PNG_BUILD_GRAYSCALE_PALETTE_SUPPORTED

@@ -3,16 +3,59 @@
 
 Change log:
 
-Version 1.7.90 (built with libpng-1.6.20 and zlib-1.2.8)
+Version 1.8.3 (built with libpng-1.6.24 and zlib-1.2.8)
+  Fixed bug introduced in 1.8.2 that causes trial 10 to be skipped when
+    using the default heuristic method.
+  Fixed incorrect typecast in call to png_create_write_struct_2() (Bug
+    report by Richard K. Lloyd).
+  Added intel_init.c, filter_sse2_intrinsics.c, and Makefile-sse,
+    to enable INTEL SSE optimization.  Revised intel_init.c to optionally
+    only optimize 4bpp images, because the optimization appears to slow
+    down reading of 3bpp images.
+  Added PNGCRUSH_TIMERS (nanosecond resolution using clock_gettime), to
+    measure defiltering time in png_read_filter_row(). For now, this only
+    works with a modified libpng, on platforms that provide "clock_gettime()".
+    To enable timing, define PNGCRUSH_TIMERS to 5 in pngcrush.h.
+  Revised "-q" to show a short summary of results (final size and timing)
+  To do: Add ZLIB_AMALGAMATED configuration; currently produces different output
+    https://blog.forrestthewoods.com/
+    improving-open-source-with-amalgamation-cf293592c5f4#.g9fb2tyhs
+    (added #ifndef NO_GZ / #endif to skip the gz* code in zlib_amalg.[ch]).
+  Added LIBPNG_UNIFIED configuration.
+
+Version 1.8.2 (built with libpng-1.6.23 and zlib-1.2.8)
+  Fixed filesize reduction report when "-ow" option is used (Bug report #68).
+  When a single method is specified, turn -reduce off by default and skip
+    trial 0.
+
+Version 1.8.1 (built with libpng-1.6.21 and zlib-1.2.8)
+  Added the LICENSE file to the tar and zip distributions.
+  Made "-force" force output even when the IDAT is larger, and added
+    "-noforce" option; "-noforce" is now the default behavior (Bug
+    report #68 at SourceForge by "wintakeall")
+  Use right filename in filesize reduction report (overwrite?inname:outname)
+    (bug report #69 by "wintakeall").
+  Removed some superfluous spaces from the Copyright statement.
+  Added "-speed" option; it avoids using the AVG or PAETH filters which
+    are slower to decode.
+
+Version 1.8.0 (built with libpng-1.6.21 and zlib-1.2.8)
+  Made "-reduce" and "-force" the default behavior.  Removed obsolete
+    options "-plte_len", "-cc", "-nocc", "-double_gamma", "-already_crushed",
+    and "-bit_depth". Removed "things_have_changed" code.
+
+Version 1.7.92 (built with libpng-1.6.20 and zlib-1.2.8)
+  Deleted png_read_update_info() statement that was mistakenly added to
+    version 1.7.89. It caused "bad adaptive filter value" errors.
+
+Version 1.7.91 (built with libpng-1.6.20 and zlib-1.2.8)
   Suppress warning about "damaged LZ stream" when bailing out and building
     with libpng-1.7.0beta.
   Added a LICENSE file to the distribution. It points to the actual
     license appearing in the NOTICES section near the top of pngcrush.c
   Show if pngcrush is built with bundled or system libpng and zlib.
   Fixed segfault while writing a -loco MNG (bug found with AFL, reported
-    by Brian Carpenter).
-
-Version 1.7.89 (built with libpng-1.6.20 and zlib-1.2.8)
+    by Brian Carpenter). Bug was introduced in pngcrush-1.7.35.
 
 Version 1.7.88 (built with libpng-1.6.19 and zlib-1.2.8)
   Eliminated a potential overflow while adding iTXt chunk (over-length
@@ -159,17 +202,17 @@ Version 1.7.59 (built with libpng-1.5.16 and zlib-1.2.8)
     Moved a closing bracket inside the PNGCRUSH_LOCO block.
     Moved the declaration of "new_mng" outside a PNGCRUSH_LOCO block.
     Put reference to "input_format" inside a PNGCRUSH_LOCO block.
-    Moved declarations of mng_out and mngname inside a PNGCRUSH_LOGO block.
+    Moved declarations of mng_out and mngname inside a PNGCRUSH_LOCO block.
 
 Version 1.7.58 (built with libpng-1.5.15 and zlib-1.2.7-1)
   Do not enable reduce_palette by default for "-reduce", "-new", or "-old".
     It still is failing for some files.
 
 Version 1.7.57 (built with libpng-1.5.15 and zlib-1.2.7-1)
-  Added "-new" option that turns on "-reduce" and "-force" which will be
-    the default settings for version 1.8.0 and beyond.
-  Added "-old" option that turns off "-reduce" and "-force" which are the
-    current default settings.
+  Added "-new" option that turns on "-reduce" which will be
+    the default setting for version 1.8.0 and beyond.
+  Added "-old" option that turns off "-reduce" which is the
+    current default setting.
   Updated copyright year for zlib-1.2.7-1.
   Reverted to libpng-1.5.15 to be able to read old PNG files with TOO FAR
     errors.  This will of course only work with the embedded libpng.
