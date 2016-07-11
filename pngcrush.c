@@ -5,7 +5,7 @@
  * Portions Copyright (C) 2005 Greg Roelofs
  */
 
-#define PNGCRUSH_VERSION "1.8.1"
+#define PNGCRUSH_VERSION "1.8.2"
 
 /* This software is released under a license derived from the libpng
  * license (see LICENSE, below).
@@ -94,6 +94,11 @@
  * If libpng is bundled with this software, it is conveyed under the
  * libpng license (see COPYRIGHT NOTICE, DISCLAIMER, and LICENSE, in png.h).
  *
+ * If intel-init.c and filter_sse2_intrinsics.c are bundled with this
+ * software, they are conveyed under the libpng license (see the
+ * copyright notices within those files and the COPYRIGHT NOTICE, DISCLAIMER,
+ * and LICENSE in png.h).
+ *
  * ZLIB COPYRIGHT, DISCLAIMER, and LICENSE:
  *
  * If zlib is bundled with this software, it is conveyed under the
@@ -117,8 +122,9 @@
  * Apple since mid-2008 as a part of the Xcode SDK.   Although it claims
  * to be pngcrush by Glenn Randers-Pehrson, it has additional options
  * "-iPhone", "-speed", "-revert-iphone-optimizations", and perhaps others.
- * It is an "altered version" but is not "plainly marked as such" as
- * required by the license.
+ * It is an "altered version".  I've seen output from a 2006 version that
+ * says on its help screen, "and modified by Apple as indicated in the
+ * sources".
  *
  * It writes files that have the PNG 8-byte signature but are not valid PNG
  * files (instead they are "IOS-optimized PNG files"), due to at least
@@ -326,6 +332,11 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.8.2 (built with libpng-1.6.23 and zlib-1.2.8)
+  Fixed filesize reduction report when "-ow" option is used (Bug report #68).
+  When a single method is specified, turn -reduce off by default and skip
+    trial 0.
 
 Version 1.8.1 (built with libpng-1.6.21 and zlib-1.2.8)
   Added the LICENSE file to the tar and zip distributions.
@@ -1795,6 +1806,7 @@ extern struct exception_context the_exception_context[1];
 struct exception_context the_exception_context[1];
 png_const_charp msg;
 
+static png_uint_32 input_length;
 static png_uint_32 total_input_length = 0;
 static png_uint_32 total_output_length = 0;
 static int pngcrush_mode = DEFAULT_MODE;
@@ -1833,6 +1845,7 @@ static int reduce_palette = 0;
 
 /* Activate these in pngcrush-1.8.0 */
 #if 1
+static int noreduce = 1; /* if 0, "-reduce" was specified */
 static int make_gray = 1; /* if 0, 2, or 3 after the first trial,
                            do not change color_type to gray */
 static int make_opaque = 1; /* if 0, 2, or 3 after the first trial,
@@ -2705,6 +2718,7 @@ void show_result(void)
             t_misc / (float) CLOCKS_PER_SEC);
     fprintf(STDERR, " total %.4f sec\n",
             (t_misc + t_decode + t_encode) / (float) CLOCKS_PER_SEC);
+
 #ifdef PNG_USER_MEM_SUPPORTED
     if (current_allocation) {
         memory_infop pinfo = pinformation;
@@ -3080,6 +3094,8 @@ int main(int argc, char *argv[])
      *              : 1 means do not try this method.
      */
     int try_method[MAX_METHODSP1];
+    int methods_enabled = 0;
+    int last_method = MAX_METHODS;
 
     int fm[MAX_METHODSP1];
     int lv[MAX_METHODSP1];
@@ -3129,7 +3145,7 @@ int main(int argc, char *argv[])
     /*
      * Definition of methods ("canonical list" is methods 11 and up)
      */
-    for (i = 0; i < MAX_METHODS; i++)
+    for (i = 0; i <= MAX_METHODS; i++)
     {
         try_method[i] = 1;  /* 1 means do not try this method */
         fm[i] = 5; lv[i] = 9; zs[i] = 1;  /* default:  method 136 */
@@ -3633,6 +3649,7 @@ int main(int argc, char *argv[])
 
         else if (!strncmp(argv[i], "-reduce", 7))
         {
+            noreduce = 0;
             make_opaque = 1;
             make_gray = 1;
             make_8_bit = 1;
@@ -4321,14 +4338,6 @@ int main(int argc, char *argv[])
 
         output_bit_depth = force_output_bit_depth;
 
-        if (!methods_specified || try10 != 0)
-        {
-            for (i = 0; i <= DEFAULT_METHODS; i++)
-                try_method[i] = 0;
-
-            try_method[6] = try10;
-        }
-
         best_of_three = 1;
         pngcrush_best_byte_count=0xffffffff;
 
@@ -4456,20 +4465,65 @@ int main(int argc, char *argv[])
              if (method && method < 11)
                 try_method[method] = 1;
            }
-         }
 
-         if (speed)
-         {
-           for (method = 1; method < num_methods; method++)
+           if (speed)
            {
-             if (try_method[method] == 0)
+             for (method = 1; method < num_methods; method++)
              {
-                /* Do not try AVG or PAETH */
-                if (fm[method] == 3 || fm[method] == 4)
-                   try_method[method] = 1;
+               if (try_method[method] == 0)
+               {
+                  /* Do not try AVG or PAETH */
+                  if (fm[method] == 3 || fm[method] == 4)
+                     try_method[method] = 1;
+               }
              }
            }
          }
+
+        if (methods_specified == 0 || try10 != 0)
+        {
+            for (i = 0; i <= DEFAULT_METHODS; i++)
+                try_method[i] = 0;
+
+            try_method[6] = try10;
+        }
+
+/* Skip trial 0 when a single method was specified and -reduce was not */
+        if (methods_specified != 0 && noreduce != 0)
+        {
+
+          for (i = 1; i <= MAX_METHODS; i++)
+          {
+             methods_enabled += (1 - try_method[i]);
+          }
+          fprintf(STDERR, "%d methods enabled\n",methods_enabled);
+          if (methods_enabled == 1)
+          {
+             try_method[0] = 1;
+             make_opaque = 0;
+             make_gray = 0;
+             make_8_bit = 0;
+             reduce_palette = 0;
+          }
+        }
+
+        for (i = 1; i <= MAX_METHODS; i++)
+        {
+           if (try_method[i] == 0)
+              last_method = i;
+        }
+
+        best_of_three = 1;
+
+#ifndef __riscos
+        {
+        struct stat stat_buf;
+        stat(inname, &stat_buf);
+        input_length = (unsigned long) stat_buf.st_size;
+        }
+#else
+        input_length = (unsigned long) filesize(inname);
+#endif
 
         /* ////////////////////////////////////////////////////////////////////
         ////////////////                                   ////////////////////
@@ -4479,9 +4533,9 @@ int main(int argc, char *argv[])
 
         /* MAX_METHODS is 150 */
         P1("\n\nENTERING MAIN LOOP OVER %d METHODS\n", MAX_METHODS);
-        for (trial = 0; trial <= MAX_METHODS; trial++)
+        for (trial = 0; trial <= last_method; trial++)
         {
-            if (nosave || trial == MAX_METHODS)
+            if (nosave || trial == last_method)
                last_trial = 1;
 
             if (verbose > 1)
@@ -4495,7 +4549,7 @@ int main(int argc, char *argv[])
 
             /* this part of if-block is for final write-the-best-file
                iteration */
-            if (trial == MAX_METHODS)
+            if (trial == last_method)
             {
                 png_uint_32 best_length;
                 int j;
@@ -4503,7 +4557,7 @@ int main(int argc, char *argv[])
                 /* check lengths */
                 best = 0;  /* i.e., input file */
                 best_length = (png_uint_32) 0xffffffff;
-                for (j = 0; j < MAX_METHODS; j++)
+                for (j = 0; j < last_method; j++)
                 {
                     if (best == 0 && best_length == idat_length[j])
                     {
@@ -4579,7 +4633,7 @@ int main(int argc, char *argv[])
                     z_strategy = Z_DEFAULT_STRATEGY;
             }
 
-            else /* Trial < MAX_METHODS */
+            else /* Trial < last_method */
             {
                 if (trial > 2 && trial < 5 && idat_length[trial - 1]
                     < idat_length[best_of_three])
@@ -4711,7 +4765,6 @@ int main(int argc, char *argv[])
                      (png_error_ptr) pngcrush_warning);
                 if (read_ptr == NULL)
                     Throw "pngcrush could not create read_ptr";
-
 
 #ifdef PNG_BENIGN_ERRORS_SUPPORTED
 # if PNGCRUSH_LIBPNG_VER >= 10400
@@ -6349,8 +6402,6 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                         {
                             png_set_filter(write_ptr, 0, PNG_FILTER_NONE |
                                PNG_FILTER_SUB | PNG_FILTER_UP);
-                            P0(" png_set_filter: %d\n", PNG_FILTER_NONE |
-                               PNG_FILTER_SUB | PNG_FILTER_UP);
                         }
                         else
                         {
@@ -6684,10 +6735,19 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
 #ifdef PNGCRUSH_MULTIPLE_ROWS
                         if (y + num_rows > height)
                             num_rows = height - y;
+#  ifdef BLOCKY_DEINTERLACE
+                        png_read_rows(read_ptr, (png_bytepp) NULL,
+                                      row_pointers, num_rows);
+#  else /* SPARKLE */
                         png_read_rows(read_ptr, row_pointers,
                                       (png_bytepp) NULL, num_rows);
+#  endif
 #else
+#  ifdef BLOCKY_DEINTERLACE
                         png_read_row(read_ptr, row_buf, (png_bytep) NULL);
+#  else /* SPARKLE */
+                        png_read_row(read_ptr, (png_bytep) NULL, row_buf);
+#  endif
 #endif
                         if (nosave == 0)
                         {
@@ -6699,7 +6759,7 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                                 if (t_stop < 0)
                                     t_decode += PNG_UINT_31_MAX;
                             }
-                            t_start = t_stop;
+                            t_start = t_stop; /* start encode */
 #ifdef PNGCRUSH_MULTIPLE_ROWS
                             /* To do: zero the padding bits */
                             png_write_rows(write_ptr, row_pointers,
@@ -6716,10 +6776,10 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                                 if (t_stop < 0)
                                     t_encode += PNG_UINT_31_MAX;
                             }
-                            t_start = t_stop;
+                            t_start = t_stop; /* start misc */
                         }
                         /* Bail if byte count exceeds best so far */
-                        if (bail == 0 && trial != MAX_METHODS &&
+                        if (bail == 0 && trial != last_method &&
                             pngcrush_write_byte_count >
                             pngcrush_best_byte_count)
                         {
@@ -6728,7 +6788,7 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                         }
                     }
                     P2( "End interlace pass %d\n\n", pass);
-                    if (bail == 0 && trial != MAX_METHODS &&
+                    if (bail == 0 && trial != last_method &&
                         pngcrush_write_byte_count >
                         pngcrush_best_byte_count)
                        break;
@@ -6785,7 +6845,7 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                         if (t_stop < 0)
                             t_decode += PNG_UINT_31_MAX;
                     }
-                    t_start = t_stop;
+                    t_start = t_stop; /* start encode */
                 }
 
 #if defined(PNG_READ_RGB_TO_GRAY_SUPPORTED) && \
@@ -6818,7 +6878,7 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
 #endif /* PNG_FREE_UNKN */
 
                 /* { GRR:  added for %-navigation (2) */
-                if (!(bail == 0 && trial != MAX_METHODS &&
+                if (!(bail == 0 && trial != last_method &&
                     pngcrush_write_byte_count >
                     pngcrush_best_byte_count))
                 {
@@ -7112,7 +7172,7 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                                         &end_info_ptr);
                 if (verbose > 1)
                     fprintf(stderr, "returning after cleanup\n");
-                trial = MAX_METHODS + 1;
+                trial = last_method + 1;
             }
 
             read_ptr = NULL;
@@ -7135,9 +7195,9 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
             if (pngcrush_write_byte_count < pngcrush_best_byte_count)
                pngcrush_best_byte_count = pngcrush_write_byte_count;
 
-            if (verbose > 0 && trial != MAX_METHODS)
+            if (verbose > 0 && trial != last_method)
             {
-                if (force == 0 && bail == 0 &&
+                if (bail == 0 &&
                     pngcrush_write_byte_count > pngcrush_best_byte_count)
                    fprintf(STDERR,
                      "   Critical chunk length, method %3d"
@@ -7157,7 +7217,7 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
 
         } /* end of trial-loop */
 
-        P1("\n\nFINISHED MAIN LOOP OVER %d METHODS\n\n\n", MAX_METHODS);
+        P1("\n\nFINISHED MAIN LOOP OVER %d METHODS\n\n\n", last_method);
 
         /* ////////////////////////////////////////////////////////////////////
         //////////////////                                 ////////////////////
@@ -7197,13 +7257,12 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
 
         if (last_trial && nosave == 0)
         {
-            png_uint_32 input_length, output_length;
+            png_uint_32 output_length;
 #ifndef __riscos
             struct stat stat_buf;
             struct utimbuf utim;
 
             stat(inname, &stat_buf);
-            input_length = (unsigned long) stat_buf.st_size;
             utim.actime  = stat_buf.st_atime;
             utim.modtime = stat_buf.st_mtime;
             stat(outname, &stat_buf);
@@ -7214,7 +7273,6 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
               utime(outname, &utim);
             }
 #else
-            input_length = (unsigned long) filesize(inname);
             output_length = (unsigned long) filesize(outname);
 #endif
             if (verbose > 0)
@@ -8474,4 +8532,5 @@ void print_usage(int retval)
 
     exit(retval);
 }
+
 #endif /* PNGCRUSH_LIBPNG_VER < 10800 || defined(PNGCRUSH_H) */
