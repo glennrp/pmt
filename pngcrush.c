@@ -4881,7 +4881,6 @@ int main(int argc, char *argv[])
 /* Skip trial 0 when a single method was specified and -reduce was not */
         if (methods_specified != 0 && noreduce != 0)
         {
-
           if (methods_enabled == 1)
           {
              try_method[0] = 1;
