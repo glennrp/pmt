@@ -5,7 +5,7 @@
  * Portions Copyright (C) 2005 Greg Roelofs
  */
 
-#define PNGCRUSH_VERSION "1.8.3"
+#define PNGCRUSH_VERSION "1.8.4"
 
 #undef BLOCKY_DEINTERLACE
 
@@ -334,6 +334,9 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.8.4 (built with libpng-1.6.24 and zlib-1.2.8)
+  Fixed handling of CLOCK_ID, removed some "//"-delimited comments.
 
 Version 1.8.3 (built with libpng-1.6.24 and zlib-1.2.8)
   Fixed bug introduced in 1.8.2 that causes trial 10 to be skipped when
@@ -1391,19 +1394,24 @@ pngcrush_timer_start(unsigned int n);
 PNGCRUSH_TIMER_VOID_API
 pngcrush_timer_stop(unsigned int n);
 
-// #undef _POSIX_C_SOURCE
-// #define _POSIX_C_SOURCE 199309L /* for clock_gettime */
+#undef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 199309L /* for clock_gettime */
+
 #include <time.h>
 
 /* As in GraphicsMagick */
 #  if defined(CLOCK_HIGHRES) /* Solaris */
 #    define PNGCRUSH_CLOCK_ID CLOCK_HIGHRES
+#    define PNGCRUSH_USING_CLOCK "HIGHRES"
 #  elif defined(CLOCK_MONOTONIC_RAW) /* Linux */
 #    define PNGCRUSH_CLOCK_ID CLOCK_MONOTONIC_RAW
+#    define PNGCRUSH_USING_CLOCK "MONOTONIC_RAW"
 #  elif defined(CLOCK_MONOTONIC_PRECISE) /* FreeBSD */
 #    define PNGCRUSH_CLOCK_ID CLOCK_MONOTONIC_PRECISE
+#    define PNGCRUSH_USING_CLOCK "MONOTONIC_PRECISE"
 #  elif defined(CLOCK_MONOTONIC) /* Linux & FreeBSD */
 #    define PNGCRUSH_CLOCK_ID CLOCK_MONOTONIC
+#    define PNGCRUSH_USING_CLOCK "MONOTONIC_PRECISE"
 #  else
 #    undef PNGCRUSH_TIMERS /* Fallback */
 #    define PNGCRUSH_TIMERS 0
@@ -4412,7 +4420,6 @@ int main(int argc, char *argv[])
         else if (overwrite)
         {
             inname = argv[names];
-            // outname = inname;
         }
 
         else
@@ -4881,7 +4888,6 @@ int main(int argc, char *argv[])
 /* Skip trial 0 when a single method was specified and -reduce was not */
         if (methods_specified != 0 && noreduce != 0)
         {
-
           if (methods_enabled == 1)
           {
              try_method[0] = 1;
@@ -8412,13 +8418,20 @@ void print_version_info(void)
       " |    Copyright (C) 1996, 1997 Andreas Dilger,\n"
       " |    Copyright (C) 1995, Guy Eric Schalnat, Group 42 Inc.,\n"
       " | and %s zlib-%s, Copyright (C) 1995%s,\n"
-      " |    Jean-loup Gailly and Mark Adler.\n",
+      " |    Jean-loup Gailly and Mark Adler",
       PNGCRUSH_VERSION, progname,
       BUNDLED_LIB,PNG_LIBPNG_VER_STRING,
       BUNDLED_LIB,png_get_header_ver(NULL),
       BUNDLED_LIB,ZLIB_VERSION,
       zlib_copyright);
 
+#if PNGCRUSH_TIMERS > 0
+    fprintf(STDERR,
+      ",\n | and using \"clock_gettime(%s,&t)\".\n",
+      PNGCRUSH_USING_CLOCK);
+#else
+    fprintf(STDERR,".\n");
+#endif
 #if defined(__GNUC__)
     fprintf(STDERR,
       " | It was compiled with gcc version %s", __VERSION__);

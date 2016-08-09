@@ -19,6 +19,10 @@ CC = gcc
 LD = gcc
 RM = rm -f
 
+CFLAGS=-std=c90 
+
+CFLAGS += -O3 -funroll-loops -fomit-frame-pointer
+
 CPPFLAGS = -I.
 # CPPFLAGS="-I. -DPNG_DEBUG=5 -DPNG_RELEASE_BUILD=0"
 # CPPFLAGS = -I${ZINC} -I.
@@ -39,9 +43,6 @@ LIBS += -lrt
 
 # Cannot use this with libpng15 and later.
 # CPPFLAGS += -DINFLATE_ALLOW_INVALID_DISTANCE_TOOFAR_ARRR
-
-CFLAGS = -O3 -funroll-loops -fomit-frame-pointer # -Wall -Wshadow
-# [note that -Wall is a gcc-specific compilation flag ("all warnings on")]
 
 LDFLAGS =
 O = .o
