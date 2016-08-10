@@ -27,18 +27,15 @@ CPPFLAGS = -I.
 # CPPFLAGS="-I. -DPNG_DEBUG=5 -DPNG_RELEASE_BUILD=0"
 # CPPFLAGS = -I${ZINC} -I.
 
-# Work around zlib compiler bug in 1.2.6
-CPPFLAGS += -DZ_SOLO
-
 # We don't need these
-CPPFLAGS += -DNO_GZCOMPRESS -DNO_GZIP -DNO_GZ
+CPPFLAGS += -DNO_GZCOMPRESS -DNO_GZIP -DZ_SOLO -DNO_GZ
 CFLAGS += -DNO_GZCOMPRESS -DNO_GZIP -DZ_SOLO -DNO_GZ
 
 # use unified libpng
 CPPFLAGS += -DLIBPNG_UNIFIED
 
 # Enable timers
-CPPFLAGS += -DPNGCRUSH_TIMERS=3
+CPPFLAGS += -DPNGCRUSH_TIMERS=4
 LIBS += -lrt
 
 # Cannot use this with libpng15 and later.
