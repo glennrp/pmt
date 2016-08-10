@@ -5,7 +5,7 @@
  * Portions Copyright (C) 2005 Greg Roelofs
  */
 
-#define PNGCRUSH_VERSION "1.8.4"
+#define PNGCRUSH_VERSION "1.8.5"
 
 #undef BLOCKY_DEINTERLACE
 
@@ -334,6 +334,11 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.8.5 (built with libpng-1.6.24 and zlib-1.2.8)
+  Added "-benchmark n" option.  It runs the main loop "n" times, and
+    records the minimum value for each timer.
+  After checking for CLOCK_ID, reset PNG_TIMERS=0 if none is found.
 
 Version 1.8.4 (built with libpng-1.6.24 and zlib-1.2.8)
   Fixed handling of CLOCK_ID, removed some "//"-delimited comments.
@@ -1361,6 +1366,30 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
     10   encode filter setup
 */
 
+#undef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 199309L /* for clock_gettime */
+
+#include <time.h>
+
+/* As in GraphicsMagick */
+#  if defined(CLOCK_HIGHRES) /* Solaris */
+#    define PNGCRUSH_CLOCK_ID CLOCK_HIGHRES
+#    define PNGCRUSH_USING_CLOCK "CLOCK_HIGHRES"
+#  elif defined(CLOCK_MONOTONIC_RAW) /* Linux */
+#    define PNGCRUSH_CLOCK_ID CLOCK_MONOTONIC_RAW
+#    define PNGCRUSH_USING_CLOCK "CLOCK_MONOTONIC_RAW"
+#  elif defined(CLOCK_MONOTONIC_PRECISE) /* FreeBSD */
+#    define PNGCRUSH_CLOCK_ID CLOCK_MONOTONIC_PRECISE
+#    define PNGCRUSH_USING_CLOCK "CLOCK_MONOTONIC_PRECISE"
+#  elif defined(CLOCK_MONOTONIC) /* Linux & FreeBSD */
+#    define PNGCRUSH_CLOCK_ID CLOCK_MONOTONIC
+#    define PNGCRUSH_USING_CLOCK "CLOCK_MONOTONIC"
+#  else
+#    undef PNGCRUSH_TIMERS /* Fallback */
+#    define PNGCRUSH_TIMERS 0
+#  endif
+#endif
+
 #ifndef LIBPNG_UNIFIED
 #include "png.h"
 #define PNGCRUSH_TIMER_UINT_API extern unsigned int PNGAPI
@@ -1394,29 +1423,7 @@ pngcrush_timer_start(unsigned int n);
 PNGCRUSH_TIMER_VOID_API
 pngcrush_timer_stop(unsigned int n);
 
-#undef _POSIX_C_SOURCE
-#define _POSIX_C_SOURCE 199309L /* for clock_gettime */
-
-#include <time.h>
-
-/* As in GraphicsMagick */
-#  if defined(CLOCK_HIGHRES) /* Solaris */
-#    define PNGCRUSH_CLOCK_ID CLOCK_HIGHRES
-#    define PNGCRUSH_USING_CLOCK "HIGHRES"
-#  elif defined(CLOCK_MONOTONIC_RAW) /* Linux */
-#    define PNGCRUSH_CLOCK_ID CLOCK_MONOTONIC_RAW
-#    define PNGCRUSH_USING_CLOCK "MONOTONIC_RAW"
-#  elif defined(CLOCK_MONOTONIC_PRECISE) /* FreeBSD */
-#    define PNGCRUSH_CLOCK_ID CLOCK_MONOTONIC_PRECISE
-#    define PNGCRUSH_USING_CLOCK "MONOTONIC_PRECISE"
-#  elif defined(CLOCK_MONOTONIC) /* Linux & FreeBSD */
-#    define PNGCRUSH_CLOCK_ID CLOCK_MONOTONIC
-#    define PNGCRUSH_USING_CLOCK "MONOTONIC_PRECISE"
-#  else
-#    undef PNGCRUSH_TIMERS /* Fallback */
-#    define PNGCRUSH_TIMERS 0
-#  endif
-
+#if PNGCRUSH_TIMERS > 0
 PNGCRUSH_TIMER_UINT_API
 pngcrush_timer_get_hits(unsigned int n)
 {
@@ -1504,6 +1511,9 @@ pngcrush_timer_stop(unsigned int n)
       pngcrush_timer_hits[n]++;
    }
 }
+
+static unsigned int pngcrush_timer_min_secs[PNGCRUSH_TIMERS];
+static unsigned int pngcrush_timer_min_nsec[PNGCRUSH_TIMERS];
 #endif /* PNGCRUSH_TIMERS */
 
 #ifdef ZLIB_AMALGAMATED
@@ -2095,6 +2105,7 @@ static int verbose = 1;
 static int salvage = 0;
 static int bail = 0;  /* if 0, bail out of trials early */
 static int force = 1; /* if 1, force output even if IDAT is larger */
+static unsigned int benchmark_iterations = 0;
 
 
 static int blacken = 0; /* if 0, or 2 after the first trial,
@@ -2172,6 +2183,7 @@ static double force_specified_gamma = 0.0;
 static int double_gamma = 0;
 
 static int names;
+static int first_name;
 
 static int have_trns = 0;
 static png_uint_16 trns_index = 0;
@@ -2231,6 +2243,7 @@ static float t_misc = 0;
 unsigned int pc_timer;
 static float t_filter[PNGCRUSH_TIMERS] = {0};
 static png_uint_32 filter_count[PNGCRUSH_TIMERS] = {0};
+static png_uint_32 t_store[PNGCRUSH_TIMERS] = {0};
 png_uint_32 t_sec;
 png_uint_32 t_nsec;
 #endif
@@ -3451,6 +3464,7 @@ void pngcrush_transform_pixels_fn(png_structp png_ptr, png_row_infop row_info,
 
 int main(int argc, char *argv[])
 {
+    unsigned int bench = 0;
     png_uint_32 y;
     int bit_depth = 0;
     int color_type = 0;
@@ -3488,7 +3502,11 @@ int main(int argc, char *argv[])
 
 #if PNGCRUSH_TIMERS > 0
     for (pc_timer=0;pc_timer< PNGCRUSH_TIMERS; pc_timer++)
+    {
         pngcrush_timer_reset(pc_timer);
+        pngcrush_timer_min_secs[pc_timer]=0xffffffff;
+        pngcrush_timer_min_nsec[pc_timer]=0xffffffff;
+    }
     pngcrush_timer_start(PNGCRUSH_TIMER_TOTAL);
     pngcrush_timer_start(PNGCRUSH_TIMER_MISC);
 #endif
@@ -3637,6 +3655,14 @@ int main(int argc, char *argv[])
 
         if (!strncmp(argv[i], "-bail", 5))
             bail=0;
+
+        if (!strncmp(argv[i], "-bench", 6))
+        {
+            names++;
+            BUMP_I;
+            benchmark_iterations = (unsigned int) pngcrush_get_long;
+            pngcrush_check_long;
+        }
 
         else if (!strncmp(argv[i], "-bkgd", 5) ||
                  !strncmp(argv[i], "-bKGD", 5))
@@ -3996,11 +4022,6 @@ int main(int argc, char *argv[])
             overwrite = 1;
         }
 
-        else if (!strncmp(argv[i], "-premultiply", 5))
-        {
-            premultiply=2;
-        }
-
         else if (!strncmp(argv[i], "-pplt", 3))
         {
             names++;
@@ -4008,6 +4029,11 @@ int main(int argc, char *argv[])
             BUMP_I;
             strncpy(pplt_string, argv[i], STR_BUF_SIZE);
             pplt_string[STR_BUF_SIZE-1] = '\0';
+        }
+
+        else if (!strncmp(argv[i], "-premultiply", 5))
+        {
+            premultiply=2;
         }
 
         else if (!strncmp(argv[i], "-p", 3) || !strncmp(argv[i], "-pau", 4))
@@ -4138,7 +4164,8 @@ int main(int argc, char *argv[])
             BUMP_I;
             if (!strncmp(argv[i], "0", 1) ||
                 !strncmp(argv[i], "1", 1) ||
-                !strncmp(argv[i], "2", 1) || !strncmp(argv[i], "3", 1))
+                !strncmp(argv[i], "2", 1) ||
+                !strncmp(argv[i], "3", 1))
             {
                 names++;
                 specified_intent = (int) pngcrush_get_long;
@@ -4167,11 +4194,6 @@ int main(int argc, char *argv[])
         {
             /* silent, suppresses warnings and results */
             verbose = -1;
-        }
-
-        else if(!strncmp(argv[i], "-try10",6))
-        {
-            try10 = 1;
         }
 
         else if (!strncmp(argv[i], "-text", 5)
@@ -4313,6 +4335,11 @@ int main(int argc, char *argv[])
         }
 #endif /* tRNS */
 
+        else if(!strncmp(argv[i], "-try10",6))
+        {
+            try10 = 1;
+        }
+
         else if (!strncmp(argv[i], "-version", 8))
         {
             fprintf(STDERR, " pngcrush ");
@@ -4434,6 +4461,31 @@ int main(int argc, char *argv[])
             }
         }
     }
+
+    first_name = names;
+
+    if (benchmark_iterations)
+        bench=1;
+    else
+        bench=0;
+    
+    for (; bench <= benchmark_iterations; bench++)
+    {
+        if (benchmark_iterations > 0)
+        {
+            P1("  Pngcrush benchmark iteration %d\n",bench);
+            names = first_name;
+        }
+
+#if PNGCRUSH_TIMERS > 0
+        for (pc_timer = 0; pc_timer < PNGCRUSH_TIMERS; pc_timer++)
+        {
+            pngcrush_timer_reset(pc_timer);
+            filter_count[pc_timer]=0;
+        }
+        pngcrush_timer_start(PNGCRUSH_TIMER_TOTAL);
+        pngcrush_timer_start(PNGCRUSH_TIMER_MISC);
+#endif
 
     for (ia = 0; ia < 256; ia++)
         trns_array[ia]=255;
@@ -7764,13 +7816,117 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                 iccp_length = 0;
             }
 #endif
-            if (pngcrush_must_exit)
-                exit(0);
-            return 0;
+            break;
         }
     } /* end of loop on input files */
 
+#if PNGCRUSH_TIMERS > 0
+    for (pc_timer=0; pc_timer < PNGCRUSH_TIMERS; pc_timer++)
+    {
+        unsigned int tim;
+
+        tim=pngcrush_timer_get_nanoseconds(pc_timer);
+        if (tim < pngcrush_timer_min_nsec[pc_timer])
+            pngcrush_timer_min_nsec[pc_timer] = tim;
+
+        tim=pngcrush_timer_get_seconds(pc_timer);
+        if (tim < pngcrush_timer_min_secs[pc_timer])
+            pngcrush_timer_min_secs[pc_timer] = tim;
+
+        pngcrush_timer_reset(pc_timer);
+    }
+#endif
+
+    } /* end of benchmark_iteration loop */
+    if (benchmark_iterations > 0)
+    {
+#if PNGCRUSH_TIMERS > 0
+    for (pc_timer=0;pc_timer < PNGCRUSH_TIMERS; pc_timer++)
+    {
+      filter_count[pc_timer]+=pngcrush_timer_get_hits(pc_timer);
+      t_sec=pngcrush_timer_min_secs[pc_timer];
+      t_nsec=pngcrush_timer_min_nsec[pc_timer];
+      t_filter[pc_timer] = (float)t_nsec/1000000000.;
+      if (t_sec)
+        t_filter[pc_timer] += (float)t_sec;
+    }
+
+#  if PNGCRUSH_TIMERS >= 3
+    fprintf(STDERR, "CPU time decode %.6f,", t_filter[1]);
+    fprintf(STDERR, " encode %.6f,", t_filter[2]);
+    fprintf(STDERR, " other %.6f,", t_filter[3]);
+    fprintf(STDERR, " total %.6f sec\n", t_filter[0]);
+#endif
+
+   if (verbose <= 0)
+     return 0;
+
+#  if PNGCRUSH_TIMERS > 9
+    {
+    float total_t_filter=0;
+    float total_filter_count=0;
+    for (pc_timer = 5; pc_timer < 10; pc_timer++)
+    {
+      total_t_filter+=t_filter[pc_timer];
+      total_filter_count+=filter_count[pc_timer];
+    }
+    if (total_filter_count > 0)
+    {
+      for (pc_timer = 5; pc_timer < 10; pc_timer++)
+      {
+        fprintf(STDERR, "     filter[%u] defilter time = %15.9f, count = %lu\n",
+            pc_timer-5, t_filter[pc_timer],
+           (unsigned long)filter_count[pc_timer]);
+      }
+      fprintf(STDERR, "     total defilter time     = %15.9f, count = %lu\n",
+        total_t_filter, (unsigned long) total_filter_count);
+      }
+    }
+#  endif
+#  if PNGCRUSH_TIMERS > 4
+    {
+      if (filter_count[4] > 0)
+        fprintf(STDERR, "     deinterlace time        = %15.9f, count = %lu\n",
+             t_filter[4], (unsigned long)filter_count[4]);
+    }
+#  endif
+#  if PNGCRUSH_TIMERS > 1
+    {
+      fprintf(STDERR, "     total decode time       = %15.9f, count = %lu\n",
+           t_filter[1], (unsigned long)filter_count[1]);
+    }
+#  endif
+#  if PNGCRUSH_TIMERS > 10
+    {
+      if (filter_count[10] > 0)
+        fprintf(STDERR, "     filter setup time       = %15.9f, count = %lu\n",
+             t_filter[10], (unsigned long)filter_count[10]);
+    }
+#  endif
+#  if PNGCRUSH_TIMERS > 2
+    {
+      fprintf(STDERR, "     total encode time       = %15.9f, count = %lu\n",
+           t_filter[2], (unsigned long)filter_count[2]);
+    }
+#  endif
+#  if PNGCRUSH_TIMERS > 3
+    {
+      fprintf(STDERR, "     total misc time         = %15.9f, count = %lu\n",
+           t_filter[3], (unsigned long)filter_count[3]);
+    }
+#  endif
+#  if PNGCRUSH_TIMERS > 0
+    {
+      fprintf(STDERR, "     total time              = %15.9f, count = %lu\n",
+           t_filter[0], (unsigned long)filter_count[0]);
+    }
+#  endif
+#  endif
+
+    if (pngcrush_must_exit)
+       exit(0);
     return 0;  /* just in case */
+    }
 
 } /* end of main() */
 
@@ -8434,7 +8590,7 @@ void print_version_info(void)
 #endif
 #if defined(__GNUC__)
     fprintf(STDERR,
-      " | It was compiled with gcc version %s", __VERSION__);
+      " | It was compiled with gcc version\n |    %s", __VERSION__);
 #  if defined(PNG_USE_PNGGCCRD)
     fprintf(STDERR,
       " and gas version %s", GAS_VERSION);

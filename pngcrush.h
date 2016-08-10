@@ -5,15 +5,7 @@
  * libpng license (see LICENSE, in pngcrush.c).
  */
 
-<<<<<<< HEAD
-/* Special defines for pngcrush version 1.8.4 */
-=======
-<<<<<<< HEAD
-/* Special defines for pngcrush version 1.8.3st */
-=======
-/* Special defines for pngcrush version 1.8.2 */
->>>>>>> 178be42f61ebd07c01c5175d6dcf36fa5fed874e
->>>>>>> 571c75afbbb59a154dec7d876d862466809928f4
+/* Special defines for pngcrush version 1.8.5 */
 
 #ifndef PNGCRUSH_H
 #define PNGCRUSH_H
