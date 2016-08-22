@@ -3,6 +3,16 @@
 
 Change log:
 
+Version 1.8.5 (built with libpng-1.6.24 and zlib-1.2.8)
+  Added "-benchmark n" option.  It runs the main loop "n" times, and
+    records the minimum value for each timer.
+  After checking for CLOCK_ID, use clock() if none is found.
+  Avoid some timing when verbose<0 ("-s" or "--silent")
+  Added PNGCRUSH_CHECK_CRC (off by default) to use libpng default
+    CRC checking. Otherwise, CRC are only computed and checked during
+    the first read pass and while writing.
+  Accept "--option" (for now, by simply skipping the first "-").
+
 Version 1.8.4 (built with libpng-1.6.24 and zlib-1.2.8)
   Fixed handling of CLOCK_ID, removed some "//"-delimited comments.
 
