@@ -5,7 +5,7 @@
 #
 # Invoke this makefile from a shell prompt in the usual way; for example:
 #
-#	make -f makefile.gcc
+#	make -f makefile.gcc [OPTIONS=-Dsomething]
 #
 # This makefile builds a statically linked executable.
 
@@ -23,7 +23,8 @@ CFLAGS=-std=c90
 
 CFLAGS += -O3 -funroll-loops -fomit-frame-pointer
 
-CPPFLAGS = -I.
+CPPFLAGS = ${OPTIONS}
+CPPFLAGS += -I.
 # CPPFLAGS="-I. -DPNG_DEBUG=5 -DPNG_RELEASE_BUILD=0"
 # CPPFLAGS = -I${ZINC} -I.
 
@@ -35,7 +36,7 @@ CFLAGS += -DNO_GZCOMPRESS -DNO_GZIP -DZ_SOLO -DNO_GZ
 CPPFLAGS += -DLIBPNG_UNIFIED
 
 # Enable timers
-CPPFLAGS += -DPNGCRUSH_TIMERS=4
+CPPFLAGS += -DPNGCRUSH_TIMERS=11
 LIBS += -lrt
 
 # Cannot use this with libpng15 and later.
