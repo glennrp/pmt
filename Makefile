@@ -1,19 +1,16 @@
 # Sample makefile for pngcrush using gcc and GNU make.
-# Revised to build with INTEL-SSE2 support
+# Revised to build with INTEL_SSE2 and ARM_NEON support
 # Glenn Randers-Pehrson
-# Last modified:  6 August 2016
+# Last modified:  27 August 2016
 #
 # Invoke this makefile from a shell prompt in the usual way; for example:
 #
 #	make -f makefile.gcc [OPTIONS=-Dsomething]
 #
-# This makefile builds a statically linked executable.
+# This makefile builds a statically linked executable, using the bundled
+# libpng and zlib code.
 
 # macros --------------------------------------------------------------------
-
-# uncomment these 2 lines only if you are using an external copy of zlib:
-#ZINC = ../../zlib
-#ZLIB = ../../zlib
 
 CC = gcc
 LD = gcc
@@ -49,9 +46,6 @@ E =
 PNGCRUSH  = pngcrush
 
 LIBS += -lm
-# uncomment one of these 2 lines only if you are using an external zlib:
-#LIBS += -L${ZLIB} -lz -lm
-#LIBS += ${ZLIB}/libz.a -lm
 
 # uncomment these 4 lines only if you are NOT using an external copy of zlib:
 ZHDR = zlib.h
@@ -59,15 +53,14 @@ ZOBJS  = adler32$(O) compress$(O) crc32$(O) deflate$(O) \
 	 infback$(O) inffast$(O) inflate$(O) inftrees$(O) \
 	 trees$(O) uncompr$(O) zutil$(O)
 
-POBJS = png$(O) pngerror$(O) pngget$(O) pngmem$(O) \
-	pngpread$(O) pngread$(O) pngrio$(O) pngrtran$(O) pngrutil$(O) \
-	pngset$(O) pngtrans$(O) pngwio$(O) pngwrite$(O) \
-	pngwtran$(O) pngwutil$(O)
+# Enable INTEL SSE support
+CPPFLAGS += -DPNG_INTEL_SSE
+
+# Enable ARM_NEON support
+CPPFLAGS += -DPNG_ARM_NEON
 
 # unified libpng with separate zlib *.o
 OBJS  = pngcrush$(O) $(ZOBJS)
-# separate libpng and separate zlib *.o
-# OBJS  = pngcrush$(O) $(POBJS) $(ZOBJS)
 
 EXES = $(PNGCRUSH)$(E)
 

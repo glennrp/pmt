@@ -5,7 +5,7 @@
  * Portions Copyright (C) 2005 Greg Roelofs
  */
 
-#define PNGCRUSH_VERSION "1.8.5"
+#define PNGCRUSH_VERSION "1.8.6"
 
 #undef BLOCKY_DEINTERLACE
 
@@ -334,6 +334,9 @@
 
 Change log:
 
+Version 1.8.6 (built with libpng-1.6.24 and zlib-1.2.8)
+  Enabled ARM_NEON support.
+
 Version 1.8.5 (built with libpng-1.6.24 and zlib-1.2.8)
   Added "-benchmark n" option.  It runs the main loop "n" times, and
     records the minimum value for each timer.
@@ -346,6 +349,8 @@ Version 1.8.5 (built with libpng-1.6.24 and zlib-1.2.8)
 
 Version 1.8.4 (built with libpng-1.6.24 and zlib-1.2.8)
   Fixed handling of CLOCK_ID, removed some "//"-delimited comments.
+    Revised intel_init.c to always optimize 4bpp images, because the
+    poor optimization noted previously has been fixed.
 
 Version 1.8.3 (built with libpng-1.6.24 and zlib-1.2.8)
   Fixed bug introduced in 1.8.2 that causes trial 10 to be skipped when
@@ -1572,14 +1577,17 @@ static unsigned long pngcrush_timer_min_nsec[PNGCRUSH_TIMERS];
 
 #ifdef ZLIB_UNIFIED  /* Not working */
 #include "zutil.h"
+
 #include "adler32.c"
 #undef DO1
 #undef DO8
+
 #include "compress.c"
 #include "crc32.c"
 #include "deflate.c"
 #include "infback.c"
 #undef PULLBYTE
+
 #include "inffast.c"
 #undef CHECK
 #undef CODES
@@ -1587,6 +1595,7 @@ static unsigned long pngcrush_timer_min_nsec[PNGCRUSH_TIMERS];
 #undef DONE
 #undef LENGTH
 #undef LENS
+
 #include "inflate.c"
 #undef CHECK
 #undef CODES
@@ -1595,6 +1604,7 @@ static unsigned long pngcrush_timer_min_nsec[PNGCRUSH_TIMERS];
 #undef LENGTH
 #undef LENS
 #undef PULLBYTE
+
 #include "inftrees.c"
 #undef CHECK
 #undef CODES
@@ -1602,6 +1612,7 @@ static unsigned long pngcrush_timer_min_nsec[PNGCRUSH_TIMERS];
 #undef DONE
 #undef LENGTH
 #undef LENS
+
 #include "trees.c"
 #include "uncompr.c"
 #include "zutil.c"
@@ -1627,6 +1638,10 @@ static unsigned long pngcrush_timer_min_nsec[PNGCRUSH_TIMERS];
 #ifdef PNG_INTEL_SSE
 # include "intel_init.c"
 # include "filter_sse2_intrinsics.c"
+#endif
+#ifdef PNG_ARM_NEON
+# include "arm_init.c"
+# include "filter_neon_intrinsics.c"
 #endif
 #endif /* LIBPNG_UNIFIED */
 
@@ -8577,11 +8592,7 @@ void print_version_info(void)
       ",\n | and using \"%s\".\n",PNGCRUSH_USING_CLOCK);
 #if defined(__GNUC__)
     fprintf(STDERR,
-      " | It was compiled with gcc version\n |    %s", __VERSION__);
-#  if defined(PNG_USE_PNGGCCRD)
-    fprintf(STDERR,
-      " and gas version %s", GAS_VERSION);
-#  endif
+      " | It was compiled with gcc version %s", __VERSION__);
 #  if defined(__DJGPP__)
     fprintf(STDERR,
       "\n"
