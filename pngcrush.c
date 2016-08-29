@@ -336,6 +336,8 @@ Change log:
 
 Version 1.8.6 (built with libpng-1.6.24 and zlib-1.2.8)
   Enabled ARM_NEON support.
+  Fixed error in handling of timer wraparound when interval exceeds one
+    second
 
 Version 1.8.5 (built with libpng-1.6.24 and zlib-1.2.8)
   Added "-benchmark n" option.  It runs the main loop "n" times, and
@@ -1535,7 +1537,7 @@ pngcrush_timer_stop(unsigned int n)
      nseconds = t*1000000000/CLOCKS_PER_SEC;
 #endif
       delta_secs = (unsigned int)seconds - pngcrush_clock_secs[n];
-      if ((unsigned long)seconds > pngcrush_clock_nsec[n])
+      if ((unsigned long)nseconds > pngcrush_clock_nsec[n])
       {
          delta_nsec  = 0;
       }
