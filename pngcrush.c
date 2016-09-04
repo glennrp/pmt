@@ -334,10 +334,12 @@
 
 Change log:
 
-Version 1.8.6 (built with libpng-1.6.24 and zlib-1.2.8)
+Version 1.8.6 (built with libpng-1.6.25 and zlib-1.2.8)
   Enabled ARM_NEON support.
   Fixed error in handling of timer wraparound when interval exceeds one
-    second
+    second.
+  Disable high resolution timers by default in Makefile.  To enable them,
+    you must enable/disable relevant CPPFLAGS and LIBS in Makefile.
 
 Version 1.8.5 (built with libpng-1.6.24 and zlib-1.2.8)
   Added "-benchmark n" option.  It runs the main loop "n" times, and
@@ -1404,7 +1406,9 @@ static int verbose = 1;
 #endif
 
 /* As in GraphicsMagick */
-#  if defined(CLOCK_HIGHRES) /* Solaris */
+#  if PNGCRUSH_USE_CLOCK_GETTIME == 0
+#    define PNGCRUSH_USING_CLOCK "clock()"
+#  elif defined(CLOCK_HIGHRES) /* Solaris */
 #    define PNGCRUSH_CLOCK_ID CLOCK_HIGHRES
 #    define PNGCRUSH_USING_CLOCK "clock_gettime(CLOCK_HIGHRES,&t)"
 #    define PNGCRUSH_USE_CLOCK_GETTIME 1
@@ -1422,9 +1426,10 @@ static int verbose = 1;
 #    define PNGCRUSH_USE_CLOCK_GETTIME 1
 #  else
 #    define PNGCRUSH_USING_CLOCK "clock()"
+#    undef PNGCRUSH_USE_CLOCK_GETTIME
 #    define PNGCRUSH_USE_CLOCK_GETTIME 0
 #  endif
-#else
+#else /* PNGCRUSH_TIMERS */
 #    define PNGCRUSH_USING_CLOCK "clock()"
 #    define PNGCRUSH_USE_CLOCK_GETTIME 0
 #endif
@@ -1637,13 +1642,17 @@ static unsigned long pngcrush_timer_min_nsec[PNGCRUSH_TIMERS];
 #include "pngwrite.c"
 #include "pngwtran.c"
 #include "pngwutil.c"
-#ifdef PNG_INTEL_SSE
-# include "intel_init.c"
-# include "filter_sse2_intrinsics.c"
-#endif
-#ifdef PNG_ARM_NEON
+#ifdef PNGCRUSH_USE_ARM_NEON
 # include "arm_init.c"
 # include "filter_neon_intrinsics.c"
+#endif
+#ifdef PNGCRUSH_USE_MIPS_NSA
+# include "mips_init.c"
+# include "filter_msa_intrinsics.c"
+#endif
+#ifdef PNGCRUSH_USE_INTEL_SSE
+# include "intel_init.c"
+# include "filter_sse2_intrinsics.c"
 #endif
 #endif /* LIBPNG_UNIFIED */
 
@@ -3082,6 +3091,7 @@ void show_result(void)
              t_filter[4], (unsigned long)filter_count[4]);
     }
 #  endif
+#  if PNGCRUSH_USE_CLOCK_GETTIME != 0
 #  if PNGCRUSH_TIMERS > 1
     {
       fprintf(STDERR, "     total decode time       = %15.9f, count = %lu\n",
@@ -3112,6 +3122,7 @@ void show_result(void)
       fprintf(STDERR, "     total time              = %15.9f, count = %lu\n",
            t_filter[0], (unsigned long)filter_count[0]);
     }
+#  endif
 #  endif
 #else
 #  ifdef PNGCRUSH_TIMERS
@@ -7867,6 +7878,7 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
     fprintf(STDERR, " total %.6f sec\n", t_filter[0]);
 #  endif
 
+#  if PNGCRUSH_USE_CLOCK_GETTIME != 0
    if (benchmark_iterations > 0)
    {
 #  if PNGCRUSH_TIMERS > 9
@@ -7930,6 +7942,7 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
     }
 #  endif
     }
+#endif
 #endif
     }
 
@@ -8590,8 +8603,12 @@ void print_version_info(void)
       BUNDLED_LIB,ZLIB_VERSION,
       zlib_copyright);
 
-    fprintf(STDERR,
-      ",\n | and using \"%s\".\n",PNGCRUSH_USING_CLOCK);
+#if PNGCRUSH_TIMERS > 0
+      fprintf(STDERR,
+        ",\n | and using \"%s\".\n",PNGCRUSH_USING_CLOCK);
+#else
+      fprintf(STDERR,"\n");
+#endif
 #if defined(__GNUC__)
     fprintf(STDERR,
       " | It was compiled with gcc version %s", __VERSION__);

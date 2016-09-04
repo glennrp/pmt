@@ -3,6 +3,13 @@
 
 Change log:
 
+Version 1.8.6 (built with libpng-1.6.25 and zlib-1.2.8)
+  Enabled ARM_NEON support.
+  Fixed error in handling of timer wraparound when interval exceeds one
+    second.
+  Disable high resolution timers by default in Makefile.  To enable them,
+    you must enable/disable relevant CPPFLAGS and LIBS in Makefile.
+
 Version 1.8.5 (built with libpng-1.6.24 and zlib-1.2.8)
   Added "-benchmark n" option.  It runs the main loop "n" times, and
     records the minimum value for each timer.
@@ -15,6 +22,8 @@ Version 1.8.5 (built with libpng-1.6.24 and zlib-1.2.8)
 
 Version 1.8.4 (built with libpng-1.6.24 and zlib-1.2.8)
   Fixed handling of CLOCK_ID, removed some "//"-delimited comments.
+    Revised intel_init.c to always optimize 4bpp images, because the
+    poor optimization noted previously has been fixed.
 
 Version 1.8.3 (built with libpng-1.6.24 and zlib-1.2.8)
   Fixed bug introduced in 1.8.2 that causes trial 10 to be skipped when
