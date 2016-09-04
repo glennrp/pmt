@@ -16,25 +16,31 @@ CC = gcc
 LD = gcc
 RM = rm -f
 
-CFLAGS=-std=c90 
+# On some platforms you might need to comment this out:
+CFLAGS += -std=c90 
 
 CFLAGS += -O3 -funroll-loops -fomit-frame-pointer
 
 CPPFLAGS = ${OPTIONS}
 CPPFLAGS += -I.
-# CPPFLAGS="-I. -DPNG_DEBUG=5 -DPNG_RELEASE_BUILD=0"
+# CPPFLAGS = "-I. -DPNG_DEBUG=5 -DPNG_RELEASE_BUILD=0"
 # CPPFLAGS = -I${ZINC} -I.
 
-# We don't need these
+# We don't need these:
 CPPFLAGS += -DNO_GZCOMPRESS -DNO_GZIP -DZ_SOLO -DNO_GZ
-CFLAGS += -DNO_GZCOMPRESS -DNO_GZIP -DZ_SOLO -DNO_GZ
+CFLAGS   += -DNO_GZCOMPRESS -DNO_GZIP -DZ_SOLO -DNO_GZ
 
-# use unified libpng
+# use unified libpng:
 CPPFLAGS += -DLIBPNG_UNIFIED
 
-# Enable timers
-CPPFLAGS += -DPNGCRUSH_TIMERS=11
-LIBS += -lrt
+# Disable high resolution timers:
+CPPFLAGS += -DPNGCRUSH_USE_CLOCK_GETTIME=0
+
+# Enable high resolution timers:
+# CPPFLAGS += -DPNGCRUSH_TIMERS=11 -DPNGCRUSH_USE_CLOCK_GETTIME=1
+# If you get a linking error with clock_gettime() you might need
+# to uncomment this:
+# LIBS += -lrt
 
 # Cannot use this with libpng15 and later.
 # CPPFLAGS += -DINFLATE_ALLOW_INVALID_DISTANCE_TOOFAR_ARRR
@@ -53,11 +59,14 @@ ZOBJS  = adler32$(O) compress$(O) crc32$(O) deflate$(O) \
 	 infback$(O) inffast$(O) inflate$(O) inftrees$(O) \
 	 trees$(O) uncompr$(O) zutil$(O)
 
-# Enable INTEL SSE support
-CPPFLAGS += -DPNG_INTEL_SSE
-
 # Enable ARM_NEON support
-CPPFLAGS += -DPNG_ARM_NEON
+CPPFLAGS += -DPNGCRUSH_USE_ARM_NEON
+
+# Enable MIPS-NSA support
+CPPFLAGS += -DPNGCRUSH_USE_MPS_MSA
+
+# Enable INTEL SSE support
+CPPFLAGS += -DPNGCRUSH_USE_INTEL_SSE -DPNG_INTEL_SSE
 
 # unified libpng with separate zlib *.o
 OBJS  = pngcrush$(O) $(ZOBJS)
