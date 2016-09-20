@@ -5,6 +5,11 @@
 
 /* @(#) $Id$ */
 
+/* This is an altered source version with changes made by Glenn Randers-Pehrson,
+   glennrp@users.sourceforge.net, September 2016.  The inflateInit2 function
+   was replaced with inflateInit3.
+ */
+
 #ifndef ZCONF_H
 #define ZCONF_H
 
@@ -41,8 +46,8 @@
 #  define deflateBound          z_deflateBound
 #  define deflateCopy           z_deflateCopy
 #  define deflateEnd            z_deflateEnd
-#  define deflateInit2_         z_deflateInit2_
 #  define deflateInit_          z_deflateInit_
+#  define deflateInit2_         z_deflateInit2_
 #  define deflateParams         z_deflateParams
 #  define deflatePending        z_deflatePending
 #  define deflatePrime          z_deflatePrime
@@ -98,12 +103,12 @@
 #  define inflateCopy           z_inflateCopy
 #  define inflateEnd            z_inflateEnd
 #  define inflateGetHeader      z_inflateGetHeader
-#  define inflateInit2_         z_inflateInit2_
+#  define inflateInit3_         z_inflateInit3_
 #  define inflateInit_          z_inflateInit_
 #  define inflateMark           z_inflateMark
 #  define inflatePrime          z_inflatePrime
 #  define inflateReset          z_inflateReset
-#  define inflateReset2         z_inflateReset2
+#  define inflateReset3         z_inflateReset3
 #  define inflateSetDictionary  z_inflateSetDictionary
 #  define inflateGetDictionary  z_inflateGetDictionary
 #  define inflateSync           z_inflateSync
@@ -238,7 +243,7 @@
 #  endif
 #endif
 
-/* Maximum value for windowBits in deflateInit2 and inflateInit2.
+/* Maximum value for windowBits in deflateInit2 and inflateInit3.
  * WARNING: reducing MAX_WBITS makes minigzip unable to extract .gz files
  * created by gzip. (Files created by minigzip can still be extracted by
  * gzip.)
@@ -498,7 +503,7 @@ typedef uLong FAR uLongf;
   #pragma map(deflateEnd,"DEEND")
   #pragma map(deflateBound,"DEBND")
   #pragma map(inflateInit_,"ININ")
-  #pragma map(inflateInit2_,"ININ2")
+  #pragma map(inflateInit3_,"ININ3")
   #pragma map(inflateEnd,"INEND")
   #pragma map(inflateSync,"INSY")
   #pragma map(inflateSetDictionary,"INSEDI")

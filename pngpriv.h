@@ -867,9 +867,9 @@
       "-I (include path) error: see the notes in pngpriv.h"
    /* This means that when pnglibconf.h was built the copy of zlib.h that it
     * used is not the same as the one being used here.  Because the build of
-    * libpng makes decisions to use inflateInit2 and inflateReset2 based on the
-    * zlib version number and because this affects handling of certain broken
-    * PNG files the -I directives must match.
+    * libpng makes decisions to use inflateInit2, inflateInit3, inflateReset2,
+    * and inflateReset3 based on the zlib version number and because this
+    * affects handling of certain broken PNG files the -I directives must match.
     *
     * The most likely explanation is that you passed a -I in CFLAGS. This will
     * not work; all the preprocessor directories and in particular all the -I
@@ -1314,7 +1314,7 @@ PNG_INTERNAL_FUNCTION(void,png_read_finish_row,(png_structrp png_ptr),
 /* Initialize the row buffers, etc. */
 PNG_INTERNAL_FUNCTION(void,png_read_start_row,(png_structrp png_ptr),PNG_EMPTY);
 
-#if PNG_ZLIB_VERNUM >= 0x1240
+#if ZLIB_VERNUM >= 0x1240
 PNG_INTERNAL_FUNCTION(int,png_zlib_inflate,(png_structrp png_ptr, int flush),
       PNG_EMPTY);
 #  define PNG_INFLATE(pp, flush) png_zlib_inflate(pp, flush)

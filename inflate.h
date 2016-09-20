@@ -13,6 +13,11 @@
    the crc code when it is not needed.  For shared libraries, gzip decoding
    should be left enabled. */
 
+/* This is an altered source version with changes made by Glenn Randers-Pehrson,
+   glennrp@users.sourceforge.net, September 2016.  The commentary about the
+   state->wrap variable was extended.
+ */
+
 #ifndef INFLATE_H
 #define INFLATE_H
 #ifndef NO_GZIP
@@ -84,7 +89,8 @@ typedef enum {
 struct inflate_state {
     inflate_mode mode;          /* current inflate mode */
     int last;                   /* true if processing last block */
-    int wrap;                   /* bit 0 true for zlib, bit 1 true for gzip */
+    int wrap;                   /* bit 0 true for zlib, bit 1 true for gzip,
+                                   bit 2 true to ignore checksum */
     int havedict;               /* true if dictionary provided */
     int flags;                  /* gzip header method and flags (0 if zlib) */
     unsigned dmax;              /* zlib header max distance (INFLATE_STRICT) */

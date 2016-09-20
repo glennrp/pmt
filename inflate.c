@@ -6,6 +6,12 @@
 /*
  * Change history:
  *
+ * 1.2.8.1      19 Sep 2016      glennrp
+ *   Added handling of state->wrap 5 or 6 (ignore checksum even when present).
+ *   Changed inflateInit2 and inflateReset2 functions to inflateInit3 and
+ *   inflateReset3, respectively, to separate the windowBits and wrap
+ *   parameters.
+ *
  * 1.2.beta0    24 Nov 2002
  * - First version -- complete rewrite of inflate to simplify code, avoid
  *   creation of window when not needed, minimize use of window when it is
@@ -139,29 +145,21 @@ z_streamp strm;
     return inflateResetKeep(strm);
 }
 
-int ZEXPORT inflateReset2(strm, windowBits)
+int ZEXPORT inflateReset3(strm, windowBits, wrap)
 z_streamp strm;
 int windowBits;
+int wrap;
 {
-    int wrap;
     struct inflate_state FAR *state;
 
     /* get the state */
     if (strm == Z_NULL || strm->state == Z_NULL) return Z_STREAM_ERROR;
     state = (struct inflate_state FAR *)strm->state;
 
-    /* extract wrap request from windowBits parameter */
-    if (windowBits < 0) {
-        wrap = 0;
-        windowBits = -windowBits;
-    }
-    else {
-        wrap = (windowBits >> 4) + 1;
-#ifdef GUNZIP
-        if (windowBits < 48)
-            windowBits &= 15;
+#ifndef GUNZIP
+    if (wrap & 0x02)
+      return Z_STREAM_ERROR;
 #endif
-    }
 
     /* set number of window bits, free window if different */
     if (windowBits && (windowBits < 8 || windowBits > 15))
@@ -177,9 +175,9 @@ int windowBits;
     return inflateReset(strm);
 }
 
-int ZEXPORT inflateInit2_(strm, windowBits, version, stream_size)
+int ZEXPORT inflateInit3_(strm, windowBits, wrap, version, stream_size)
 z_streamp strm;
-int windowBits;
+int windowBits, wrap;
 const char *version;
 int stream_size;
 {
@@ -211,7 +209,7 @@ int stream_size;
     Tracev((stderr, "inflate: allocated\n"));
     strm->state = (struct internal_state FAR *)state;
     state->window = Z_NULL;
-    ret = inflateReset2(strm, windowBits);
+    ret = inflateReset3(strm, windowBits, wrap);
     if (ret != Z_OK) {
         ZFREE(strm, state);
         strm->state = Z_NULL;
@@ -224,7 +222,7 @@ z_streamp strm;
 const char *version;
 int stream_size;
 {
-    return inflateInit2_(strm, DEF_WBITS, version, stream_size);
+    return inflateInit3_(strm, DEF_WBITS, DEF_WRAP, version, stream_size);
 }
 
 int ZEXPORT inflatePrime(strm, bits, value)
@@ -1177,19 +1175,20 @@ int flush;
                 out -= left;
                 strm->total_out += out;
                 state->total += out;
-                if (out)
+                if (out && state->wrap < 3) {
                     strm->adler = state->check =
                         UPDATE(state->check, put - out, out);
-                out = left;
-                if ((
+                    if ((
 #ifdef GUNZIP
-                     state->flags ? hold :
+                         state->flags ? hold :
 #endif
-                     ZSWAP32(hold)) != state->check) {
-                    strm->msg = (char *)"incorrect data check";
-                    state->mode = BAD;
-                    break;
+                         ZSWAP32(hold)) != state->check) {
+                        strm->msg = (char *)"incorrect data check";
+                        state->mode = BAD;
+                        break;
+                    }
                 }
+                out = left;
                 INITBITS();
                 Tracev((stderr, "inflate:   check matches trailer\n"));
             }
@@ -1240,7 +1239,7 @@ int flush;
     strm->total_in += in;
     strm->total_out += out;
     state->total += out;
-    if (state->wrap && out)
+    if (state->wrap < 3 && (state->wrap & 0x3) && out)
         strm->adler = state->check =
             UPDATE(state->check, strm->next_out - out, out);
     strm->data_type = state->bits + (state->last ? 64 : 0) +

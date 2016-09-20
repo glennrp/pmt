@@ -367,14 +367,20 @@ png_inflate_claim(png_structrp png_ptr, png_uint_32 owner)
     * inflateReset2 was added to zlib 1.2.4; before this the window could not be
     * reset, therefore it is necessary to always allocate the maximum window
     * size with earlier zlibs just in case later compressed chunks need it.
+    *
+    * inflateReset3 was added to zlib 1.2.8.1; before this wrap > 3 could not
+    * be set and evaluating ADLER32 checksum could not be avoided.
     */
    {
       int ret; /* zlib return code */
-#if PNG_ZLIB_VERNUM >= 0x1240
+#if ZLIB_VERNUM >= 0x1240
+      int window_bits = 0;
+
+# if ZLIB_VERNUM > 0x1280
+      int wrap = 1;
+# endif
 
 # if defined(PNG_SET_OPTION_SUPPORTED) && defined(PNG_MAXIMUM_INFLATE_WINDOW)
-      int window_bits;
-
       if (((png_ptr->options >> PNG_MAXIMUM_INFLATE_WINDOW) & 3) ==
           PNG_OPTION_ON)
       {
@@ -384,13 +390,15 @@ png_inflate_claim(png_structrp png_ptr, png_uint_32 owner)
 
       else
       {
-         window_bits = 0;
          png_ptr->zstream_start = 1;
       }
-# else
-#   define window_bits 0
 # endif
-#endif
+
+# if ZLIB_VERNUM > 0x1280 && !defined(PNGCRUSH_CHECK_ADLER32)
+      if ((png_ptr->flags & PNG_FLAG_CRC_CRITICAL_IGNORE) != 0)
+         wrap = 5; /* ignore adler32 checksum */
+# endif
+#endif /* ZLIB_VERNUM >= 0x1240 */
 
       /* Set this for safety, just in case the previous owner left pointers to
        * memory allocations.
@@ -402,19 +410,27 @@ png_inflate_claim(png_structrp png_ptr, png_uint_32 owner)
 
       if ((png_ptr->flags & PNG_FLAG_ZSTREAM_INITIALIZED) != 0)
       {
-#if PNG_ZLIB_VERNUM < 0x1240
-         ret = inflateReset(&png_ptr->zstream);
+#if ZLIB_VERNUM > 0x1280
+         ret = inflateReset3(&png_ptr->zstream, window_bits, wrap);
 #else
+# if ZLIB_VERNUM >= 0x1240
          ret = inflateReset2(&png_ptr->zstream, window_bits);
+# else
+         ret = inflateReset(&png_ptr->zstream);
+# endif
 #endif
       }
 
       else
       {
-#if PNG_ZLIB_VERNUM < 0x1240
-         ret = inflateInit(&png_ptr->zstream);
+#if ZLIB_VERNUM > 0x1280
+         ret = inflateInit3(&png_ptr->zstream, window_bits, wrap);
 #else
+# if ZLIB_VERNUM >= 0x1240
          ret = inflateInit2(&png_ptr->zstream, window_bits);
+# else
+         ret = inflateInit(&png_ptr->zstream);
+# endif
 #endif
 
          if (ret == Z_OK)
@@ -435,12 +451,12 @@ png_inflate_claim(png_structrp png_ptr, png_uint_32 owner)
 #endif
 }
 
-#if PNG_ZLIB_VERNUM >= 0x1240
-/* Handle the start of the inflate stream if we called inflateInit2(strm,0);
- * in this case some zlib versions skip validation of the CINFO field and, in
- * certain circumstances, libpng may end up displaying an invalid image, in
- * contrast to implementations that call zlib in the normal way (e.g. libpng
- * 1.5).
+#if ZLIB_VERNUM >= 0x1240
+/* Handle the start of the inflate stream if we called inflateInit2(strm,0)
+ * or inflateInit3(strm,0,wrap); in this case some zlib versions skip
+ * validation of the CINFO field and, in certain circumstances, libpng may
+ * end up displaying an invalid image, in contrast to implementations that
+ * call zlib in the normal way (e.g. libpng 1.5).
  */
 int /* PRIVATE */
 png_zlib_inflate(png_structrp png_ptr, int flush)
@@ -4101,7 +4117,15 @@ png_read_IDAT_data(png_structrp png_ptr, png_bytep output,
          png_zstream_error(png_ptr, ret);
 
          if (output != NULL)
-            png_chunk_error(png_ptr, png_ptr->zstream.msg);
+         {
+            if(!strncmp(png_ptr->zstream.msg,"incorrect data check",20))
+            {
+               png_chunk_benign_error(png_ptr, "ADLER32 checksum mismatch");
+               continue;
+            }
+            else
+               png_chunk_error(png_ptr, png_ptr->zstream.msg);
+         }
 
          else /* checking */
          {

@@ -335,6 +335,9 @@
 Change log:
 
 Version 1.8.7 (built with libpng-1.6.25 and zlib-1.2.8)
+  Do not check the ADLER32 CRC except during the final write pass (requires
+    modified libpng/pngrutil.c and zlib/inflate.c, inflate.h, zlib.h,
+    zconf.h, and zutil.h).
 
 Version 1.8.6 (built with libpng-1.6.25 and zlib-1.2.8)
   Enabled ARM_NEON support.
