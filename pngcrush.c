@@ -5,7 +5,7 @@
  * Portions Copyright (C) 2005 Greg Roelofs
  */
 
-#define PNGCRUSH_VERSION "1.8.6"
+#define PNGCRUSH_VERSION "1.8.7"
 
 #undef BLOCKY_DEINTERLACE
 
@@ -333,6 +333,8 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.8.7 (built with libpng-1.6.25 and zlib-1.2.8)
 
 Version 1.8.6 (built with libpng-1.6.25 and zlib-1.2.8)
   Enabled ARM_NEON support.
