@@ -335,8 +335,15 @@
 Change log:
 
 Version 1.8.7 (built with libpng-1.6.25 and zlib-1.2.8-1)
-  Do not check the ADLER32 CRC except during the final write pass (requires
-    modified libpng/pngrutil.c and zlib-1.2.8-1 of 20 Sept 2016 or later).
+  Do not check the ADLER32 CRC while reading except during the final write
+    pass (requires modified libpng/pngrutil.c and zlib-1.2.8-1 of 20 Sept 2016
+    or later).
+  Do not calculate the ADLER32 CRC while writing except during the final
+    write pass (writing raw deflate streams instead of zlib streams to
+    the IDAT chunks; these are invalid PNGs but since all we do is count
+    the bytes that does not matter). This saves some CPU time but it is
+    barely perceptible. Requires modified pngwutil.c.
+    
 
 Version 1.8.6 (built with libpng-1.6.25 and zlib-1.2.8)
   Enabled ARM_NEON support.
@@ -5030,6 +5037,11 @@ int main(int argc, char *argv[])
             fprintf(STDERR, "pngcrush: trial = %d\n",trial);
 
             pngcrush_write_byte_count=0;
+#ifndef PNGCRUSH_CHECK_ADLER32
+            if (last_trial == 0)
+               pngcrush_write_byte_count=6; /* zlib header that isn't written */
+#endif
+
             found_IDAT = 0;
 
             if (trial != 0)
@@ -5396,9 +5408,13 @@ int main(int argc, char *argv[])
                                    PNG_CRC_QUIET_USE);
 
                 if (last_trial == 0)
-                    /* Only calculate CRC while writing the final output */
+                {
+                    /* During trials other than the final output, avoid
+                     * calculating CRC and ADLER32 checksums
+                     */
                     png_set_crc_action(write_ptr, PNG_CRC_QUIET_USE,
                         PNG_CRC_QUIET_USE);
+                 }
 # endif
 #endif
 

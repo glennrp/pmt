@@ -385,6 +385,14 @@ png_deflate_claim(png_structrp png_ptr, png_uint_32 owner,
          }
       }
 
+#if ZLIB_VERNUM > 0x1240 && !defined(PNGCRUSH_CHECK_ADLER32)
+         if ((png_ptr->flags & PNG_FLAG_CRC_CRITICAL_IGNORE) != 0)
+         {
+            /* Write a raw deflate datastream instead of a zlib datastream */
+            windowBits = -windowBits;
+         }
+#endif
+
       /* Check against the previous initialized values, if any. */
       if ((png_ptr->flags & PNG_FLAG_ZSTREAM_INITIALIZED) != 0 &&
          (png_ptr->zlib_set_level != level ||
@@ -408,7 +416,7 @@ png_deflate_claim(png_structrp png_ptr, png_uint_32 owner,
       png_ptr->zstream.avail_out = 0;
 
       /* Now initialize if required, setting the new parameters, otherwise just
-       * to a simple reset to the previous parameters.
+       * do a simple reset to the previous parameters.
        */
       if ((png_ptr->flags & PNG_FLAG_ZSTREAM_INITIALIZED) != 0)
          ret = deflateReset(&png_ptr->zstream);
@@ -421,6 +429,7 @@ png_deflate_claim(png_structrp png_ptr, png_uint_32 owner,
          if (ret == Z_OK)
             png_ptr->flags |= PNG_FLAG_ZSTREAM_INITIALIZED;
       }
+
 
       /* The return code is from either deflateReset or deflateInit2; they have
        * pretty much the same set of error codes.
