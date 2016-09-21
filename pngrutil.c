@@ -421,7 +421,7 @@ png_inflate_claim(png_structrp png_ptr, png_uint_32 owner)
             png_ptr->flags |= PNG_FLAG_ZSTREAM_INITIALIZED;
       }
 
-#if ZLIB_VERNUM > 0x1280 && !defined(PNGCRUSH_CHECK_ADLER32)
+#if ZLIB_VERNUM > 0x1280
       if ((png_ptr->flags & PNG_FLAG_CRC_CRITICAL_IGNORE) != 0)
       {
          /* Turn off validation of the ADLER32 checksum */

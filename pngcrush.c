@@ -342,8 +342,7 @@ Version 1.8.7 (built with libpng-1.6.25 and zlib-1.2.8-1)
     write pass (writing raw deflate streams instead of zlib streams to
     the IDAT chunks; these are invalid PNGs but since all we do is count
     the bytes that does not matter). This saves some CPU time but it is
-    barely perceptible. Requires modified pngwutil.c.
-    
+    barely perceptible. Requires modified pngwutil.c and zlib 1.2.4 or later.
 
 Version 1.8.6 (built with libpng-1.6.25 and zlib-1.2.8)
   Enabled ARM_NEON support.
@@ -5037,7 +5036,7 @@ int main(int argc, char *argv[])
             fprintf(STDERR, "pngcrush: trial = %d\n",trial);
 
             pngcrush_write_byte_count=0;
-#ifndef PNGCRUSH_CHECK_ADLER32
+#if ZLIB_VERNUM > 0x1240
             if (last_trial == 0)
                pngcrush_write_byte_count=6; /* zlib header that isn't written */
 #endif
@@ -5400,8 +5399,7 @@ int main(int argc, char *argv[])
                 P2("io has been initialized.\n");
                 pngcrush_pause();
 
-#ifndef PNGCRUSH_CHECK_CRC
-# ifdef PNG_CRC_QUIET_USE
+#ifdef PNG_CRC_QUIET_USE
                 /* We don't need to check CRC's because they were already
                    checked in the pngcrush_measure_idat function */
                 png_set_crc_action(read_ptr, PNG_CRC_QUIET_USE,
@@ -5415,7 +5413,6 @@ int main(int argc, char *argv[])
                     png_set_crc_action(write_ptr, PNG_CRC_QUIET_USE,
                         PNG_CRC_QUIET_USE);
                  }
-# endif
 #endif
 
 #ifdef PNG_READ_CHECK_FOR_INVALID_INDEX_SUPPORTED
