@@ -8,11 +8,6 @@
    subject to change. Applications should only use zlib.h.
  */
 
-/* This is an altered source version with changes made by Glenn Randers-Pehrson,
-   glennrp@users.sourceforge.net, September 2016.  The "DEF_WRAP" macro was
-   added.
- */
-
 /* @(#) $Id$ */
 
 #ifndef ZUTIL_H
@@ -60,14 +55,10 @@ extern z_const char * const z_errmsg[10]; /* indexed by 2-zlib_error */
 
         /* common constants */
 
-/* default windowBits for decompression. MAX_WBITS is for compression only */
 #ifndef DEF_WBITS
 #  define DEF_WBITS MAX_WBITS
 #endif
-
-#ifndef DEF_WRAP
-#  define DEF_WRAP 1 /* zlib wrapped */
-#endif
+/* default windowBits for decompression. MAX_WBITS is for compression only */
 
 #if MAX_MEM_LEVEL >= 8
 #  define DEF_MEM_LEVEL 8
@@ -225,7 +216,7 @@ extern z_const char * const z_errmsg[10]; /* indexed by 2-zlib_error */
 #endif
 
 /* Diagnostic functions */
-#ifdef DEBUG
+#ifdef ZLIB_DEBUG
 #  include <stdio.h>
    extern int ZLIB_INTERNAL z_verbose;
    extern void ZLIB_INTERNAL z_error OF((char *m));

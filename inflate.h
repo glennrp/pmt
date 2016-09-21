@@ -12,14 +12,6 @@
    trailer decoding by inflate().  NO_GZIP would be used to avoid linking in
    the crc code when it is not needed.  For shared libraries, gzip decoding
    should be left enabled. */
-
-/* This is an altered source version with changes made by Glenn Randers-Pehrson,
-   glennrp@users.sourceforge.net, September 2016.  The commentary about the
-   state->wrap variable was extended.
- */
-
-#ifndef INFLATE_H
-#define INFLATE_H
 #ifndef NO_GZIP
 #  define GUNZIP
 #endif
@@ -85,12 +77,13 @@ typedef enum {
         CHECK -> LENGTH -> DONE
  */
 
-/* state maintained between inflate() calls.  Approximately 10K bytes. */
+/* State maintained between inflate() calls -- approximately 7K bytes, not
+   inlcuding the allocated sliding window, which is up to 32K bytes. */
 struct inflate_state {
     inflate_mode mode;          /* current inflate mode */
     int last;                   /* true if processing last block */
     int wrap;                   /* bit 0 true for zlib, bit 1 true for gzip,
-                                   bit 2 true to ignore checksum */
+                                   bit 2 true to validate check value */
     int havedict;               /* true if dictionary provided */
     int flags;                  /* gzip header method and flags (0 if zlib) */
     unsigned dmax;              /* zlib header max distance (INFLATE_STRICT) */
@@ -129,4 +122,3 @@ struct inflate_state {
     int back;                   /* bits back of last unprocessed length/lit */
     unsigned was;               /* initial length of match */
 };
-#endif /* INFLATE_H */

@@ -368,17 +368,13 @@ png_inflate_claim(png_structrp png_ptr, png_uint_32 owner)
     * reset, therefore it is necessary to always allocate the maximum window
     * size with earlier zlibs just in case later compressed chunks need it.
     *
-    * inflateReset3 was added to zlib 1.2.8.1; before this wrap > 3 could not
-    * be set and evaluating ADLER32 checksum could not be avoided.
+    * inflateValidate() was added to zlib 1.2.8.1; before this evaluating
+    * the ADLER32 checksum could not be avoided.
     */
    {
       int ret; /* zlib return code */
 #if ZLIB_VERNUM >= 0x1240
       int window_bits = 0;
-
-# if ZLIB_VERNUM > 0x1280
-      int wrap = 1;
-# endif
 
 # if defined(PNG_SET_OPTION_SUPPORTED) && defined(PNG_MAXIMUM_INFLATE_WINDOW)
       if (((png_ptr->options >> PNG_MAXIMUM_INFLATE_WINDOW) & 3) ==
@@ -394,10 +390,6 @@ png_inflate_claim(png_structrp png_ptr, png_uint_32 owner)
       }
 # endif
 
-# if ZLIB_VERNUM > 0x1280 && !defined(PNGCRUSH_CHECK_ADLER32)
-      if ((png_ptr->flags & PNG_FLAG_CRC_CRITICAL_IGNORE) != 0)
-         wrap = 5; /* ignore adler32 checksum */
-# endif
 #endif /* ZLIB_VERNUM >= 0x1240 */
 
       /* Set this for safety, just in case the previous owner left pointers to
@@ -410,32 +402,32 @@ png_inflate_claim(png_structrp png_ptr, png_uint_32 owner)
 
       if ((png_ptr->flags & PNG_FLAG_ZSTREAM_INITIALIZED) != 0)
       {
-#if ZLIB_VERNUM > 0x1280
-         ret = inflateReset3(&png_ptr->zstream, window_bits, wrap);
-#else
-# if ZLIB_VERNUM >= 0x1240
+#if ZLIB_VERNUM >= 0x1240
          ret = inflateReset2(&png_ptr->zstream, window_bits);
-# else
+#else
          ret = inflateReset(&png_ptr->zstream);
-# endif
 #endif
       }
 
       else
       {
-#if ZLIB_VERNUM > 0x1280
-         ret = inflateInit3(&png_ptr->zstream, window_bits, wrap);
-#else
-# if ZLIB_VERNUM >= 0x1240
+#if ZLIB_VERNUM >= 0x1240
          ret = inflateInit2(&png_ptr->zstream, window_bits);
-# else
+#else
          ret = inflateInit(&png_ptr->zstream);
-# endif
 #endif
 
          if (ret == Z_OK)
             png_ptr->flags |= PNG_FLAG_ZSTREAM_INITIALIZED;
       }
+
+#if ZLIB_VERNUM > 0x1280 && !defined(PNGCRUSH_CHECK_ADLER32)
+      if ((png_ptr->flags & PNG_FLAG_CRC_CRITICAL_IGNORE) != 0)
+      {
+         /* Turn off validation of the ADLER32 checksum */
+         inflateValidate(&png_ptr->zstream, 0);
+      }
+#endif
 
       if (ret == Z_OK)
          png_ptr->zowner = owner;
