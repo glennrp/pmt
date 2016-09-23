@@ -367,9 +367,6 @@ png_inflate_claim(png_structrp png_ptr, png_uint_32 owner)
     * inflateReset2 was added to zlib 1.2.4; before this the window could not be
     * reset, therefore it is necessary to always allocate the maximum window
     * size with earlier zlibs just in case later compressed chunks need it.
-    *
-    * inflateValidate() was added to zlib 1.2.8.1; before this evaluating
-    * the ADLER32 checksum could not be avoided.
     */
    {
       int ret; /* zlib return code */
@@ -421,12 +418,10 @@ png_inflate_claim(png_structrp png_ptr, png_uint_32 owner)
             png_ptr->flags |= PNG_FLAG_ZSTREAM_INITIALIZED;
       }
 
-#if ZLIB_VERNUM > 0x1280
+#if ZLIB_VERNUM >= 0x1240
+      /* Turn off validation of the ADLER32 checksum */
       if ((png_ptr->flags & PNG_FLAG_CRC_CRITICAL_IGNORE) != 0)
-      {
-         /* Turn off validation of the ADLER32 checksum */
-         inflateValidate(&png_ptr->zstream, 0);
-      }
+         ret = inflateReset2(&png_ptr->zstream, -window_bits);
 #endif
 
       if (ret == Z_OK)
@@ -444,11 +439,11 @@ png_inflate_claim(png_structrp png_ptr, png_uint_32 owner)
 }
 
 #if ZLIB_VERNUM >= 0x1240
-/* Handle the start of the inflate stream if we called inflateInit2(strm,0)
- * or inflateInit3(strm,0,wrap); in this case some zlib versions skip
- * validation of the CINFO field and, in certain circumstances, libpng may
- * end up displaying an invalid image, in contrast to implementations that
- * call zlib in the normal way (e.g. libpng 1.5).
+/* Handle the start of the inflate stream if we called inflateInit2(strm,0);
+ * in this case some zlib versions skip validation of the CINFO field and, in
+ * certain circumstances, libpng may end up displaying an invalid image, in
+ * contrast to implementations that call zlib in the normal way (e.g. libpng
+ * 1.5).
  */
 int /* PRIVATE */
 png_zlib_inflate(png_structrp png_ptr, int flush)

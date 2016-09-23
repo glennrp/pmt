@@ -77,13 +77,11 @@ typedef enum {
         CHECK -> LENGTH -> DONE
  */
 
-/* State maintained between inflate() calls -- approximately 7K bytes, not
-   inlcuding the allocated sliding window, which is up to 32K bytes. */
+/* state maintained between inflate() calls.  Approximately 10K bytes. */
 struct inflate_state {
     inflate_mode mode;          /* current inflate mode */
     int last;                   /* true if processing last block */
-    int wrap;                   /* bit 0 true for zlib, bit 1 true for gzip,
-                                   bit 2 true to validate check value */
+    int wrap;                   /* bit 0 true for zlib, bit 1 true for gzip */
     int havedict;               /* true if dictionary provided */
     int flags;                  /* gzip header method and flags (0 if zlib) */
     unsigned dmax;              /* zlib header max distance (INFLATE_STRICT) */
