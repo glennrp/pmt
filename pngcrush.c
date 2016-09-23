@@ -334,10 +334,9 @@
 
 Change log:
 
-Version 1.8.7 (built with libpng-1.6.25 and zlib-1.2.8-1)
+Version 1.8.7 (built with libpng-1.6.25 and zlib-1.2.8)
   Do not check the ADLER32 CRC while reading except during the final write
-    pass (requires modified libpng/pngrutil.c and zlib-1.2.8-1 of 20 Sept 2016
-    or later).
+    pass (requires modified libpng/pngrutil.c and zlib-1.2.4 or later).
   Do not calculate the ADLER32 CRC while writing except during the final
     write pass (writing raw deflate streams instead of zlib streams to
     the IDAT chunks; these are invalid PNGs but since all we do is count
