@@ -337,11 +337,13 @@ Change log:
 Version 1.8.7 (built with libpng-1.6.25 and zlib-1.2.8)
   Do not check the ADLER32 CRC while reading except during the final write
     pass (requires modified libpng/pngrutil.c and zlib-1.2.4 or later).
+    This saves some CPU time, around five to ten percent, in decoding.
   Do not calculate the ADLER32 CRC while writing except during the final
     write pass (writing raw deflate streams instead of zlib streams to
     the IDAT chunks; these are invalid PNGs but since all we do is count
-    the bytes that does not matter). This saves some CPU time but it is
-    barely perceptible. Requires modified pngwutil.c and zlib 1.2.4 or later.
+    the bytes that does not matter). This saves some CPU time in encoding
+    but it is barely perceptible. Requires zlib 1.2.4 or later and modified
+    pngwutil.c.
 
 Version 1.8.6 (built with libpng-1.6.25 and zlib-1.2.8)
   Enabled ARM_NEON support.
