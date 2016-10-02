@@ -5,7 +5,7 @@
  * Portions Copyright (C) 2005 Greg Roelofs
  */
 
-#define PNGCRUSH_VERSION "1.8.7"
+#define PNGCRUSH_VERSION "1.8.8"
 
 #undef BLOCKY_DEINTERLACE
 
@@ -334,9 +334,12 @@
 
 Change log:
 
+Version 1.8.8 (built with libpng-1.6.26beta01 and zlib-1.2.8)
+  Fixed "nolib" build (bug report by Hanspeter Niederstrasser).
+
 Version 1.8.7 (built with libpng-1.6.25 and zlib-1.2.8)
   Do not check the ADLER32 CRC while reading except during the final write
-    pass (requires modified libpng/pngrutil.c and zlib-1.2.4 or later).
+    pass (requires libpng-1.6.26 or later and zlib-1.2.4 or later).
     This saves some CPU time, around five to ten percent, in decoding.
   Do not calculate the ADLER32 CRC while writing except during the final
     write pass (writing raw deflate streams instead of zlib streams to
@@ -923,7 +926,7 @@ Version 1.6.19 (built with libpng-1.2.37 and zlib-1.2.3.2)
 
 Version 1.6.18 (built with libpng-1.2.37 and zlib-1.2.3.2)
   Removed extra FCLOSE(fpin) and FCLOSE(fpout) in the first Catch{} block,
-    since they get removed anyway right after that (hanno boeck).
+    since they get removed anyway right after that (Hanno Boeck).
   Define PNG_NO_READ|WRITE_cHRM and PNG_NO_READ_|WRITEiCCP in pngcrush.h
     and reordered pngcrush.h
 
@@ -1899,7 +1902,7 @@ static unsigned long pngcrush_timer_min_nsec[PNGCRUSH_TIMERS];
 #  define PNG_UINT_zTXt PNG_UINT_32_NAME(122, 84, 88, 116)
 #endif
 
-#if !defined(LIBPNG_UNIFIED) && !defined(LIBPNG_AMALGAMATED)
+#ifndef LIBPNG_UNIFIED
 #define PNG_FLAG_CRC_ANCILLARY_USE        0x0100
 #define PNG_FLAG_CRC_ANCILLARY_NOWARN     0x0200
 #define PNG_FLAG_CRC_CRITICAL_USE         0x0400
@@ -1917,7 +1920,7 @@ static unsigned long pngcrush_timer_min_nsec[PNGCRUSH_TIMERS];
 #define PNG_FILLER             0x8000L
 #define PNG_USER_TRANSFORM   0x100000L
 #define PNG_RGB_TO_GRAY      0x600000L  /* two bits, RGB_TO_GRAY_ERR|WARN */
-#endif /* LIBPNG_UNIFIED|AMALGAMATED */
+#endif /* LIBPNG_UNIFIED */
 
 /*
  * We don't need some of the extra libpng transformations
@@ -2299,7 +2302,6 @@ static png_bytep png_row_filters = NULL;
 unsigned int pc_timer;
 static float t_filter[PNGCRUSH_TIMERS] = {0};
 static png_uint_32 filter_count[PNGCRUSH_TIMERS] = {0};
-static png_uint_32 t_store[PNGCRUSH_TIMERS] = {0};
 png_uint_32 t_sec;
 png_uint_32 t_nsec;
 #endif
@@ -2357,32 +2359,6 @@ void PNGCBAPI pngcrush_default_write_data(png_structp png_ptr, png_bytep data,
 void pngcrush_write_png(png_structp write_pointer, png_bytep data,
      png_size_t length);
 
-#ifdef PNGCRUSH_H
-#if !defined(LIBPNG_UNIFIED) && !defined(LIBPNG_AMALGAMATED)
-void png_reset_crc(png_structp png_ptr);
-void png_calculate_crc(png_structp png_ptr, png_bytep ptr, png_size_t length);
-void png_crc_read(png_structp png_ptr, png_bytep buf, png_size_t length);
-int png_crc_error(png_structp png_ptr);
-int png_crc_finish(png_structp png_ptr, png_uint_32 skip);
-# endif /* LIBPNG_UNIFIED */
-#else
-/* Use replacement functions for those in the system libpng */
-void pngcrush_reset_crc(png_structp png_ptr);
-void pngcrush_calculate_crc(png_structp png_ptr, \
-  png_bytep ptr, png_size_t length);
-void pngcrush_crc_read(png_structp png_ptr, png_bytep buf,\
-   png_size_t length);
-int pngcrush_crc_error(png_structp png_ptr);
-int pngcrush_crc_finish(png_structp png_ptr, png_uint_32 skip);
-#define png_reset_crc(png_ptr) pngcrush_reset_crc(png_ptr)
-#define png_calculate_crc(png_ptr, ptr, length) \
-  pngcrush_calculate_crc(png_ptr, ptr, length)
-#define png_crc_read(png_ptr, buf, length) \
-  pngcrush_crc_read(png_ptr, buf, length)
-#define png_crc_error(png_ptr) pngcrush_crc_error(png_ptr)
-#define png_crc_finish(png_ptr, skip) pngcrush_crc_finish(png_ptr, skip)
-#endif
-
 #ifdef PNG_USER_MEM_SUPPORTED
 png_voidp pngcrush_debug_malloc(png_structp png_ptr, png_uint_32 size);
 void pngcrush_debug_free(png_structp png_ptr, png_voidp ptr);
@@ -2406,7 +2382,17 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr);
 void print_version_info(void);
 void print_usage(int retval);
 
-#ifndef PNGCRUSH_H
+#ifdef PNGCRUSH_H
+/* Use unexported functions in the embedded libpng */
+# define pngcrush_reset_crc(png_ptr) png_reset_crc(png_ptr)
+# define pngcrush_calculate_crc(png_ptr, ptr, length) \
+  png_calculate_crc(png_ptr, ptr, length)
+# define pngcrush_crc_read(png_ptr, buf, length) \
+  png_crc_read(png_ptr, buf, length)
+# define pngcrush_crc_error(png_ptr) png_crc_error(png_ptr)
+# define pngcrush_crc_finish(png_ptr, skip) png_crc_finish(png_ptr, skip)
+
+#else
 /*
  * ============================================================
  * We aren't using the bundled libpng functions, so we must
@@ -2414,10 +2400,9 @@ void print_usage(int retval);
  * ============================================================
  */
 
-
-#  if (PNGCRUSH_LIBPNG_VER >= 10209)
-#    ifndef PNG_READ_BIG_ENDIAN_SUPPORTED
-#undef pngcrush_get_uint_32
+# if (PNGCRUSH_LIBPNG_VER >= 10209)
+#   ifndef PNG_READ_BIG_ENDIAN_SUPPORTED
+#     undef pngcrush_get_uint_32
 png_uint_32 pngcrush_get_uint_32(png_bytep buf);
 /* Grab an unsigned 32-bit integer from a buffer in big-endian format. */
 png_uint_32 /* PRIVATE */
@@ -2428,11 +2413,11 @@ pngcrush_get_uint_32(png_bytep buf)
 
    return (i);
 }
-#    else
+#   else /*! BIG_ENDIAN */
 #      define pngcrush_get_uint_32(buf) ( *((png_uint_32p) (buf)))
-#    endif
+#   endif /* BIG_ENDIAN */
 
-#undef pngcrush_get_uint_31
+#   undef pngcrush_get_uint_31
 png_uint_32 pngcrush_get_uint_31(png_structp png_ptr, png_bytep buf);
 png_uint_32 /* PRIVATE */
 pngcrush_get_uint_31(png_structp png_ptr, png_bytep buf)
@@ -2446,7 +2431,7 @@ pngcrush_get_uint_31(png_structp png_ptr, png_bytep buf)
    return (i);
 }
 
-#undef pngcrush_save_uint_32
+#   undef pngcrush_save_uint_32
 void pngcrush_save_uint_32(png_bytep buf, png_uint_32 i);
 void /* PRIVATE */
 pngcrush_save_uint_32(png_bytep buf, png_uint_32 i)
@@ -2456,7 +2441,7 @@ pngcrush_save_uint_32(png_bytep buf, png_uint_32 i)
    buf[2] = (png_byte)((i >> 8) & 0xff);
    buf[3] = (png_byte)(i & 0xff);
 }
-#  endif  /* PNGCRUSH_LIBPNG_VER < 10209 */
+# endif  /* PNGCRUSH_LIBPNG_VER < 10209 */
 
 /*
  * Reset the CRC variable to 32 bits of 1's.  Care must be taken
@@ -2534,7 +2519,7 @@ pngcrush_crc_finish(png_structp png_ptr, png_uint_32 skip)
 
    return (0);
 }
-#endif /* !defined(PNGCRUSH_H) */
+#endif /* PNGCRUSH_H */
 
 #ifdef PNG_STDIO_SUPPORTED
 /*
@@ -8180,8 +8165,8 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
         pngcrush_default_read_data(png_ptr, chunk_length, 4);
         length = pngcrush_get_uint_31(png_ptr,chunk_length);
 
-        png_reset_crc(png_ptr);
-        png_crc_read(png_ptr, chunk_name, 4);
+        pngcrush_reset_crc(png_ptr);
+        pngcrush_crc_read(png_ptr, chunk_name, 4);
         chunk_name[4]='\0';
 
 /* Check for valid chunk name [A-Za-z][A-Za-z][A-Z][A-Za-z] */
@@ -8248,7 +8233,7 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
                   bb=(png_byte*)png_malloc(mng_ptr, length+1);
                   malloced_length=length+1;
               }
-              png_crc_read(png_ptr, bb, length);
+              pngcrush_crc_read(png_ptr, bb, length);
               bb[length]='\0';
               png_write_chunk(mng_ptr, chunk_name,
                             bb, (png_size_t) length);
@@ -8374,7 +8359,7 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
 #endif
             {
                 /* get the color type */
-                png_crc_read(png_ptr, buff, 13);
+                pngcrush_crc_read(png_ptr, buff, 13);
                 length -= 13;
                 input_color_type = buff[9];
             }
@@ -8408,7 +8393,7 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
                 /* Set found_color_bKGD if the components are different,
                  * so we do not do reduction of color-type from color to gray
                  */
-                png_crc_read(png_ptr, buff, 6);
+                pngcrush_crc_read(png_ptr, buff, 6);
                 length -= 6;
                 if ((buff[0] != buff[2]) && (buff[0] != buff[4]) &&
                     (buff[1] != buff[3]) && (buff[0] != buff[5]))
@@ -8452,7 +8437,7 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
              */
             if (length == 2615)
             {
-                png_crc_read(png_ptr, buff, 22);
+                pngcrush_crc_read(png_ptr, buff, 22);
                 length -= 22;
                 buff[23] = 0;
                 if (!strncmp((png_const_charp) buff, "Photoshop ICC profile",
@@ -8489,7 +8474,7 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
           if (length <= 4)
           {
             int i;
-            png_crc_read(png_ptr, buff, length);
+            pngcrush_crc_read(png_ptr, buff, length);
             found_sBIT_max=0;
             for (i=length; i; i--)
               if (buff[i] > found_sBIT_max)
@@ -8514,7 +8499,7 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
           found_tRNS=1;
 #endif /* PNG_tRNS_SUPPORTED */
 
-        png_crc_finish(png_ptr, length);
+        pngcrush_crc_finish(png_ptr, length);
 
 #ifdef PNGCRUSH_LOCO
 #  ifdef PNG_UINT_MEND
