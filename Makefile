@@ -1,11 +1,11 @@
 # Sample makefile for pngcrush using gcc and GNU make.
 # Revised to build with INTEL_SSE2 and ARM_NEON support
 # Glenn Randers-Pehrson
-# Last modified:  27 August 2016
+# Last modified:  3 October 2016
 #
 # Invoke this makefile from a shell prompt in the usual way; for example:
 #
-#	make -f makefile.gcc [OPTIONS=-Dsomething]
+#	make -f Makefile [OPTIONS=-Dsomething]
 #
 # This makefile builds a statically linked executable, using the bundled
 # libpng and zlib code.
@@ -21,25 +21,17 @@ CFLAGS += -std=c90
 
 CFLAGS += -O3 -funroll-loops -fomit-frame-pointer
 
-CPPFLAGS = ${OPTIONS}
-CPPFLAGS += -I.
-# CPPFLAGS = "-I. -DPNG_DEBUG=5 -DPNG_RELEASE_BUILD=0"
-# CPPFLAGS = -I${ZINC} -I.
+# use unified libpng:
+CPPFLAGS = -DLIBPNG_UNIFIED
+
+CPPFLAGS += ${OPTIONS} -I.
 
 # We don't need these:
 CPPFLAGS += -DNO_GZCOMPRESS -DNO_GZIP -DZ_SOLO -DNO_GZ
-CFLAGS   += -DNO_GZCOMPRESS -DNO_GZIP -DZ_SOLO -DNO_GZ
-
-# use unified libpng:
-CPPFLAGS += -DLIBPNG_UNIFIED
-
-# Disable high resolution timers:
-CPPFLAGS += -DPNGCRUSH_USE_CLOCK_GETTIME=0
 
 # Enable high resolution timers:
 # CPPFLAGS += -DPNGCRUSH_TIMERS=11 -DPNGCRUSH_USE_CLOCK_GETTIME=1
-# If you get a linking error with clock_gettime() you might need
-# to uncomment this:
+# If you get a linking error with clock_gettime() you might need this:
 # LIBS += -lrt
 
 # Cannot use this with libpng15 and later.
@@ -82,12 +74,6 @@ EXES = $(PNGCRUSH)$(E)
 # dependencies --------------------------------------------------------------
 
 all:  $(EXES)
-
-inffast$(O): inffast.c
-	$(CC) -c $(CPPFLAGS) $(CFLAGS) $<
-
-inflate$(O): inflate.c
-	$(CC) -c $(CPPFLAGS) $(CFLAGS) $<
 
 deflate$(O): deflate.c
 	$(CC) -c -DTOO_FAR=32767 $(CPPFLAGS) $(CFLAGS) $<

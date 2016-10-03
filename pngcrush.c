@@ -336,8 +336,13 @@ Change log:
 
 Version 1.8.8 (built with libpng-1.6.26beta01 and zlib-1.2.8)
   Fixed "nolib" build (bug report by Hanspeter Niederstrasser).
-    Moves png.h temporarily to png.h_embedded, then puts it back after
-    compiling pngcrush.c.
+    Make sure we use system-png.h, and not the local file.  It is now
+    possible to build either the regular pngcrush or the "nolib"
+    pngcrush in the complete pngcrush source directory (use
+    "make clean" before rebuilding!)
+  Fixed timing when using "clock()". Sometimes an additional second
+    was added when the timer crossed a one-second boundary, since
+    version 1.8.5.
 
 Version 1.8.7 (built with libpng-1.6.25 and zlib-1.2.8)
   Do not check the ADLER32 CRC while reading except during the final write
@@ -1451,7 +1456,7 @@ static int verbose = 1;
 #endif
 
 #ifndef LIBPNG_UNIFIED
-#include "png.h"
+#include <png.h>
 #define PNGCRUSH_TIMER_UINT_API extern unsigned int PNGAPI
 #define PNGCRUSH_TIMER_VOID_API extern void PNGAPI
 #else
@@ -1534,7 +1539,8 @@ pngcrush_timer_start(unsigned int n)
 #else
      TIME_T t = clock();
      pngcrush_clock_secs[n] = t/CLOCKS_PER_SEC;
-     pngcrush_clock_nsec[n] = t*1000000000/CLOCKS_PER_SEC;
+     pngcrush_clock_nsec[n] = (t*1000000000/CLOCKS_PER_SEC) -
+       pngcrush_clock_secs[n]*1000000000;
 #endif
    }
 }
@@ -1555,17 +1561,17 @@ pngcrush_timer_stop(unsigned int n)
 #else
      TIME_T t = clock();
      seconds = t/CLOCKS_PER_SEC;
-     nseconds = t*1000000000/CLOCKS_PER_SEC;
+     nseconds = (t*1000000000/CLOCKS_PER_SEC) - seconds*1000000000;
 #endif
       delta_secs = (unsigned int)seconds - pngcrush_clock_secs[n];
-      if ((unsigned long)nseconds > pngcrush_clock_nsec[n])
-      {
-         delta_nsec  = 0;
-      }
-      else
+      if ((unsigned long)nseconds < pngcrush_clock_nsec[n])
       {
          delta_nsec  = 1000000000;
          delta_secs--;
+      }
+      else
+      {
+         delta_nsec  = 0;
       }
 
       delta_nsec  += (unsigned long)nseconds - pngcrush_clock_nsec[n];
@@ -3524,7 +3530,7 @@ int main(int argc, char *argv[])
     char *cp;
     int i;
 
-#if PNGCRUSH_TIMERS > 0
+#if PNGCRUSH_TIMERS >= 0
     for (pc_timer=0;pc_timer< PNGCRUSH_TIMERS; pc_timer++)
     {
         pngcrush_timer_reset(pc_timer);
@@ -5024,9 +5030,11 @@ int main(int argc, char *argv[])
             fprintf(STDERR, "pngcrush: trial = %d\n",trial);
 
             pngcrush_write_byte_count=0;
-#if ZLIB_VERNUM > 0x1240
+#ifdef PNGCRUSH_H
+# if ZLIB_VERNUM > 0x1240
             if (last_trial == 0)
                pngcrush_write_byte_count=6; /* zlib header that isn't written */
+# endif
 #endif
 
             found_IDAT = 0;

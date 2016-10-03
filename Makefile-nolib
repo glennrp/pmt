@@ -1,10 +1,10 @@
 # Sample makefile for pngcrush using gcc and GNU make.
 # Glenn Randers-Pehrson
-# Last modified:  19 February 2005
+# Last modified:  3 October 2016
 #
 # Invoke this makefile from a shell prompt in the usual way; for example:
 #
-#	make -f makefile.gcc
+#	make -f Makefile-nolib [OPTIONS=-Dsomething]
 #
 # This makefile builds a dynamically linked executable.
 
@@ -21,7 +21,7 @@ CC = gcc
 LD = gcc
 RM = rm -f
 
-CPPFLAGS = -I $(PNGINC)
+CPPFLAGS = ${OPTIONS} -I$(PNGINC)
 
 CFLAGS = -g -O3 -fomit-frame-pointer -Wall
 # [note that -Wall is a gcc-specific compilation flag ("all warnings on")]
@@ -48,10 +48,7 @@ EXES = $(PNGCRUSH)$(E)
 all:  $(EXES)
 
 pngcrush$(O): pngcrush.c cexcept.h
-	touch png.h
-	mv png.h png.h_embedded
 	$(CC) -c $(CPPFLAGS) $(CFLAGS) $<
-	mv png.h_embedded png.h
 
 $(PNGCRUSH)$(E): $(OBJS)
 	$(LD) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
