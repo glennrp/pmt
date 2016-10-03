@@ -336,6 +336,8 @@ Change log:
 
 Version 1.8.8 (built with libpng-1.6.26beta01 and zlib-1.2.8)
   Fixed "nolib" build (bug report by Hanspeter Niederstrasser).
+    Moves png.h temporarily to png.h_embedded, then puts it back after
+    compiling pngcrush.c.
 
 Version 1.8.7 (built with libpng-1.6.25 and zlib-1.2.8)
   Do not check the ADLER32 CRC while reading except during the final write
