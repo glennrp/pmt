@@ -1167,6 +1167,18 @@ ZEXTERN uLong ZEXPORT zlibCompileFlags OF((void));
      27-31: 0 (reserved)
  */
 
+#ifdef NO_GZ
+# ifndef NO_GZCOMPRESS
+#   define NO_GZCOMPRESS
+# endif
+# ifndef NO_GZIP
+#   define NO_GZIP
+# endif
+# ifndef Z_SOLO
+#   define Z_SOLO
+# endif
+#endif
+
 #ifndef Z_SOLO
 
                         /* utility functions */

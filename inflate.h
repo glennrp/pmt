@@ -8,6 +8,9 @@
    subject to change. Applications should only use zlib.h.
  */
 
+#ifndef INFLATE_H
+#define INFLATE_H
+
 /* define NO_GZIP when compiling if you want to disable gzip header and
    trailer decoding by inflate().  NO_GZIP would be used to avoid linking in
    the crc code when it is not needed.  For shared libraries, gzip decoding
@@ -122,3 +125,4 @@ struct inflate_state {
     int back;                   /* bits back of last unprocessed length/lit */
     unsigned was;               /* initial length of match */
 };
+#endif /* INFLATE_H */

@@ -21,6 +21,16 @@
 
 #ifdef PNG_READ_SUPPORTED
 
+#ifndef LIBPNG_UNIFIED
+#if PNGCRUSH_TIMERS > 4
+#define PNGCRUSH_TIMER_VOID_API extern void PNGAPI
+PNGCRUSH_TIMER_VOID_API
+pngcrush_timer_start(unsigned int n);
+PNGCRUSH_TIMER_VOID_API
+pngcrush_timer_stop(unsigned int n);
+#endif
+#endif
+
 /* Create a PNG structure for reading, and allocate any memory needed. */
 PNG_FUNCTION(png_structp,PNGAPI
 png_create_read_struct,(png_const_charp user_png_ver, png_voidp error_ptr,
@@ -451,6 +461,9 @@ png_read_row(png_structrp png_ptr, png_bytep row, png_bytep dsp_row)
    if (png_ptr->interlaced != 0 &&
        (png_ptr->transformations & PNG_INTERLACE) != 0)
    {
+#if PNGCRUSH_TIMERS > 4
+      pngcrush_timer_start(4);
+#endif
       switch (png_ptr->pass)
       {
          case 0:
@@ -527,6 +540,9 @@ png_read_row(png_structrp png_ptr, png_bytep row, png_bytep dsp_row)
             }
             break;
       }
+#if PNGCRUSH_TIMERS > 4
+      pngcrush_timer_stop(4);
+#endif
    }
 #endif
 

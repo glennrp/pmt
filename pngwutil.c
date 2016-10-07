@@ -2528,6 +2528,16 @@ png_setup_paeth_row_only(png_structrp png_ptr, const png_uint_32 bpp,
 }
 #endif /* WRITE_FILTER */
 
+#ifndef LIBPNG_UNIFIED
+#if PNGCRUSH_TIMERS > 10
+#define PNGCRUSH_TIMER_VOID_API extern void PNGAPI
+PNGCRUSH_TIMER_VOID_API
+pngcrush_timer_start(unsigned int n);
+PNGCRUSH_TIMER_VOID_API
+pngcrush_timer_stop(unsigned int n);
+#endif
+#endif
+
 void /* PRIVATE */
 png_write_find_filter(png_structrp png_ptr, png_row_infop row_info)
 {
@@ -2542,6 +2552,10 @@ png_write_find_filter(png_structrp png_ptr, png_row_infop row_info)
    png_size_t row_bytes = row_info->rowbytes;
 
    png_debug(1, "in png_write_find_filter");
+
+#if PNGCRUSH_TIMERS > 10
+   pngcrush_timer_start(10);
+#endif
 
    /* Find out how many bytes offset each pixel is */
    bpp = (row_info->pixel_depth + 7) >> 3;
@@ -2716,6 +2730,10 @@ png_write_find_filter(png_structrp png_ptr, png_row_infop row_info)
          }
       }
    }
+
+#if PNGCRUSH_TIMERS > 10
+   pngcrush_timer_stop(10);
+#endif
 
    /* Do the actual writing of the filtered row data from the chosen filter. */
    png_write_filtered_row(png_ptr, best_row, row_info->rowbytes+1);
