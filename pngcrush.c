@@ -334,7 +334,7 @@
 
 Change log:
 
-Version 1.8.8 (built with libpng-1.6.26beta01 and zlib-1.2.8)
+Version 1.8.8 (built with libpng-1.6.26beta06 and zlib-1.2.8.1)
   Fixed "nolib" build (bug report by Hanspeter Niederstrasser).
     Make sure we use system-png.h, and not the local file.  It is now
     possible to build either the regular pngcrush or the "nolib"
@@ -343,6 +343,10 @@ Version 1.8.8 (built with libpng-1.6.26beta01 and zlib-1.2.8)
   Fixed timing when using "clock()". Sometimes an additional second
     was added when the timer crossed a one-second boundary, since
     version 1.8.5.
+  Upgrade libpng to version 1.6.26beta06 and zlib to 1.2.8.1.
+  Use zlib-1.2.8.1 new "inflateValidate()" function to avoid checking
+    ADLER32 checksums. Version 1.8.7 did not work when the "-fix"
+    option was used.
 
 Version 1.8.7 (built with libpng-1.6.25 and zlib-1.2.8)
   Do not check the ADLER32 CRC while reading except during the final write
@@ -1791,6 +1795,7 @@ static unsigned long pngcrush_timer_min_nsec[PNGCRUSH_TIMERS];
 #  endif
 #endif
 
+#ifndef LIBPNG_UNIFIED
 #define PNG_IDAT const png_byte png_IDAT[5] = { 73,  68,  65,  84, '\0'}
 #define PNG_IHDR const png_byte png_IHDR[5] = { 73,  72,  68,  82, '\0'}
 #define PNG_acTL const png_byte png_acTL[5] = { 97,  99,  84,  76, '\0'}
@@ -1799,6 +1804,7 @@ static unsigned long pngcrush_timer_min_nsec[PNGCRUSH_TIMERS];
 #define PNG_fdAT const png_byte png_fdAT[5] = {102, 100,  65,  84, '\0'}
 #define PNG_iCCP const png_byte png_iCCP[5] = {105,  67,  67,  80, '\0'}
 #define PNG_IEND const png_byte png_IEND[5] = { 73,  69,  78,  68, '\0'}
+#endif
 
 /* GRR 20050220:  added these, which apparently aren't defined anywhere else */
 /* GRP 20110714:  define PNG_UINT_32_NAME macro and used that instead */
@@ -2176,6 +2182,8 @@ static png_uint_32 pngcrush_best_byte_count=0xffffffff;
 
 static int salvage = 0;
 static int bail = 0;  /* if 0, bail out of trials early */
+static int check_crc = 0;  /* if 0, skip CRC and ADLER32 checks */
+                           /* otherwise check both */
 static int force = 1; /* if 1, force output even if IDAT is larger */
 static unsigned int benchmark_iterations = 0;
 
@@ -3735,6 +3743,11 @@ int main(int argc, char *argv[])
                     brute_force_strategies[strat] = 0;
         }
 
+        else if (!strncmp(argv[i], "-check", 6))
+        {
+            check_crc = 1;
+        }
+
         else if (!strncmp(argv[i], "-c", 3) || !strncmp(argv[i], "-col", 4))
         {
             names++;
@@ -4000,6 +4013,11 @@ int main(int argc, char *argv[])
 
         else if (!strncmp(argv[i], "-nobail", 7))
             bail=1;
+
+        else if (!strncmp(argv[i], "-nocheck", 8))
+        {
+            check_crc = 0;
+        }
 
         else if (!strncmp(argv[i], "-nofilecheck", 5))
         {
@@ -5005,9 +5023,10 @@ int main(int argc, char *argv[])
 
 #ifndef __riscos
         {
-        struct stat stat_buf;
-        stat(inname, &stat_buf);
-        input_length = (unsigned long) stat_buf.st_size;
+            /* COVERITY complains about TOCTOU when inname is used later */
+            struct stat stat_buf;
+            stat(inname, &stat_buf);
+            input_length = (unsigned long) stat_buf.st_size;
         }
 #else
         input_length = (unsigned long) filesize(inname);
@@ -5296,9 +5315,9 @@ int main(int argc, char *argv[])
 #if defined(PNG_MAXIMUM_INFLATE_WINDOW) && defined(PNG_OPTION_ON)
                 if (salvage)
                 {
+                   P1(" Setting MAXIMUM_INFLATE_WINDOW\n");
                    png_set_option(read_ptr, PNG_MAXIMUM_INFLATE_WINDOW,
                        PNG_OPTION_ON);
-                   printf(" Setting MAXIMUM_INFLATE_WINDOW\n");
                 }
 #endif
 
@@ -5396,18 +5415,22 @@ int main(int argc, char *argv[])
                 pngcrush_pause();
 
 #ifdef PNG_CRC_QUIET_USE
-                /* We don't need to check CRC's because they were already
-                   checked in the pngcrush_measure_idat function */
-                png_set_crc_action(read_ptr, PNG_CRC_QUIET_USE,
-                                   PNG_CRC_QUIET_USE);
-
-                if (last_trial == 0)
+                if (check_crc == 0)
                 {
-                    /* During trials other than the final output, avoid
-                     * calculating CRC and ADLER32 checksums
-                     */
-                    png_set_crc_action(write_ptr, PNG_CRC_QUIET_USE,
-                        PNG_CRC_QUIET_USE);
+                    /* We don't need to check CRC's because they were already
+                       checked in the pngcrush_measure_idat function */
+                       png_set_crc_action(read_ptr, PNG_CRC_QUIET_USE,
+                                          PNG_CRC_QUIET_USE);
+
+                    if (last_trial == 0)
+                    {
+                        /* During trials other than the final output, avoid
+                         * calculating CRC and ADLER32 checksums (just write
+                         * a DEFLATE datastream)
+                         */
+                        png_set_crc_action(write_ptr, PNG_CRC_QUIET_USE,
+                            PNG_CRC_QUIET_USE);
+                     }
                  }
 #endif
 
@@ -7835,7 +7858,6 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
             {
                 show_result();
             }
-            break;
 #ifdef PNG_iCCP_SUPPORTED
             if (iccp_length)
             {
@@ -8137,9 +8159,6 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
 
     if (salvage)
     {
-#ifdef PNG_CRC_WARN_USE
-        png_set_crc_action(png_ptr, PNG_CRC_WARN_USE, PNG_CRC_WARN_USE);
-#endif
 #ifdef INFLATE_ALLOW_INVALID_DISTANCE_TOOFAR_ARRR
         /* The warning here about deprecated access to png_ptr->zstream
          * is unavoidable.  This will not work with libpng-1.5.x and later.
@@ -8728,6 +8747,11 @@ struct options_help pngcrush_options[] = {
     {2, "               You can use 0 or 4 to convert color to grayscale."},
     {2, "               Use 0 or 2 to delete an unwanted alpha channel."},
     {2, "               Default is to use same color type as the input file."},
+    {2, ""},
+
+    {0, "        -check (check CRC and ADLER32 checksums)"},
+    {2, ""},
+    {2, "               Use \"-nocheck\" (default) to skip checking them"},
     {2, ""},
 
     {0, "            -d directory_name/ (where output files will go)"},

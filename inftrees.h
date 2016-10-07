@@ -8,9 +8,6 @@
    subject to change. Applications should only use zlib.h.
  */
 
-#ifndef INFTREES_H
-#define INFTREES_H
-
 /* Structure for decoding tables.  Each entry provides either the
    information needed to do the operation requested by the code that
    indexed that table entry, or it provides a pointer to another
@@ -63,4 +60,3 @@ typedef enum {
 int ZLIB_INTERNAL inflate_table OF((codetype type, unsigned short FAR *lens,
                              unsigned codes, code FAR * FAR *table,
                              unsigned FAR *bits, unsigned short FAR *work));
-#endif /* INFTREES_H */

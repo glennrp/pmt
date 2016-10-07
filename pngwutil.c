@@ -1,7 +1,7 @@
 
 /* pngwutil.c - utilities to write a PNG file
  *
- * Last changed in libpng 1.6.24 [August 4, 2016]
+ * Last changed in libpng 1.6.26 [(PENDING RELEASE)]
  * Copyright (c) 1998-2002,2004,2006-2016 Glenn Randers-Pehrson
  * (Version 0.96 Copyright (c) 1996, 1997 Andreas Dilger)
  * (Version 0.88 Copyright (c) 1995, 1996 Guy Eric Schalnat, Group 42, Inc.)
@@ -386,11 +386,11 @@ png_deflate_claim(png_structrp png_ptr, png_uint_32 owner,
       }
 
 #if ZLIB_VERNUM > 0x1240
-         if ((png_ptr->flags & PNG_FLAG_CRC_CRITICAL_IGNORE) != 0)
-         {
-            /* Write a raw deflate datastream instead of a zlib datastream */
-            windowBits = -windowBits;
-         }
+      if ((png_ptr->flags & PNG_FLAG_CRC_CRITICAL_IGNORE) != 0)
+      {
+         /* Write a raw deflate datastream instead of a zlib datastream */
+         windowBits=-windowBits;
+      }
 #endif
 
       /* Check against the previous initialized values, if any. */
@@ -1184,7 +1184,7 @@ png_write_sPLT(png_structrp png_ptr, png_const_sPLT_tp spalette)
    png_byte new_name[80];
    png_byte entrybuf[10];
    png_size_t entry_size = (spalette->depth == 8 ? 6 : 10);
-   png_size_t palette_size = entry_size * spalette->nentries;
+   png_size_t palette_size = entry_size * (png_size_t)spalette->nentries;
    png_sPLT_entryp ep;
 #ifndef PNG_POINTER_INDEXING_SUPPORTED
    int i;
@@ -1751,7 +1751,7 @@ png_write_pCAL(png_structrp png_ptr, png_charp purpose, png_int_32 X0,
    total_len = purpose_len + units_len + 10;
 
    params_len = (png_size_tp)png_malloc(png_ptr,
-       (png_alloc_size_t)(nparams * (sizeof (png_size_t))));
+       (png_alloc_size_t)((png_alloc_size_t)nparams * (sizeof (png_size_t))));
 
    /* Find the length of each parameter, making sure we don't count the
     * null terminator for the last parameter.
@@ -2263,7 +2263,7 @@ png_setup_sub_row(png_structrp png_ptr, const png_uint_32 bpp,
    png_bytep rp, dp, lp;
    png_size_t i;
    png_size_t sum = 0;
-   int v;
+   unsigned int v;
 
    png_ptr->try_row[0] = PNG_FILTER_VALUE_SUB;
 
@@ -2272,7 +2272,7 @@ png_setup_sub_row(png_structrp png_ptr, const png_uint_32 bpp,
    {
       v = *dp = *rp;
 #ifdef PNG_USE_ABS
-      sum += 128 - abs(v - 128);
+      sum += 128 - abs((int)v - 128);
 #else
       sum += (v < 128) ? v : 256 - v;
 #endif
@@ -2283,7 +2283,7 @@ png_setup_sub_row(png_structrp png_ptr, const png_uint_32 bpp,
    {
       v = *dp = (png_byte)(((int)*rp - (int)*lp) & 0xff);
 #ifdef PNG_USE_ABS
-      sum += 128 - abs(v - 128);
+      sum += 128 - abs((int)v - 128);
 #else
       sum += (v < 128) ? v : 256 - v;
 #endif
@@ -2324,7 +2324,7 @@ png_setup_up_row(png_structrp png_ptr, const png_size_t row_bytes,
    png_bytep rp, dp, pp;
    png_size_t i;
    png_size_t sum = 0;
-   int v;
+   unsigned int v;
 
    png_ptr->try_row[0] = PNG_FILTER_VALUE_UP;
 
@@ -2334,7 +2334,7 @@ png_setup_up_row(png_structrp png_ptr, const png_size_t row_bytes,
    {
       v = *dp = (png_byte)(((int)*rp - (int)*pp) & 0xff);
 #ifdef PNG_USE_ABS
-      sum += 128 - abs(v - 128);
+      sum += 128 - abs((int)v - 128);
 #else
       sum += (v < 128) ? v : 256 - v;
 #endif
@@ -2368,7 +2368,7 @@ png_setup_avg_row(png_structrp png_ptr, const png_uint_32 bpp,
    png_bytep rp, dp, pp, lp;
    png_uint_32 i;
    png_size_t sum = 0;
-   int v;
+   unsigned int v;
 
    png_ptr->try_row[0] = PNG_FILTER_VALUE_AVG;
 
@@ -2378,7 +2378,7 @@ png_setup_avg_row(png_structrp png_ptr, const png_uint_32 bpp,
       v = *dp++ = (png_byte)(((int)*rp++ - ((int)*pp++ / 2)) & 0xff);
 
 #ifdef PNG_USE_ABS
-      sum += 128 - abs(v - 128);
+      sum += 128 - abs((int)v - 128);
 #else
       sum += (v < 128) ? v : 256 - v;
 #endif
@@ -2390,7 +2390,7 @@ png_setup_avg_row(png_structrp png_ptr, const png_uint_32 bpp,
           & 0xff);
 
 #ifdef PNG_USE_ABS
-      sum += 128 - abs(v - 128);
+      sum += 128 - abs((int)v - 128);
 #else
       sum += (v < 128) ? v : 256 - v;
 #endif
@@ -2430,7 +2430,7 @@ png_setup_paeth_row(png_structrp png_ptr, const png_uint_32 bpp,
    png_bytep rp, dp, pp, cp, lp;
    png_size_t i;
    png_size_t sum = 0;
-   int v;
+   unsigned int v;
 
    png_ptr->try_row[0] = PNG_FILTER_VALUE_PAETH;
 
@@ -2440,7 +2440,7 @@ png_setup_paeth_row(png_structrp png_ptr, const png_uint_32 bpp,
       v = *dp++ = (png_byte)(((int)*rp++ - (int)*pp++) & 0xff);
 
 #ifdef PNG_USE_ABS
-      sum += 128 - abs(v - 128);
+      sum += 128 - abs((int)v - 128);
 #else
       sum += (v < 128) ? v : 256 - v;
 #endif
@@ -2473,7 +2473,7 @@ png_setup_paeth_row(png_structrp png_ptr, const png_uint_32 bpp,
       v = *dp++ = (png_byte)(((int)*rp++ - p) & 0xff);
 
 #ifdef PNG_USE_ABS
-      sum += 128 - abs(v - 128);
+      sum += 128 - abs((int)v - 128);
 #else
       sum += (v < 128) ? v : 256 - v;
 #endif
@@ -2528,16 +2528,6 @@ png_setup_paeth_row_only(png_structrp png_ptr, const png_uint_32 bpp,
 }
 #endif /* WRITE_FILTER */
 
-#ifndef LIBPNG_UNIFIED
-#if PNGCRUSH_TIMERS > 10
-#define PNGCRUSH_TIMER_VOID_API extern void PNGAPI
-PNGCRUSH_TIMER_VOID_API
-pngcrush_timer_start(unsigned int n);
-PNGCRUSH_TIMER_VOID_API
-pngcrush_timer_stop(unsigned int n);
-#endif
-#endif
-
 void /* PRIVATE */
 png_write_find_filter(png_structrp png_ptr, png_row_infop row_info)
 {
@@ -2552,10 +2542,6 @@ png_write_find_filter(png_structrp png_ptr, png_row_infop row_info)
    png_size_t row_bytes = row_info->rowbytes;
 
    png_debug(1, "in png_write_find_filter");
-
-#if PNGCRUSH_TIMERS > 10
-   pngcrush_timer_start(10);
-#endif
 
    /* Find out how many bytes offset each pixel is */
    bpp = (row_info->pixel_depth + 7) >> 3;
@@ -2610,14 +2596,14 @@ png_write_find_filter(png_structrp png_ptr, png_row_infop row_info)
       png_bytep rp;
       png_size_t sum = 0;
       png_size_t i;
-      int v;
+      unsigned int v;
 
       {
          for (i = 0, rp = row_buf + 1; i < row_bytes; i++, rp++)
          {
             v = *rp;
 #ifdef PNG_USE_ABS
-            sum += 128 - abs(v - 128);
+            sum += 128 - abs((int)v - 128);
 #else
             sum += (v < 128) ? v : 256 - v;
 #endif
@@ -2730,10 +2716,6 @@ png_write_find_filter(png_structrp png_ptr, png_row_infop row_info)
          }
       }
    }
-
-#if PNGCRUSH_TIMERS > 10
-   pngcrush_timer_stop(10);
-#endif
 
    /* Do the actual writing of the filtered row data from the chosen filter. */
    png_write_filtered_row(png_ptr, best_row, row_info->rowbytes+1);
