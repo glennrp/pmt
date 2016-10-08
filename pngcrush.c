@@ -5,7 +5,7 @@
  * Portions Copyright (C) 2005 Greg Roelofs
  */
 
-#define PNGCRUSH_VERSION "1.8.8"
+#define PNGCRUSH_VERSION "1.8.9"
 
 #undef BLOCKY_DEINTERLACE
 
@@ -333,6 +333,10 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.8.9 (built with libpng-1.6.26beta06 and zlib-1.2.8.1)
+  Added "-warn" option, to show warnings even when the "-s" option
+    is used.
 
 Version 1.8.8 (built with libpng-1.6.26beta06 and zlib-1.2.8.1)
   Fixed "nolib" build (bug report by Hanspeter Niederstrasser).
@@ -1364,6 +1368,7 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 #endif /* end of changelog */
 
 static int verbose = 1;
+static int show_warnings = 0; /* =1 to show warnings even with verbose < 0 */
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -2622,6 +2627,11 @@ static void pngcrush_warning(png_structp png_ptr,
 
    if (verbose >= 0)
       fprintf(stderr, "pngcrush: %s\n", warning_msg);
+   else
+   {
+      if (show_warnings)
+         fprintf(stderr, "%s: %s\n", inname, warning_msg);
+   }
    return;
 }
 
@@ -4407,6 +4417,11 @@ int main(int argc, char *argv[])
         else if (!strncmp(argv[i], "-v", 3) || !strncmp(argv[i], "-ver", 4))
         {
             verbose++;
+        }
+
+        else if (!strncmp(argv[i], "-warn", 5))
+        {
+            show_warnings++;
         }
 
         else if (!strncmp(argv[i], "-w", 3) || !strncmp(argv[i], "-win", 4))
@@ -8894,6 +8909,11 @@ struct options_help pngcrush_options[] = {
     {2, "               exact filesize achieved by each trial."},
     {2, ""},
 
+    {0, "      -nocheck (do not check CRC and ADLER32 checksums)"},
+    {2, ""},
+    {2, "               Use \"-check\" to check them"},
+    {2, ""},
+
     {0, FAKE_PAUSE_STRING},
 
     {0, "  -nofilecheck (do not check for infile.png == outfile.png)"},
@@ -8997,6 +9017,7 @@ struct options_help pngcrush_options[] = {
     {0, "            -s (silent) suppresses console output including warnings"},
     {2, ""},
     {2, "               benchmark timing, and summary of results."},
+    {2, "               (Use \"-s -warn\" to show only warnings"},
     {2, ""},
 
     {0, "         -save (keep all copy-unsafe PNG chunks)"},
@@ -9067,6 +9088,9 @@ struct options_help pngcrush_options[] = {
     {2, ""},
     {2, "               Look for the most recent version of pngcrush at"},
     {2, "               http://pmt.sf.net"},
+    {2, ""},
+
+    {0, "         -warn (show warnings even when \"-s\" is used)"},
     {2, ""},
 
     {0, "            -w compression_window_size [32, 16, 8, 4, 2, 1, 512]"},
