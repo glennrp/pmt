@@ -1,7 +1,7 @@
 
 /* pngread.c - read a PNG file
  *
- * Last changed in libpng 1.6.26 [(PENDING RELEASE)]
+ * Last changed in libpng 1.6.26 [October 20, 2016]
  * Copyright (c) 1998-2002,2004,2006-2016 Glenn Randers-Pehrson
  * (Version 0.96 Copyright (c) 1996, 1997 Andreas Dilger)
  * (Version 0.88 Copyright (c) 1995, 1996 Guy Eric Schalnat, Group 42, Inc.)
@@ -552,6 +552,9 @@ png_read_row(png_structrp png_ptr, png_bytep row, png_bytep dsp_row)
    /* Fill the row with IDAT data: */
    png_read_IDAT_data(png_ptr, png_ptr->row_buf, row_info.rowbytes + 1);
 
+#if PNGCRUSH_TIMERS > 5
+   pngcrush_timer_start(png_ptr->row_buf[0]+5);
+#endif
    if (png_ptr->row_buf[0] > PNG_FILTER_VALUE_NONE)
    {
       if (png_ptr->row_buf[0] < PNG_FILTER_VALUE_LAST)
@@ -560,6 +563,9 @@ png_read_row(png_structrp png_ptr, png_bytep row, png_bytep dsp_row)
       else
          png_error(png_ptr, "bad adaptive filter value");
    }
+#if PNGCRUSH_TIMERS > 5
+   pngcrush_timer_stop(png_ptr->row_buf[0]+5);
+#endif
 
    /* libpng 1.5.6: the following line was copying png_ptr->rowbytes before
     * 1.5.6, while the buffer really is this big in current versions of libpng

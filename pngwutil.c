@@ -1,7 +1,7 @@
 
 /* pngwutil.c - utilities to write a PNG file
  *
- * Last changed in libpng 1.6.26 [(PENDING RELEASE)]
+ * Last changed in libpng 1.6.26 [October 20, 2016]
  * Copyright (c) 1998-2002,2004,2006-2016 Glenn Randers-Pehrson
  * (Version 0.96 Copyright (c) 1996, 1997 Andreas Dilger)
  * (Version 0.88 Copyright (c) 1995, 1996 Guy Eric Schalnat, Group 42, Inc.)
@@ -384,14 +384,6 @@ png_deflate_claim(png_structrp png_ptr, png_uint_32 owner,
             --windowBits;
          }
       }
-
-#if ZLIB_VERNUM > 0x1240
-      if ((png_ptr->flags & PNG_FLAG_CRC_CRITICAL_IGNORE) != 0)
-      {
-         /* Write a raw deflate datastream instead of a zlib datastream */
-         windowBits=-windowBits;
-      }
-#endif
 
       /* Check against the previous initialized values, if any. */
       if ((png_ptr->flags & PNG_FLAG_ZSTREAM_INITIALIZED) != 0 &&
@@ -2537,7 +2529,6 @@ PNGCRUSH_TIMER_VOID_API
 pngcrush_timer_stop(unsigned int n);
 #endif
 #endif
-
 void /* PRIVATE */
 png_write_find_filter(png_structrp png_ptr, png_row_infop row_info)
 {
@@ -2730,7 +2721,6 @@ png_write_find_filter(png_structrp png_ptr, png_row_infop row_info)
          }
       }
    }
-
 #if PNGCRUSH_TIMERS > 10
    pngcrush_timer_stop(10);
 #endif
