@@ -280,8 +280,9 @@
  *   6. Accept "--long-option".  For starters, just accept -long_option
  *   and --long_option equally.
  *
- *   7. Implement a "-copy" option that simply copies the IDAT data,
- *   possibly repackaged in a different IDAT chunk size.
+ *   7. Implement a "copy_idat" option that simply copies the IDAT data,
+ *   implemented as "-m 149". This will still repackage the IDAT chunks
+ *   in a possibly different IDAT chunk size.
  *
  *   8. Implement palette-building (from ImageMagick-6.7.0 or later, minus
  *   the "PNG8" part) -- actually ImageMagick puts the transparent colors
@@ -328,14 +329,19 @@
  *   16. With libpng17, png_write throws an "affirm()" with tc.format=256
  *   when attempting to write a sub-8-bit grayscale image.
  *
+ *   17. Figure out why we aren't calling png_read_update_info() and fix.
+ *
+ *
  */
 
 #if 0 /* changelog */
 
 Change log:
 
-Version 1.8.9 (built with libpng-1.6.26beta06 and zlib-1.2.8.1)
+Version 1.8.9 (built with libpng-1.6.26 and zlib-1.2.8.1)
   Added "-warn" option, to show only warnings.
+  Enabled method 149. For now it writes uncompressed IDAT but in
+    a future version of pngcrush it will just copy the IDAT data.
 
 Version 1.8.8 (built with libpng-1.6.26beta06 and zlib-1.2.8.1)
   Fixed "nolib" build (bug report by Hanspeter Niederstrasser).
@@ -1368,6 +1374,7 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 
 static int verbose = 1;
 static int show_warnings = 0; /* =1 to show warnings even with verbose < 0 */
+static int copy_idat = 0; /* = 1 to simply copy the IDAT chunk data */
 
 /* Experimental: define these if you wish, but, good luck.
 #define PNGCRUSH_COUNT_COLORS
@@ -3596,17 +3603,18 @@ int main(int argc, char *argv[])
     }
 
 
-    fm[0] = 0; lv[0] = 0; zs[0] = 0;   /* method  0 == uncompressed */
-    fm[1] = 0; lv[1] = 4; zs[1] = 0;   /* method  1 == method  53 */
-    fm[2] = 1; lv[2] = 4; zs[2] = 0;   /* method  2 == method  54 */
-               lv[3] = 4;              /* method  3 == method  64 */
-    fm[4] = 0;                         /* method  4 == method 119 */
-    fm[5] = 1;            zs[5] = 0;   /* method  5 == method 114 */
-                          zs[6] = 0;   /* method  6 == method 118 */
-    fm[7] = 0;            zs[7] = 0;   /* method  7 == method 113 */
-    fm[8] = 1;                         /* method  8 == method 120 */
-               lv[9] = 2; zs[9] = 2;   /* method  9 == method  16 */
-                                       /* method 10 == method 124 */
+    fm[0] = 0;   lv[0] = 0;   zs[0] = 0;   /* method  0 == uncompressed */
+    fm[1] = 0;   lv[1] = 4;   zs[1] = 0;   /* method  1 == method  53 */
+    fm[2] = 1;   lv[2] = 4;   zs[2] = 0;   /* method  2 == method  54 */
+ /* fm[3] = 5;*/ lv[3] = 4;/* zs[3] = 1;*/ /* method  3 == method  64 */
+    fm[4] = 0;/* lv[4] = 9;   zs[4] = 1;*/ /* method  4 == method 119 */
+    fm[5] = 1;/* lv[5] = 9;   zs[5] = 0;*/ /* method  5 == method 114 */
+ /* fm[6] = 5;   lv[6] = 9;*/ zs[6] = 0;   /* method  6 == method 118 */
+    fm[7] = 0;/* lv=7] = 9;*/ zs[7] = 0;   /* method  7 == method 113 */
+    fm[8] = 1;/* lv[8] = 9;   zs[8] = 1;*/ /* method  8 == method 120 */
+ /* fm[9] = 5;*/ lv[9] = 2;   zs[9] = 2;   /* method  9 == method  16 */
+                                           /* method 10 == method 124 */
+ /* fm[10]= 5;   lv[10]= 9;   zs[10]= 1;*/ /* method 10 == method 124 */
 
     /* methods 11 through 16
      *
@@ -3670,6 +3678,10 @@ int main(int argc, char *argv[])
             method++;
         }
     }
+
+    /* method 149 */
+    fm[method] = 0; lv[method] = 0; zs[method] = 0;  /* copy_idat */
+    method++;
 
     num_methods = method;   /* GRR */
 
@@ -3988,7 +4000,7 @@ int main(int argc, char *argv[])
             BUMP_I;
             method = pngcrush_get_long;
             pngcrush_check_long;
-            if (method > 0 && method <= MAX_METHODS)
+            if (method >= 0 && method <= MAX_METHODS)
             {
               methods_specified = 1;
               brute_force = 0;
@@ -5004,7 +5016,7 @@ int main(int argc, char *argv[])
             try_method[6] = try10;
         }
 
-        for (i = 1; i <= MAX_METHODS; i++)
+        for (i = 0; i <= MAX_METHODS; i++)
         {
            methods_enabled += (1 - try_method[i]);
         }
@@ -5022,7 +5034,8 @@ int main(int argc, char *argv[])
           }
         }
 
-        for (i = 1; i <= MAX_METHODS; i++)
+        last_method = 0;
+        for (i = 0; i <= MAX_METHODS; i++)
         {
            if (try_method[i] == 0)
               last_method = i;
@@ -5033,6 +5046,9 @@ int main(int argc, char *argv[])
 
         P1("   pngcrush: methods     = %d\n",methods_enabled);
         P1("   pngcrush: last_method = %d\n",last_method);
+        
+        if (last_method == 149)
+           copy_idat = 1;
 
         best_of_three = 1;
 
@@ -7004,6 +7020,9 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                     }
                     P1( "\nWriting info struct\n");
 
+                    if (copy_idat == 0)
+                    {
+
 #if 0 /* doesn't work; compression level has to be the same as in IDAT */
                     /* if zTXt other compressed chunk */
                     png_set_compression_level(write_ptr, 9);
@@ -7144,8 +7163,18 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                       }
 
                     png_set_compression_level(write_ptr, zlib_level);
+                    } /* copy_idat */
+
                     png_write_info(write_ptr, write_info_ptr);
                     P1( "\nWrote info struct\n");
+
+                    if (copy_idat == 1)
+                    {
+                       /* No recompress, just copy IDATs. */
+                       png_set_compression_buffer_size(write_ptr,
+                                                       MAX_IDAT_SIZE);
+                    }
+
 #ifdef PNG_WRITE_PACK_SUPPORTED
                     if (output_bit_depth < 8)
                     {
