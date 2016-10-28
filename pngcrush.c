@@ -5,7 +5,7 @@
  * Portions Copyright (C) 2005 Greg Roelofs
  */
 
-#define PNGCRUSH_VERSION "1.8.9"
+#define PNGCRUSH_VERSION "1.8.10"
 
 #undef BLOCKY_DEINTERLACE
 
@@ -331,12 +331,18 @@
  *
  *   17. Figure out why we aren't calling png_read_update_info() and fix.
  *
+ *   18. Fix ADLER32 checksum handling in conjunction with iCCP chunk
+ *   reading.
  *
  */
 
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.8.10 (built with libpng-1.6.26 and zlib-1.2.8.1)
+  Changed ADLER32 checksum handling to only use inflateValidate()
+    during IDAT chunk handling; it broke iCCP chunk handling.
 
 Version 1.8.9 (built with libpng-1.6.26 and zlib-1.2.8.1)
   Added "-warn" option, to show only warnings.
@@ -3679,11 +3685,11 @@ int main(int argc, char *argv[])
         }
     }
 
+    num_methods = method;   /* GRR */
+
     /* method 149 */
     fm[method] = 0; lv[method] = 0; zs[method] = 0;  /* copy_idat */
     method++;
-
-    num_methods = method;   /* GRR */
 
 #define pngcrush_get_long strtol(argv[i],&endptr,10)
 
@@ -4000,7 +4006,7 @@ int main(int argc, char *argv[])
             BUMP_I;
             method = pngcrush_get_long;
             pngcrush_check_long;
-            if (method >= 0 && method <= MAX_METHODS)
+            if (method >= 1 && method <= MAX_METHODS)
             {
               methods_specified = 1;
               brute_force = 0;
@@ -5016,7 +5022,7 @@ int main(int argc, char *argv[])
             try_method[6] = try10;
         }
 
-        for (i = 0; i <= MAX_METHODS; i++)
+        for (i = 1; i <= MAX_METHODS; i++)
         {
            methods_enabled += (1 - try_method[i]);
         }
@@ -5035,7 +5041,7 @@ int main(int argc, char *argv[])
         }
 
         last_method = 0;
-        for (i = 0; i <= MAX_METHODS; i++)
+        for (i = 1; i <= MAX_METHODS; i++)
         {
            if (try_method[i] == 0)
               last_method = i;
@@ -5047,7 +5053,7 @@ int main(int argc, char *argv[])
         P1("   pngcrush: methods     = %d\n",methods_enabled);
         P1("   pngcrush: last_method = %d\n",last_method);
         
-        if (last_method == 149)
+        if (methods_enabled == 1 && last_method == 149)
            copy_idat = 1;
 
         best_of_three = 1;
@@ -5448,10 +5454,11 @@ int main(int argc, char *argv[])
 #ifdef PNG_CRC_QUIET_USE
                 if (check_crc == 0)
                 {
-                    /* We don't need to check CRC's because they were already
-                       checked in the pngcrush_measure_idat function */
-                       png_set_crc_action(read_ptr, PNG_CRC_QUIET_USE,
-                                          PNG_CRC_QUIET_USE);
+                    /* We don't need to check IDAT CRC's because they were
+                     * already checked in the pngcrush_measure_idat function
+                     */
+                    png_set_crc_action(read_ptr, PNG_CRC_QUIET_USE,
+                                       PNG_CRC_QUIET_USE);
 
                     if (last_trial == 0)
                     {
