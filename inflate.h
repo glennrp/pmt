@@ -1,5 +1,5 @@
 /* inflate.h -- internal inflate state definition
- * Copyright (C) 1995-2009 Mark Adler
+ * Copyright (C) 1995-2016 Mark Adler
  * For conditions of distribution and use, see copyright notice in zlib.h
  */
 
@@ -7,9 +7,6 @@
    part of the implementation of the compression library and is
    subject to change. Applications should only use zlib.h.
  */
-
-#ifndef INFLATE_H
-#define INFLATE_H
 
 /* define NO_GZIP when compiling if you want to disable gzip header and
    trailer decoding by inflate().  NO_GZIP would be used to avoid linking in
@@ -21,7 +18,7 @@
 
 /* Possible inflate modes between inflate() calls */
 typedef enum {
-    HEAD,       /* i: waiting for magic header */
+    HEAD = 16180,   /* i: waiting for magic header */
     FLAGS,      /* i: waiting for method and flags (gzip) */
     TIME,       /* i: waiting for modification time (gzip) */
     OS,         /* i: waiting for extra flags and operating system (gzip) */
@@ -83,6 +80,7 @@ typedef enum {
 /* State maintained between inflate() calls -- approximately 7K bytes, not
    including the allocated sliding window, which is up to 32K bytes. */
 struct inflate_state {
+    z_streamp strm;             /* pointer back to this zlib stream */
     inflate_mode mode;          /* current inflate mode */
     int last;                   /* true if processing last block */
     int wrap;                   /* bit 0 true for zlib, bit 1 true for gzip,
@@ -125,4 +123,3 @@ struct inflate_state {
     int back;                   /* bits back of last unprocessed length/lit */
     unsigned was;               /* initial length of match */
 };
-#endif /* INFLATE_H */

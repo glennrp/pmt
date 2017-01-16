@@ -5,7 +5,7 @@
  * Portions Copyright (C) 2005 Greg Roelofs
  */
 
-#define PNGCRUSH_VERSION "1.8.10"
+#define PNGCRUSH_VERSION "1.8.11"
 
 #undef BLOCKY_DEINTERLACE
 
@@ -334,11 +334,25 @@
  *   18. Fix ADLER32 checksum handling in conjunction with iCCP chunk
  *   reading.
  *
+ *   19. Fix Coverity "TOCTOU" warning about our "stat()" usage.
+ *
+ *   20. Warn about removing copyright and license info appearing in
+ *   PNG text chunks.
+ *
+ *   21. Implement the "eXIf" chunk if it is approved by the PNG
+ *   Development Group.  Optionally, remove preview and thumbnail
+ *   images from the Exif profile contained in the eXIf chunk.
+ *
  */
 
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.8.11 (built with libpng-1.6.28 and zlib-1.2.11)
+  Use png_set_option(PNG_IGNORE_ADLER32) to control ADLER32 handling.
+  Changed LD=gcc to LD=$(CC) in Makefile and Makefile-nolib (suggested
+    by Helmut G in Bug#850927 of some GIT project)
 
 Version 1.8.10 (built with libpng-1.6.26 and zlib-1.2.8.1)
   Changed ADLER32 checksum handling to only use inflateValidate()
@@ -5459,17 +5473,21 @@ int main(int argc, char *argv[])
                      */
                     png_set_crc_action(read_ptr, PNG_CRC_QUIET_USE,
                                        PNG_CRC_QUIET_USE);
+                }
+#endif
 
-                    if (last_trial == 0)
-                    {
-                        /* During trials other than the final output, avoid
-                         * calculating CRC and ADLER32 checksums (just write
-                         * a DEFLATE datastream)
-                         */
-                        png_set_crc_action(write_ptr, PNG_CRC_QUIET_USE,
-                            PNG_CRC_QUIET_USE);
-                     }
-                 }
+#ifndef PNGCRUSH_CHECK_ADLER32
+# ifdef PNG_IGNORE_ADLER32
+                if (last_trial == 0)
+                {
+                    /* During trials other than the final output, avoid
+                     * calculating CRC and ADLER32 checksums (just write
+                     * a DEFLATE datastream)
+                     */
+                    png_set_option(write_ptr, PNG_IGNORE_ADLER32,
+                        PNG_OPTION_ON);
+                }
+# endif
 #endif
 
 #ifdef PNG_READ_CHECK_FOR_INVALID_INDEX_SUPPORTED
@@ -8649,6 +8667,11 @@ void print_version_info(void)
       case 0x1271:
       case 0x1280:
          zlib_copyright="-2013";
+         break;
+      case 0x1290:
+      case 0x12a0:
+      case 0x12b0:
+         zlib_copyright="-2017";
          break;
       default:
          zlib_copyright=" (or later)";

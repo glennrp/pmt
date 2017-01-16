@@ -13,7 +13,7 @@
 # macros --------------------------------------------------------------------
 
 CC = gcc
-LD = gcc
+LD = $(CC)
 RM = rm -f
 
 # On some platforms you might need to comment this out:
@@ -27,7 +27,7 @@ CPPFLAGS = -DLIBPNG_UNIFIED
 CPPFLAGS += ${OPTIONS} -I.
 
 # We don't need these:
-CPPFLAGS += -DNO_GZCOMPRESS -DNO_GZIP -DZ_SOLO -DNO_GZ
+CPPFLAGS += -DNO_GZ
 
 # Enable high resolution timers:
 # CPPFLAGS += -DPNGCRUSH_TIMERS=11 -DPNGCRUSH_USE_CLOCK_GETTIME=1

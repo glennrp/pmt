@@ -18,7 +18,7 @@ ZINC = /usr/local/include
 ZLIB = /usr/local/lib
 
 CC = gcc
-LD = gcc
+LD = $(CC)
 RM = rm -f
 
 CPPFLAGS = ${OPTIONS} -I$(PNGINC)
