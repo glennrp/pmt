@@ -1,11 +1,11 @@
 
 /* pngcrush.c - recompresses png files
- * Copyright (C) 1998-2002, 2006-2016 Glenn Randers-Pehrson
+ * Copyright (C) 1998-2002, 2006-2017 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
  * Portions Copyright (C) 2005 Greg Roelofs
  */
 
-#define PNGCRUSH_VERSION "1.8.11"
+#define PNGCRUSH_VERSION "1.8.12"
 
 #undef BLOCKY_DEINTERLACE
 
@@ -34,7 +34,7 @@
  *
  * COPYRIGHT:
  *
- * Copyright (C) 1998-2002, 2006-2016 Glenn Randers-Pehrson
+ * Copyright (C) 1998-2002, 2006-2017 Glenn Randers-Pehrson
  *                                   (glennrp at users.sf.net)
  * Portions Copyright (C) 2005 Greg Roelofs
  *
@@ -281,7 +281,7 @@
  *   and --long_option equally.
  *
  *   7. Implement a "copy_idat" option that simply copies the IDAT data,
- *   implemented as "-m 149". This will still repackage the IDAT chunks
+ *   implemented as "-m 176". This will still repackage the IDAT chunks
  *   in a possibly different IDAT chunk size.
  *
  *   8. Implement palette-building (from ImageMagick-6.7.0 or later, minus
@@ -348,6 +348,17 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.8.12 (built with libpng-1.6.31 and zlib-1.2.11)
+  Changed default verbosity from 1 (normal) to 0 (quiet). Use "-v" to get
+    the previous default behavior and "-v -v" to get the previous "verbose"
+    behavior. The "-s" (silent) and "-q" (quiet) options behave as before.
+  Added POWERPC-VSX support.
+  Report whether using optimizations, when operating verbosely.
+  Added filter_method 6 (same as filter 5 with -speed).
+  Added "methods" 149-176 (that use filter_method 6).
+  Only issue a warning when the "build" and "runtime" libpng versions 
+    differ in the first 4 symbols, indicating incompatible versions.
 
 Version 1.8.11 (built with libpng-1.6.28 and zlib-1.2.11)
   Use png_set_option(PNG_IGNORE_ADLER32) to control ADLER32 handling.
@@ -1392,7 +1403,7 @@ Version 1.1.4: added ability to restrict brute_force to one or more filter
 
 #endif /* end of changelog */
 
-static int verbose = 1;
+static int verbose = 0;
 static int show_warnings = 0; /* =1 to show warnings even with verbose < 0 */
 static int copy_idat = 0; /* = 1 to simply copy the IDAT chunk data */
 
@@ -1710,6 +1721,10 @@ static unsigned long pngcrush_timer_min_nsec[PNGCRUSH_TIMERS];
 #ifdef PNGCRUSH_USE_INTEL_SSE
 # include "intel_init.c"
 # include "filter_sse2_intrinsics.c"
+#endif
+#ifdef PNGCRUSH_USE_POWERPC_VSX
+# include "powerpc_init.c"
+# include "filter_vsx_intrinsics.c"
 #endif
 #endif /* LIBPNG_UNIFIED */
 
@@ -2071,7 +2086,7 @@ png_uint_32 pngcrush_crc;
 
 #define STR_BUF_SIZE      2048
 #define MAX_IDAT_SIZE     524288L
-#define MAX_METHODS       150
+#define MAX_METHODS       177
 #define MAX_METHODSP1     (MAX_METHODS+1)
 #define DEFAULT_METHODS   10
 #define FAKE_PAUSE_STRING "P"
@@ -3585,7 +3600,7 @@ int main(int argc, char *argv[])
     pngcrush_timer_start(PNGCRUSH_TIMER_MISC);
 #endif
 
-    if (strcmp(png_libpng_ver, PNG_LIBPNG_VER_STRING))
+    if (strncmp(png_libpng_ver, PNG_LIBPNG_VER_STRING,4))
     {
         fprintf(STDERR,
                 "Warning: versions are different between png.h and png.c\n");
@@ -3619,22 +3634,21 @@ int main(int argc, char *argv[])
     for (i = 0; i <= MAX_METHODS; i++)
     {
         try_method[i] = 1;  /* 1 means do not try this method */
-        fm[i] = 5; lv[i] = 9; zs[i] = 1;  /* default:  method 136 */
+        fm[i] = 6; lv[i] = 9; zs[i] = 1;  /* default:  method 136 */
     }
 
 
     fm[0] = 0;   lv[0] = 0;   zs[0] = 0;   /* method  0 == uncompressed */
     fm[1] = 0;   lv[1] = 4;   zs[1] = 0;   /* method  1 == method  53 */
     fm[2] = 1;   lv[2] = 4;   zs[2] = 0;   /* method  2 == method  54 */
- /* fm[3] = 5;*/ lv[3] = 4;/* zs[3] = 1;*/ /* method  3 == method  64 */
+ /* fm[3] = 6;*/ lv[3] = 4;/* zs[3] = 1;*/ /* method  3 == method 161 */
     fm[4] = 0;/* lv[4] = 9;   zs[4] = 1;*/ /* method  4 == method 119 */
     fm[5] = 1;/* lv[5] = 9;   zs[5] = 0;*/ /* method  5 == method 114 */
- /* fm[6] = 5;   lv[6] = 9;*/ zs[6] = 0;   /* method  6 == method 118 */
-    fm[7] = 0;/* lv=7] = 9;*/ zs[7] = 0;   /* method  7 == method 113 */
+ /* fm[6] = 6;   lv[6] = 9;*/ zs[6] = 0;   /* method  6 == method 157 */
+    fm[7] = 0;/* lv[7] = 9;*/ zs[7] = 0;   /* method  7 == method 113 */
     fm[8] = 1;/* lv[8] = 9;   zs[8] = 1;*/ /* method  8 == method 120 */
- /* fm[9] = 5;*/ lv[9] = 2;   zs[9] = 2;   /* method  9 == method  16 */
-                                           /* method 10 == method 124 */
- /* fm[10]= 5;   lv[10]= 9;   zs[10]= 1;*/ /* method 10 == method 124 */
+ /* fm[9] = 6;*/ lv[9] = 2;   zs[9] = 2;   /* method  9 == method xxx */
+ /* fm[10]= 6;   lv[10]= 9;   zs[10]= 1;*/ /* method 10 == method 166 */
 
     /* methods 11 through 16
      *
@@ -3667,7 +3681,7 @@ int main(int argc, char *argv[])
     }
 
 #ifdef Z_RLE
-    /* methods 137 through 148
+    /* methods 125 through 136
      *
      * [strategy 3 (Z_RLE) is mostly independent of level; 1-3 and 4-9 are
      * same]
@@ -3688,6 +3702,8 @@ int main(int argc, char *argv[])
     }
 #endif /* Z_RLE */
 
+    /* methods 137 through 148 (12*1*1 = 12), level 0 */
+
     for (strat = 0; strat <= 1; strat++)
     {
         for (filt = 0; filt <= 5; filt++)
@@ -3699,9 +3715,26 @@ int main(int argc, char *argv[])
         }
     }
 
+    /*
+     * methods 149 through 176 (9*3*1 + 1 = 28), speedy
+     */
+    for (strat = 0; strat <= 3; strat++)
+    {
+        for (lev = 1; lev <= 9; lev++)
+        {
+           lv[method] = lev;
+           zs[method] = strat;
+           fm[method] = 6;
+           method++;
+           if (strat == 2)
+              break; /* HUFFMAN ONLY is independent of level */
+        }
+    }
+
+
     num_methods = method;   /* GRR */
 
-    /* method 149 */
+    /* method 177 */
     fm[method] = 0; lv[method] = 0; zs[method] = 0;  /* copy_idat */
     method++;
 
@@ -4553,7 +4586,7 @@ int main(int argc, char *argv[])
             {
                 inname = argv[names];
             }
-            if (verbose > 0 && !nosave)
+            if (verbose >= 0 && !nosave)
             {
                 print_usage(1);   /* this exits */
             }
@@ -5016,14 +5049,12 @@ int main(int argc, char *argv[])
 
            if (speed)
            {
+             /* Do not try AVG or PAETH */
              for (method = 1; method < num_methods; method++)
              {
-               if (try_method[method] == 0)
-               {
-                  /* Do not try AVG or PAETH */
-                  if (fm[method] == 3 || fm[method] == 4)
+               if (try_method[method] == 0 && (fm[method] == 3 ||
+                   fm[method] == 4 || fm[method] == 5))
                      try_method[method] = 1;
-               }
              }
            }
          }
@@ -5067,7 +5098,7 @@ int main(int argc, char *argv[])
         P1("   pngcrush: methods     = %d\n",methods_enabled);
         P1("   pngcrush: last_method = %d\n",last_method);
         
-        if (methods_enabled == 1 && last_method == 149)
+        if (methods_enabled == 1 && last_method == 176)
            copy_idat = 1;
 
         best_of_three = 1;
@@ -5089,7 +5120,7 @@ int main(int argc, char *argv[])
         ////////////////                                   ////////////////////
         //////////////////////////////////////////////////////////////////// */
 
-        /* MAX_METHODS is 150 */
+        /* MAX_METHODS is 177 */
         P1("\n\nENTERING MAIN LOOP OVER %d METHODS\n", MAX_METHODS);
         for (trial = 0; trial <= last_method; trial++)
         {
@@ -5141,6 +5172,11 @@ int main(int argc, char *argv[])
                             best_length > idat_length[j])
                        {
                            best_length = idat_length[j];
+                           best = j;
+                       }
+                       if (j > 148 && j < 176 && best_length == idat_length[j])
+                       {
+                           /* break ties in favor of method 6 */
                            best = j;
                        }
                    }
@@ -5468,9 +5504,12 @@ int main(int argc, char *argv[])
 #ifdef PNG_CRC_QUIET_USE
                 if (check_crc == 0)
                 {
-                    /* We don't need to check IDAT CRC's because they were
-                     * already checked in the pngcrush_measure_idat function
+                    /* We don't need to check IDAT CRC's and ADLER32 because
+                     * they were already checked in the pngcrush_measure_idat
+                     * function
                      */
+                    png_set_option(read_ptr, PNG_IGNORE_ADLER32,
+                        PNG_OPTION_ON);
                     png_set_crc_action(read_ptr, PNG_CRC_QUIET_USE,
                                        PNG_CRC_QUIET_USE);
                 }
@@ -6985,17 +7024,10 @@ defined(PNG_READ_STRIP_16_TO_8_SUPPORTED)
                     else if (filter_type == 4)
                         png_set_filter(write_ptr, 0, PNG_FILTER_PAETH);
                     else if (filter_type == 5)
-                    {
-                        if (speed)
-                        {
+                            png_set_filter(write_ptr, 0, PNG_ALL_FILTERS);
+                    else if (filter_type == 6) /* speedy */
                             png_set_filter(write_ptr, 0, PNG_FILTER_NONE |
                                PNG_FILTER_SUB | PNG_FILTER_UP);
-                        }
-                        else
-                        {
-                            png_set_filter(write_ptr, 0, PNG_ALL_FILTERS);
-                        }
-                    }
                     else
                         png_set_filter(write_ptr, 0, PNG_FILTER_NONE);
 
@@ -8425,7 +8457,7 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
 #endif
             }
 
-            if (verbose > 1)
+            if (verbose > 0)
             {
                 chunk_name[4] = '\0';
                 fprintf(STDERR, "   Reading %s chunk, length = %lu.\n",
@@ -8690,7 +8722,7 @@ void print_version_info(void)
       " | pngcrush-%s\n"
       /* If you have modified this source, you may insert additional notices
        * immediately after this sentence: */
-      " |    Copyright (C) 1998-2002, 2006-2016 Glenn Randers-Pehrson\n"
+      " |    Copyright (C) 1998-2002, 2006-2017 Glenn Randers-Pehrson\n"
       " |    Portions Copyright (C) 2005 Greg Roelofs\n"
       " | This is a free, open-source program.  Permission is irrevocably\n"
       " | granted to everyone to use this version of pngcrush without\n"
@@ -8698,7 +8730,7 @@ void print_version_info(void)
       " | Executable name is %s\n"
       " | It was built with   %s libpng-%s\n"
       " | and is running with %s libpng-%s\n"
-      " |    Copyright (C) 1998-2004, 2006-2016 Glenn Randers-Pehrson,\n"
+      " |    Copyright (C) 1998-2004, 2006-2017 Glenn Randers-Pehrson,\n"
       " |    Copyright (C) 1996, 1997 Andreas Dilger,\n"
       " |    Copyright (C) 1995, Guy Eric Schalnat, Group 42 Inc.,\n"
       " | and %s zlib-%s, Copyright (C) 1995%s,\n"
@@ -8726,8 +8758,21 @@ void print_version_info(void)
       " |    Copyright (C) 1996, Matthias Grimrath.\n",
       __DJGPP__, __DJGPP_MINOR__);
 #  else
-    fprintf(STDERR, ".\n");
+    fprintf(STDERR, "\n");
 #  endif
+#endif
+
+#if PNG_ARM_NEON_OPT > 0
+    fprintf(STDERR," | using ARM_NEON optimizations.\n");
+#endif
+#if PNG_MIPS_MSA_OPT > 0
+    fprintf(STDERR," | using MIPS_MSA optimizations.\n");
+#endif
+#if PNG_POWERPC_VSX_OPT > 0
+    fprintf(STDERR," | using POWERPC_VSX optimizations.\n");
+#endif
+#if PNG_INTEL_SSE_OPT > 0
+    fprintf(STDERR," | using INTEL_SSE optimizations.\n");
 #endif
 
     fprintf(STDERR, "\n");
@@ -8741,7 +8786,7 @@ static const char *pngcrush_legal[] = {
     "",
     "If you have modified this source, you may insert additional notices",
     "immediately after this sentence.",
-    "Copyright (C) 1998-2002, 2006-2016 Glenn Randers-Pehrson",
+    "Copyright (C) 1998-2002, 2006-2017 Glenn Randers-Pehrson",
     "Portions Copyright (C) 2005 Greg Roelofs",
     "",
     "DISCLAIMER: The pngcrush computer program is supplied \"AS IS\".",
@@ -8777,7 +8822,8 @@ static const char *pngcrush_usage[] = {
     "       %s -e ext [other options] file.png ...\n",
     "       %s -d dir/ [other options] file.png ...\n",
     "       %s -ow [other options] file.png [tempfile.png]\n",
-    "       %s -n -v file.png ...\n"
+    "       %s -h or -v -h (for help or verbose help) \n",
+    "       %s -n -v file.png ... (to list chunks)\n"
 };
 
 struct options_help pngcrush_options[] = {
@@ -8798,9 +8844,9 @@ struct options_help pngcrush_options[] = {
     {2, ""},
 
 #ifdef Z_RLE
-    {0, "        -brute (use brute-force: try 148 different methods)"},
+    {0, "        -brute (use brute-force: try 176 different methods)"},
 #else
-    {0, "        -brute (use brute-force: try 136 different methods)"},
+    {0, "        -brute (use brute-force: try 166 different methods)"},
 #endif
     {2, ""},
     {2, "               Very time-consuming and generally not worthwhile."},
@@ -9140,7 +9186,8 @@ struct options_help pngcrush_options[] = {
 
     {0, "            -v (display more detailed information)"},
     {2, ""},
-    {2, "               Repeat the option (use \"-v -v\") for even more."},
+    {2, "               Repeat the option (use \"-v -v\" or \"-v -v -v\""},
+    {2, "               for even more.)"},
     {2, ""},
 
     {0, "      -version (display the pngcrush version)"},
@@ -9210,7 +9257,10 @@ void print_usage(int retval)
         jmax = sizeof(pngcrush_legal) / sizeof(char *);
         for (j = 0;  j < jmax;  ++j)
             fprintf(STDERR, "%s\n", pngcrush_legal[j]);
+    }
 
+    if (verbose >= 0)
+    {
         jmax = sizeof(pngcrush_usage) / sizeof(char *);
         for (j = 0;  j < jmax;  ++j)
             fprintf(STDERR, pngcrush_usage[j], progname);  /* special case */
@@ -9228,7 +9278,8 @@ void print_usage(int retval)
           "\n\n");
     }
     else
-        fprintf(STDERR, "options:\n");
+        if (verbose > 0)
+           fprintf(STDERR, "options:\n");
 
     /* This is the main part of the help screen; it is more complex than the
      * other blocks due to the mix of verbose and non-verbose lines
@@ -9236,7 +9287,7 @@ void print_usage(int retval)
     jmax = sizeof(pngcrush_options) / sizeof(struct options_help);
     for (j = 0;  j < jmax;  ++j)
     {
-        if (verbose >= pngcrush_options[j].verbosity)
+        if (verbose > pngcrush_options[j].verbosity)
         {
             if (pngcrush_options[j].textline[0] == FAKE_PAUSE_STRING[0])
                 pngcrush_pause();
