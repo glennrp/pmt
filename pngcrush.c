@@ -8822,7 +8822,7 @@ static const char *pngcrush_usage[] = {
     "       %s -e ext [other options] file.png ...\n",
     "       %s -d dir/ [other options] file.png ...\n",
     "       %s -ow [other options] file.png [tempfile.png]\n",
-    "       %s -h or -v -h (for help or verbose help) \n",
+    "       %s -h or -v -v -h (for help or verbose help) \n",
     "       %s -n -v file.png ... (to list chunks)\n"
 };
 
@@ -9238,7 +9238,7 @@ struct options_help pngcrush_options[] = {
 
     {0, "            -h (help and legal notices)"},
     {2, ""},
-    {2, "               Display this information."},
+    {2, "               Use -v -v -h for more verbose help"},
     {2, ""},
 
     {0, "            -p (pause)"}
