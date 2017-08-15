@@ -4476,6 +4476,7 @@ int main(int argc, char *argv[])
             fprintf(STDERR, "\n Check http://pmt.sf.net/\n");
             fprintf(STDERR, " for the most recent version.\n");
             verbose = 0;
+            exit(0);
         }
 
         else if (!strncmp(argv[i], "-v", 3) || !strncmp(argv[i], "-ver", 4))
