@@ -5,7 +5,7 @@
  * Portions Copyright (C) 2005 Greg Roelofs
  */
 
-#define PNGCRUSH_VERSION "1.8.12"
+#define PNGCRUSH_VERSION "1.8.13"
 
 #undef BLOCKY_DEINTERLACE
 
@@ -349,16 +349,22 @@
 
 Change log:
 
+Version 1.8.13 (built with libpng-1.6.32 and zlib-1.2.11)
+  Add "exit(0)" after processing "-version" argument, to avoid
+    displaying the Usage information (bug report by Peter Hagan,
+    Issue #76).
+  Fix problem with MacOS prior to Sierra; it uses CLOCK_MONOTONIC
+    for some other purpose (bug report and help developing patch by
+    Github user "ilovezfs", Homebrew/homebrew-core PR#16391).
+
 Version 1.8.12 (built with libpng-1.6.31 and zlib-1.2.11)
+  Added POWERPC-VSX support.
+  Report whether using optimizations.
+  Added filter_method 6 (same as filter 5 with -speed).
+  Added "methods" 149-176 (that use filter_method 6).
   Changed default verbosity from 1 (normal) to 0 (quiet). Use "-v" to get
     the previous default behavior and "-v -v" to get the previous "verbose"
     behavior. The "-s" (silent) and "-q" (quiet) options behave as before.
-  Added POWERPC-VSX support.
-  Report whether using optimizations, when operating verbosely.
-  Added filter_method 6 (same as filter 5 with -speed).
-  Added "methods" 149-176 (that use filter_method 6).
-  Only issue a warning when the "build" and "runtime" libpng versions 
-    differ in the first 4 symbols, indicating incompatible versions.
 
 Version 1.8.11 (built with libpng-1.6.28 and zlib-1.2.11)
   Use png_set_option(PNG_IGNORE_ADLER32) to control ADLER32 handling.
@@ -1472,6 +1478,10 @@ static int copy_idat = 0; /* = 1 to simply copy the IDAT chunk data */
 #  endif
 #endif
 
+#ifdef __APPLE__
+#  include <AvailabilityMacros.h>
+#endif
+
 /* As in GraphicsMagick */
 #  if PNGCRUSH_USE_CLOCK_GETTIME == 0
 #    define PNGCRUSH_USING_CLOCK "clock()"
@@ -1487,7 +1497,8 @@ static int copy_idat = 0; /* = 1 to simply copy the IDAT chunk data */
 #    define PNGCRUSH_CLOCK_ID CLOCK_MONOTONIC_PRECISE
 #    define PNGCRUSH_USING_CLOCK "clock_gettime(CLOCK_MONOTONIC_PRECISE,&t)"
 #    define PNGCRUSH_USE_CLOCK_GETTIME 1
-#  elif defined(CLOCK_MONOTONIC) /* Linux & FreeBSD */
+#  elif defined(CLOCK_MONOTONIC) /* Linux, FreeBSD & macOS Sierra & up */ && \
+     !(defined(__APPLE__) && MAC_OS_X_VERSION_MIN_REQUIRED < 101200)
 #    define PNGCRUSH_CLOCK_ID CLOCK_MONOTONIC
 #    define PNGCRUSH_USING_CLOCK "clock_gettime(CLOCK_MONOTONIC,&t)"
 #    define PNGCRUSH_USE_CLOCK_GETTIME 1
@@ -3600,7 +3611,7 @@ int main(int argc, char *argv[])
     pngcrush_timer_start(PNGCRUSH_TIMER_MISC);
 #endif
 
-    if (strncmp(png_libpng_ver, PNG_LIBPNG_VER_STRING,4))
+    if (strcmp(png_libpng_ver, PNG_LIBPNG_VER_STRING))
     {
         fprintf(STDERR,
                 "Warning: versions are different between png.h and png.c\n");
@@ -4587,7 +4598,7 @@ int main(int argc, char *argv[])
             {
                 inname = argv[names];
             }
-            if (verbose >= 0 && !nosave)
+            if (verbose > 0 && !nosave)
             {
                 print_usage(1);   /* this exits */
             }
@@ -8458,7 +8469,7 @@ png_uint_32 pngcrush_measure_idat(png_structp png_ptr)
 #endif
             }
 
-            if (verbose > 0)
+            if (verbose > 1)
             {
                 chunk_name[4] = '\0';
                 fprintf(STDERR, "   Reading %s chunk, length = %lu.\n",
@@ -8823,8 +8834,7 @@ static const char *pngcrush_usage[] = {
     "       %s -e ext [other options] file.png ...\n",
     "       %s -d dir/ [other options] file.png ...\n",
     "       %s -ow [other options] file.png [tempfile.png]\n",
-    "       %s -h or -v -v -h (for help or verbose help) \n",
-    "       %s -n -v file.png ... (to list chunks)\n"
+    "       %s -n -v file.png ...\n"
 };
 
 struct options_help pngcrush_options[] = {
@@ -9075,6 +9085,8 @@ struct options_help pngcrush_options[] = {
     {2, "               bit depth from 16 to 8.  Reduces all-gray RGB"},
     {2, "               or RGBA image to gray or gray-alpha.  Reduces"},
     {2, "               all-opaque RGBA or GA image to RGB or grayscale."},
+    {2, "               Since pngcrush version 1.8.0, -reduce is on by"},
+    {2, "               default, and you can disable it with -noreduce."},
     {2, ""},
 
     {0, "          -rem chunkname (or \"alla\" or \"allb\")"},
@@ -9187,8 +9199,7 @@ struct options_help pngcrush_options[] = {
 
     {0, "            -v (display more detailed information)"},
     {2, ""},
-    {2, "               Repeat the option (use \"-v -v\" or \"-v -v -v\""},
-    {2, "               for even more.)"},
+    {2, "               Repeat the option (use \"-v -v\") for even more."},
     {2, ""},
 
     {0, "      -version (display the pngcrush version)"},
@@ -9239,7 +9250,7 @@ struct options_help pngcrush_options[] = {
 
     {0, "            -h (help and legal notices)"},
     {2, ""},
-    {2, "               Use -v -v -h for more verbose help"},
+    {2, "               Display this information."},
     {2, ""},
 
     {0, "            -p (pause)"}
@@ -9258,10 +9269,7 @@ void print_usage(int retval)
         jmax = sizeof(pngcrush_legal) / sizeof(char *);
         for (j = 0;  j < jmax;  ++j)
             fprintf(STDERR, "%s\n", pngcrush_legal[j]);
-    }
 
-    if (verbose >= 0)
-    {
         jmax = sizeof(pngcrush_usage) / sizeof(char *);
         for (j = 0;  j < jmax;  ++j)
             fprintf(STDERR, pngcrush_usage[j], progname);  /* special case */
@@ -9279,8 +9287,7 @@ void print_usage(int retval)
           "\n\n");
     }
     else
-        if (verbose > 0)
-           fprintf(STDERR, "options:\n");
+        fprintf(STDERR, "options:\n");
 
     /* This is the main part of the help screen; it is more complex than the
      * other blocks due to the mix of verbose and non-verbose lines
@@ -9288,7 +9295,7 @@ void print_usage(int retval)
     jmax = sizeof(pngcrush_options) / sizeof(struct options_help);
     for (j = 0;  j < jmax;  ++j)
     {
-        if (verbose > pngcrush_options[j].verbosity)
+        if (verbose >= pngcrush_options[j].verbosity)
         {
             if (pngcrush_options[j].textline[0] == FAKE_PAUSE_STRING[0])
                 pngcrush_pause();
