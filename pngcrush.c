@@ -5,7 +5,7 @@
  * Portions Copyright (C) 2005 Greg Roelofs
  */
 
-#define PNGCRUSH_VERSION "1.8.13"
+#define PNGCRUSH_VERSION "1.8.14"
 
 #undef BLOCKY_DEINTERLACE
 
@@ -348,6 +348,8 @@
 #if 0 /* changelog */
 
 Change log:
+
+Version 1.8.14 (built with libpng-1.6.34 and zlib-1.2.11)
 
 Version 1.8.13 (built with libpng-1.6.32 and zlib-1.2.11)
   Add "exit(0)" after processing "-version" argument, to avoid

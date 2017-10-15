@@ -1,7 +1,7 @@
 
 /* pngread.c - read a PNG file
  *
- * Last changed in libpng 1.6.32 [August 24, 2017]
+ * Last changed in libpng 1.6.33 [September 28, 2017]
  * Copyright (c) 1998-2002,2004,2006-2017 Glenn Randers-Pehrson
  * (Version 0.96 Copyright (c) 1996, 1997 Andreas Dilger)
  * (Version 0.88 Copyright (c) 1995, 1996 Guy Eric Schalnat, Group 42, Inc.)
@@ -20,16 +20,6 @@
 #endif
 
 #ifdef PNG_READ_SUPPORTED
-
-#ifndef LIBPNG_UNIFIED
-#if PNGCRUSH_TIMERS > 4
-#define PNGCRUSH_TIMER_VOID_API extern void PNGAPI
-PNGCRUSH_TIMER_VOID_API
-pngcrush_timer_start(unsigned int n);
-PNGCRUSH_TIMER_VOID_API
-pngcrush_timer_stop(unsigned int n);
-#endif
-#endif
 
 /* Create a PNG structure for reading, and allocate any memory needed. */
 PNG_FUNCTION(png_structp,PNGAPI
@@ -466,9 +456,6 @@ png_read_row(png_structrp png_ptr, png_bytep row, png_bytep dsp_row)
    if (png_ptr->interlaced != 0 &&
        (png_ptr->transformations & PNG_INTERLACE) != 0)
    {
-#if PNGCRUSH_TIMERS > 4
-      pngcrush_timer_start(4);
-#endif
       switch (png_ptr->pass)
       {
          case 0:
@@ -545,9 +532,6 @@ png_read_row(png_structrp png_ptr, png_bytep row, png_bytep dsp_row)
             }
             break;
       }
-#if PNGCRUSH_TIMERS > 4
-      pngcrush_timer_stop(4);
-#endif
    }
 #endif
 
@@ -558,10 +542,6 @@ png_read_row(png_structrp png_ptr, png_bytep row, png_bytep dsp_row)
    png_ptr->row_buf[0]=255; /* to force error if no data was found */
    png_read_IDAT_data(png_ptr, png_ptr->row_buf, row_info.rowbytes + 1);
 
-#if PNGCRUSH_TIMERS > 5
-   pngcrush_timer_start(png_ptr->row_buf[0]+5);
-#endif
-
    if (png_ptr->row_buf[0] > PNG_FILTER_VALUE_NONE)
    {
       if (png_ptr->row_buf[0] < PNG_FILTER_VALUE_LAST)
@@ -570,9 +550,6 @@ png_read_row(png_structrp png_ptr, png_bytep row, png_bytep dsp_row)
       else
          png_error(png_ptr, "bad adaptive filter value");
    }
-#if PNGCRUSH_TIMERS > 5
-   pngcrush_timer_stop(png_ptr->row_buf[0]+5);
-#endif
 
    /* libpng 1.5.6: the following line was copying png_ptr->rowbytes before
     * 1.5.6, while the buffer really is this big in current versions of libpng
@@ -3782,7 +3759,13 @@ png_image_read_direct(png_voidp argument)
          mode = PNG_ALPHA_PNG;
          output_gamma = PNG_DEFAULT_sRGB;
       }
-
+      
+      if ((change & PNG_FORMAT_FLAG_ASSOCIATED_ALPHA) != 0)
+      {
+         mode = PNG_ALPHA_OPTIMIZED;
+         change &= ~PNG_FORMAT_FLAG_ASSOCIATED_ALPHA;
+      }
+      
       /* If 'do_local_background' is set check for the presence of gamma
        * correction; this is part of the work-round for the libpng bug
        * described above.
@@ -4007,6 +3990,10 @@ png_image_read_direct(png_voidp argument)
 
       else if (do_local_compose != 0) /* internal error */
          png_error(png_ptr, "png_image_read: alpha channel lost");
+
+      if ((format & PNG_FORMAT_FLAG_ASSOCIATED_ALPHA) != 0) {
+         info_format |= PNG_FORMAT_FLAG_ASSOCIATED_ALPHA;
+      }
 
       if (info_ptr->bit_depth == 16)
          info_format |= PNG_FORMAT_FLAG_LINEAR;
