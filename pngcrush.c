@@ -350,6 +350,9 @@
 Change log:
 
 Version 1.8.14 (built with libpng-1.6.34 and zlib-1.2.11)
+  Recognize the "-bail" option properly (bug fix by Hadrien Lacour).
+  Fix documentation about "-force/-noforce" to represent the default
+    behavior since 1.8.1 (bug report by Hadrien Lacour).
 
 Version 1.8.13 (built with libpng-1.6.32 and zlib-1.2.11)
   Add "exit(0)" after processing "-version" argument, to avoid
@@ -2246,7 +2249,6 @@ static int check_crc = 0;  /* if 0, skip CRC and ADLER32 checks */
 static int force = 1; /* if 1, force output even if IDAT is larger */
 static unsigned int benchmark_iterations = 0;
 
-
 static int blacken = 0; /* if 0, or 2 after the first trial,
                            do not blacken color samples */
 
@@ -3784,7 +3786,7 @@ int main(int argc, char *argv[])
         if (!strncmp(argv[i], "-bail", 5))
             bail=0;
 
-        if (!strncmp(argv[i], "-bench", 6))
+        else if (!strncmp(argv[i], "-bench", 6))
         {
             names++;
             BUMP_I;
@@ -8923,7 +8925,7 @@ struct options_help pngcrush_options[] = {
     {2, "               the \"Too far back\" error"},
     {2, ""},
 
-    {0, "        -force (write output even if IDAT is larger)"},
+    {0, "        -force (default; write output even if IDAT is larger)"},
     {2, ""},
 
 #ifdef PNG_FIXED_POINT_SUPPORTED
@@ -9041,7 +9043,7 @@ struct options_help pngcrush_options[] = {
     {2, "               ensuring that the input file is not the output file."},
     {2, ""},
 
-    {0, "      -noforce (default; do not write output when IDAT is larger)"},
+    {0, "      -noforce (do not write output when IDAT is larger)"},
     {2, ""},
 
     {0, "     -nolimits (turns off limits on width, height, cache, malloc)"},
