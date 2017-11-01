@@ -8925,7 +8925,7 @@ struct options_help pngcrush_options[] = {
     {2, "               the \"Too far back\" error"},
     {2, ""},
 
-    {0, "        -force (default; write output even if IDAT is larger)"},
+    {0, "        -force (default; write output even if IDAT does not decrease)"},
     {2, ""},
 
 #ifdef PNG_FIXED_POINT_SUPPORTED
@@ -9043,7 +9043,7 @@ struct options_help pngcrush_options[] = {
     {2, "               ensuring that the input file is not the output file."},
     {2, ""},
 
-    {0, "      -noforce (do not write output when IDAT is larger)"},
+    {0, "      -noforce (do not write output when IDAT is not decreased)"},
     {2, ""},
 
     {0, "     -nolimits (turns off limits on width, height, cache, malloc)"},
