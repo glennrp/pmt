@@ -5524,8 +5524,10 @@ int main(int argc, char *argv[])
                      * they were already checked in the pngcrush_measure_idat
                      * function
                      */
+# ifdef PNG_IGNORE_ADLER32
                     png_set_option(read_ptr, PNG_IGNORE_ADLER32,
                         PNG_OPTION_ON);
+# endif
                     png_set_crc_action(read_ptr, PNG_CRC_QUIET_USE,
                                        PNG_CRC_QUIET_USE);
                 }
